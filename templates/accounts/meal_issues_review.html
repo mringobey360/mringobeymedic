@@ -92,7 +92,7 @@
                 {% endif %}
                 <div class="mt-4 rounded-lg bg-ink-50 border border-ink-100 p-3 sm:p-4">
                     <p class="text-[11px] uppercase tracking-wider font-semibold text-ink-500 mb-1">Reason: {{ x.get_reason_display }}</p>
-                    <p class="text-sm text-ink-800 whitespace-pre-line break-words">{{ x.details|default:"No details provided." }}</p>
+                    <p class="text-sm text-ink-800 whitespace-pre-line break-words">{{ x.details|default:"No extra details: the employee chose the reason from the list." }}</p>
                 </div>
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 mt-4">
                     <form method="post" action="{% url 'accounts:meal_issue_decide' x.pk 'credit' %}" class="rounded-xl border-2 border-emerald-200 bg-emerald-50/60 p-3 space-y-3 lg:col-span-2" data-confirm="Approve this request and credit the meal as if the employee scanned in time?">

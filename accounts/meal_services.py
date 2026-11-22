@@ -637,8 +637,8 @@ def submit_meal_issue(employee, meal_type, reason, details, ip_address=None, lat
             raise ValueError(f'{label} window ended at {timezone.localtime(end):%H:%M}. Use "Request rescan" to ask your manager to reopen it.')
         if reason not in LATE_REASONS:
             raise ValueError('Choose a valid reason for the late request.')
-        if len(details) < 3:
-            raise ValueError('Please explain why you could not scan this meal on time.')
+        if reason == MealIssueReport.Reason.OTHER and len(details) < 3:
+            raise ValueError('Please describe what happened so your boss can review the request.')
         used, limit = late_quota(employee, now)
         if limit <= 0:
             raise ValueError('Rescan requests are turned off for your branch.')

@@ -1,0 +1,20 @@
+{# Reason chips; the free-text box appears only for "Other". Works with touch and keyboard. #}
+<form method="post" action="{% url 'accounts:meal_issue_report' %}" class="mr-form" data-meal-request novalidate>
+  {% csrf_token %}
+  <input type="hidden" name="meal_type" value="{{ meal_type }}">
+  {% if late %}<input type="hidden" name="late" value="1">{% endif %}
+  <fieldset class="mr-fieldset">
+    <legend class="mr-legend">{{ legend }}</legend>
+    <div class="mr-chips" role="radiogroup" aria-label="{{ legend }}">
+      {% for value, label in reasons %}
+      <label class="mr-chip"><input type="radio" name="reason" value="{{ value }}" required><span>{{ label }}</span></label>
+      {% endfor %}
+    </div>
+  </fieldset>
+  <div class="mr-other" hidden>
+    <label class="mr-label" for="mr-details-{{ meal_type }}-{{ late|yesno:'late,now' }}-{{ forloop_id|default:'x' }}">Tell your boss what happened</label>
+    <textarea id="mr-details-{{ meal_type }}-{{ late|yesno:'late,now' }}-{{ forloop_id|default:'x' }}" name="details" maxlength="500" rows="2" class="form-input mr-textarea" placeholder="Briefly describe what happened"></textarea>
+  </div>
+  <button type="submit" class="btn btn-primary btn-sm mr-submit" data-icon="send">{{ button }}</button>
+  {% if hint %}<p class="mr-hint">{{ hint }}</p>{% endif %}
+</form>

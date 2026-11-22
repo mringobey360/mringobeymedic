@@ -185,6 +185,27 @@
   {% endif %}
 })();</script>
 
+<style>
+.mr-form{display:grid;gap:.7rem;width:100%;max-width:26rem}
+.mr-fieldset{border:0;margin:0;padding:0;min-width:0}
+.mr-legend{font-size:.75rem;font-weight:600;color:#475569;margin:0 0 .45rem;padding:0}
+.mr-chips{display:flex;flex-wrap:wrap;gap:.45rem}
+.mr-chip{position:relative;display:inline-flex;cursor:pointer}
+.mr-chip input{position:absolute;opacity:0;pointer-events:none}
+.mr-chip span{display:inline-flex;align-items:center;min-height:2.5rem;padding:.4rem .9rem;border-radius:999px;border:1px solid #cbd5e1;background:#fff;color:#334155;font-size:.8125rem;font-weight:600;line-height:1.2;transition:background .15s,color .15s,border-color .15s,box-shadow .15s}
+.mr-chip:hover span{border-color:#0f766e}
+.mr-chip input:checked+span{background:#0f766e;border-color:#0f766e;color:#fff;box-shadow:0 0 0 3px rgba(15,118,110,.18)}
+.mr-chip input:focus-visible+span{outline:2px solid #0f766e;outline-offset:2px}
+.mr-label{display:block;font-size:.75rem;font-weight:600;color:#475569;margin-bottom:.3rem}
+.mr-textarea{width:100%;font-size:16px;resize:vertical;min-height:4.25rem}
+.mr-submit{width:100%;justify-content:center;min-height:2.5rem}
+.mr-submit[disabled]{opacity:.55;cursor:not-allowed}
+.mr-hint{font-size:.6875rem;color:#94a3b8;line-height:1.4;margin:0}
+.mr-details{min-width:min(18rem,78vw)}
+.mr-details>summary{list-style:none;display:inline-flex}
+.mr-details>summary::-webkit-details-marker{display:none}
+@media (max-width:640px){.mr-form{max-width:none}.mr-chip span{min-height:2.75rem;padding:.45rem 1rem}}
+</style>
 {% if meal_board %}
 <div class="card mb-5" id="meal-board">
   <div class="flex flex-wrap items-center justify-between gap-2 mb-3"><div><h2 class="font-bold">Meals — Scan to Claim</h2><p class="text-xs text-ink-500 mt-1">A meal is issued when you scan the branch QR inside its window. If a window has passed or scanning failed, send a rescan request: your boss reviews it and, if approved, the meal is credited as if you scanned in time.</p></div></div>
@@ -208,24 +229,14 @@
       {% if m.issue and m.issue.status == 'REJECTED' %}<p class="text-xs text-red-600 mt-2">Your request {{ m.issue.reference }} was rejected: {{ m.issue.decision_note }}.{% if m.state == 'OPEN' %} You can still scan before {{ m.end|date:'H:i' }}.{% endif %}</p>{% endif %}
       {% if m.can_report %}
       <details class="mt-3"><summary class="text-xs text-brand-700 font-semibold cursor-pointer">Having trouble scanning? Report an issue</summary>
-        <form method="post" action="{% url 'accounts:meal_issue_report' %}" class="mt-3 grid gap-2 sm:grid-cols-[1fr_2fr_auto]">{% csrf_token %}
-          <input type="hidden" name="meal_type" value="{{ m.meal_type }}">
-          <select name="reason" required class="form-input"><option value="">Reason…</option>{% for value, label in meal_issue_reasons %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select>
-          <input name="details" maxlength="500" class="form-input" placeholder="Describe the problem (required for Other)">
-          <button class="btn btn-secondary btn-sm" data-icon="alert">Report</button>
-        </form>
+        <div class="mt-3">{% include "dashboard/_meal_request_form.html" with meal_type=m.meal_type reasons=meal_issue_reasons legend="What stopped you from scanning?" button="Report problem" forloop_id="board" hint="" %}</div>
         <p class="text-[11px] text-ink-400 mt-2">Reporting does not give you the meal. A manager must verify it, and the report must be sent before {{ m.end|date:'H:i' }}.</p>
       </details>
       {% endif %}
       {% if m.can_late %}
       <details class="mt-3"><summary class="text-xs text-brand-700 font-semibold cursor-pointer">Missed the scan? Request rescan ({{ m.late_left }} of {{ m.late_limit }} left this week)</summary>
         {% if m.late_left > 0 %}
-        <form method="post" action="{% url 'accounts:meal_issue_report' %}" class="mt-3 grid gap-2 sm:grid-cols-[1fr_2fr_auto]">{% csrf_token %}
-          <input type="hidden" name="meal_type" value="{{ m.meal_type }}"><input type="hidden" name="late" value="1">
-          <select name="reason" required class="form-input"><option value="">Reason…</option>{% for value, label in meal_late_reasons %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select>
-          <input name="details" required minlength="3" maxlength="500" class="form-input" placeholder="Explain why you could not scan it on time">
-          <button class="btn btn-secondary btn-sm" data-icon="send">Request rescan</button>
-        </form>
+        <div class="mt-3">{% include "dashboard/_meal_request_form.html" with meal_type=m.meal_type late=True reasons=meal_late_reasons legend="Why did you miss the scan?" button="Send to boss" forloop_id="board" hint="" %}</div>
         <p class="text-[11px] text-ink-400 mt-2">A request does not issue the meal by itself. Your boss reviews the reason. If approved, the meal is credited as if you scanned in time (or reopened so you scan the branch QR). You must still be at work.</p>
         {% else %}<p class="text-xs text-red-600 mt-2">You have used all your rescan requests for this week.</p>{% endif %}
       </details>
@@ -245,9 +256,29 @@
     <td>TZS {{ x.amount|floatformat:0 }}</td>
     <td>{% if x.claimed_at %}<span class="px-2 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-semibold">Claimed {{ x.claimed_at|date:'H:i' }}</span>{% elif x.board_state == 'REVIEW' %}<span class="px-2 py-1 rounded-full bg-amber-100 text-amber-700 text-xs font-semibold">Under review</span>{% elif x.board_state == 'OPEN' %}<span class="px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-semibold">Open now</span>{% elif x.board_state == 'SCAN_REOPENED' %}<span class="px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-semibold">Reopened</span>{% elif x.board_state == 'MISSED' %}<span class="px-2 py-1 rounded-full bg-red-100 text-red-700 text-xs font-semibold">Missed</span>{% else %}<span class="px-2 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-semibold">Upcoming</span>{% endif %}</td>
     <td class="text-xs text-ink-500 max-w-xs">{{ x.status_note }}</td>
-    <td>{% if x.can_scan_now %}<a href="{% url 'accounts:attendance_qr_scanner' %}" class="btn btn-primary btn-sm" data-icon="qr">Scan to claim</a>{% elif x.board_state == 'REVIEW' %}<span class="text-xs text-amber-700">Awaiting manager</span>{% elif x.can_request_rescan %}<details class="min-w-[220px]"><summary class="btn btn-secondary btn-sm cursor-pointer" data-icon="send">Request rescan</summary><form method="post" action="{% url 'accounts:meal_issue_report' %}" class="mt-2 grid gap-2">{% csrf_token %}<input type="hidden" name="meal_type" value="{{ x.meal_type }}"><input type="hidden" name="late" value="1"><select name="reason" required class="form-input"><option value="">Why did you miss it?</option>{% for value, label in meal_late_reasons %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select><input name="details" required minlength="3" maxlength="500" class="form-input" placeholder="Short explanation for your boss"><button class="btn btn-primary btn-sm" data-icon="send">Send to boss</button><p class="text-[11px] text-ink-400">If approved, this meal is credited as if you scanned in time. {{ x.rescan_left }} request{{ x.rescan_left|pluralize }} left this week.</p></form></details>{% elif x.rescan_exhausted %}<span class="text-xs text-red-600">No rescan requests left this week</span>{% else %}<span class="text-xs text-ink-400">—</span>{% endif %}</td></tr>
+    <td>{% if x.can_scan_now %}<a href="{% url 'accounts:attendance_qr_scanner' %}" class="btn btn-primary btn-sm" data-icon="qr">Scan to claim</a>{% elif x.board_state == 'REVIEW' %}<span class="text-xs text-amber-700">Awaiting manager</span>{% elif x.can_request_rescan %}<details class="mr-details"><summary class="btn btn-secondary btn-sm cursor-pointer" data-icon="send">Request rescan</summary><div class="mt-2">{% include "dashboard/_meal_request_form.html" with meal_type=x.meal_type late=True reasons=meal_late_reasons legend="Why did you miss the scan?" button="Send to boss" forloop_id="row" hint="If approved, this meal is credited as if you scanned in time." %}</div><p class="text-[11px] text-ink-400 mt-1">{{ x.rescan_left }} request{{ x.rescan_left|pluralize }} left this week.</p></details>{% elif x.rescan_exhausted %}<span class="text-xs text-red-600">No rescan requests left this week</span>{% else %}<span class="text-xs text-ink-400">—</span>{% endif %}</td></tr>
   {% empty %}<tr><td colspan="6" class="py-8 text-center text-ink-400">{% if settled_today_count %}All of today's meals are settled. Find them in your <a href="{% url 'accounts:meal_history' %}" class="text-brand-700 font-semibold">Meal History</a>.{% else %}No eligible meals recorded for today yet.{% endif %}</td></tr>{% endfor %}</tbody></table>
   {% if settled_today_count and today_meals %}<p class="mt-3 text-xs text-ink-500">{{ settled_today_count }} settled meal{{ settled_today_count|pluralize }} moved to your <a href="{% url 'accounts:meal_history' %}" class="text-brand-700 font-semibold">Meal History</a>.</p>{% endif %}
 </div>
 
+<script>(function(){
+  document.querySelectorAll('[data-meal-request]').forEach(function(f){
+    var other=f.querySelector('.mr-other'), ta=f.querySelector('.mr-textarea'), btn=f.querySelector('.mr-submit');
+    if(!other||!ta||!btn)return;
+    var label=btn.textContent;
+    function sync(){
+      var c=f.querySelector('input[name="reason"]:checked'), isOther=!!c&&c.value==='OTHER';
+      other.hidden=!isOther; ta.required=isOther;
+      if(isOther&&document.activeElement&&document.activeElement.name==='reason'){try{ta.focus({preventScroll:true});}catch(e){}}
+      btn.disabled=!c||(isOther&&ta.value.trim().length<3);
+    }
+    f.addEventListener('change',sync); ta.addEventListener('input',sync);
+    f.addEventListener('submit',function(e){
+      if(btn.disabled){e.preventDefault();return;}
+      setTimeout(function(){btn.disabled=true;btn.textContent='Sending\u2026';},0);
+    });
+    window.addEventListener('pageshow',function(){btn.textContent=label;sync();});
+    sync();
+  });
+})();</script>
 {% endblock %}

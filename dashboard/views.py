@@ -583,7 +583,10 @@ def dashboard_home_view(request):
             'meal_board': meal_board,
             'attendance_in_review': attendance_in_review,
             'meal_issue_reasons': [c for c in MealIssueReport.Reason.choices if c[0] != 'BUSY_AT_WORK'],
-            'meal_late_reasons': [c for c in MealIssueReport.Reason.choices if c[0] in ('BUSY_AT_WORK', 'NETWORK_PROBLEM', 'DEVICE_PROBLEM', 'OTHER')],
+            'meal_late_reasons': [
+                ('BUSY_AT_WORK', 'Busy at work'), ('NETWORK_PROBLEM', 'Network problem'),
+                ('DEVICE_PROBLEM', 'Device problem'), ('OTHER', 'Other'),
+            ],
             'today_meal_earned': sum((x.amount for x in meal_qs.filter(status=MealLedger.Status.EARNED)), Decimal('0')),
             'today_meal_debt': sum((x.amount for x in meal_qs.filter(status=MealLedger.Status.DEBT)), Decimal('0')),
             'today_meal_awaiting': sum((x.amount for x in meal_qs.filter(status=MealLedger.Status.PENDING, claimed_at__isnull=False)), Decimal('0')),
