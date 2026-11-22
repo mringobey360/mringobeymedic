@@ -955,7 +955,7 @@ def meal_workday_reopen_view(request, pk):
             [employee], 'Your workday was reopened',
             f"{request.user.get_full_name() or request.user.username} reopened your workday. You can continue selling.",
             'SUCCESS', reverse('dashboard:home'), employee.pharmacy)
-        messages.success(request, f"{employee.get_full_name() or employee.username}’s workday was reopened. They can continue working and request an eligible late meal if needed.")
+        messages.success(request, f"{employee.get_full_name() or employee.username}’s workday was reopened. They can continue working and request an eligible meal rescan if needed.")
     except ValueError as exc:
         messages.error(request, str(exc))
     return redirect('accounts:meal_issues')
@@ -1872,7 +1872,7 @@ def meal_issue_report_view(request):
             request.POST.get('details', ''), ip_address=_ip(request), late=request.POST.get('late') == '1',
         )
         if issue.is_late:
-            messages.success(request, f'Late request {issue.reference} sent to the manager. No meal is issued unless the manager approves it.')
+            messages.success(request, f'Rescan request {issue.reference} sent to the manager. If approved, the meal is reopened and you scan the branch QR yourself.')
         else:
             messages.success(request, f'Issue {issue.reference} sent to the manager. Your {issue.get_meal_type_display().lower()} stays pending until it is verified.')
     except ValueError as exc:
@@ -1901,6 +1901,17 @@ def meal_issues_view(request):
         .select_related('employee', 'decided_by').order_by('-decided_at')
     )
     pending_page = Paginator(pending, 10).get_page(request.GET.get('pending_page'))
+    # Show the manager each requester's attendance state so a REVIEW case is never a surprise.
+    pending_page.object_list = list(pending_page.object_list)
+    _att_map = {
+        (a.employee_id, a.date): a
+        for a in AttendanceRecord.objects.filter(
+            pharmacy=request.pharmacy, date__in={x.date for x in pending_page.object_list}, check_in_at__isnull=False)
+    }
+    for _issue in pending_page.object_list:
+        _a = _att_map.get((_issue.employee_id, _issue.date))
+        _issue.attendance = _a
+        _issue.attendance_in_review = bool(_a and _a.status == AttendanceRecord.Status.REVIEW)
     rows_page = Paginator(rows, 25).get_page(request.GET.get('rows_page'))
     recent_page = Paginator(recent, 20).get_page(request.GET.get('recent_page'))
     closed_workdays = (
@@ -1916,6 +1927,7 @@ def meal_issues_view(request):
         'manual_reasons': MealLedger.ManualReason.choices,
         'meal_choices': MealLedger.MealType.choices,
         'closed_workdays': closed_workdays,
+        'branch_requires_location': getattr(request.pharmacy, 'attendance_qr_requires_location', True),
         'workday_reopen_requests': WorkdayReopenRequest.objects.filter(pharmacy=request.pharmacy, status=WorkdayReopenRequest.Status.PENDING).select_related('employee').order_by('requested_at'),
     })
 
@@ -1977,7 +1989,7 @@ def meal_bulk_grant_view(request):
             request.pharmacy, request.user, request.POST.get('meal_type', ''), day,
             request.POST.get('reason', ''), request.POST.get('note', ''),
         )
-        messages.success(request, f'{granted} meal(s) verified.' + (f' {skipped} skipped (no verified attendance or outside the allowed days).' if skipped else ''))
+        messages.success(request, f'{granted} meal(s) verified.' + (f' {skipped} skipped (attendance not verified, or outside the allowed days).' if skipped else ''))
     except ValueError as exc:
         messages.error(request, str(exc))
         return redirect('accounts:meal_issues')
@@ -1989,11 +2001,13 @@ def meal_bulk_grant_view(request):
 def meal_issue_decide_view(request, pk, decision):
     issue = get_object_or_404(MealIssueReport, pk=pk, pharmacy=request.pharmacy)
     from .meal_services import decide_meal_issue
-    action = {'approve': 'reopen', 'reopen': 'reopen', 'verify': 'verify', 'return': 'return', 'reject': 'reject'}.get(decision, decision)
+    action = {'approve': 'reopen', 'reopen': 'reopen', 'credit': 'credit', 'verify': 'verify', 'return': 'return', 'reject': 'reject'}.get(decision, decision)
     try:
         decide_meal_issue(issue, request.user, action, request.POST.get('note', ''), request.POST.get('reason', ''))
         if action == 'reopen':
             messages.success(request, f'{issue.reference} approved. {issue.get_meal_type_display()} was reopened for the employee to scan. No meal was recorded yet.')
+        elif action == 'credit':
+            messages.success(request, f'{issue.reference} approved. {issue.get_meal_type_display()} was credited to {issue.employee.get_full_name() or issue.employee.username} as if scanned in time, and follows normal meal accounting (earned when sales fund it, otherwise meal debt).')
         elif action == 'verify':
             messages.success(request, f'{issue.reference} verified by you. {issue.get_meal_type_display()} was recorded for {issue.employee.get_full_name() or issue.employee.username}.')
         elif action == 'return':

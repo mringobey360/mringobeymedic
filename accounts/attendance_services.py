@@ -229,8 +229,30 @@ def _qr_action_for_employee(employee, local_now, attendance):
     return 'WAIT', 'Next checkpoint'
 
 
+def _restore_verified_after_scan(attendance, now):
+    """A QR scan that passed the workplace GPS check is fresh proof of presence.
+
+    A single drifting presence reading can flip a checked-in employee to REVIEW. Because a
+    scan that recorded something already required the device to be inside the branch radius,
+    it re-verifies attendance exactly like a successful presence check, so the employee is
+    not locked out of meals until a manager steps in.
+    """
+    attendance.status = AttendanceRecord.Status.VERIFIED
+    attendance.presence_status = AttendanceRecord.PresenceStatus.VERIFIED
+    attendance.last_presence_at = now
+    attendance.outside_since = None
+    attendance.outside_alert_sent_at = None
+    attendance.presence_check_count = 0
+    stamp = f'Re-verified by QR scan at the workplace at {timezone.localtime(now):%H:%M}.'
+    attendance.review_note = f'{attendance.review_note} {stamp}'.strip()[:255] if getattr(attendance, 'review_note', '') else stamp
+    attendance.save(update_fields=[
+        'status', 'presence_status', 'last_presence_at', 'outside_since', 'outside_alert_sent_at',
+        'presence_check_count', 'review_note', 'updated_at',
+    ])
+
+
 @transaction.atomic
-def _start_workday_with_qr_atomic(employee, token, request, max_age=None):
+def _start_workday_with_qr_atomic(employee, token, request, max_age=None, location_verified=False):
     """Dynamic branch QR handles check-in, meal checkpoints and end-of-shift check-out."""
     if employee.pharmacy_id is None:
         raise ValueError('Your account is not assigned to a branch.')
@@ -287,10 +309,13 @@ def _start_workday_with_qr_atomic(employee, token, request, max_age=None):
         queue_owner_attendance_sms('OUT', existing)
         return 'CHECKOUT'
 
+    if (location_verified and existing.status == AttendanceRecord.Status.REVIEW
+            and existing.check_in_at and not existing.check_out_at):
+        _restore_verified_after_scan(existing, now)
     if existing.effective_presence_status == AttendanceRecord.PresenceStatus.OUTSIDE:
-        raise ValueError('Your latest presence check shows you outside the branch. Return to the workplace or request manager review.')
+        raise ValueError('Your latest presence check shows you outside the branch. Return to the workplace and tap Verify Presence on your dashboard, or request manager review.')
     if not existing.is_verified:
-        raise ValueError('Your attendance is awaiting manager review. Meals can only be claimed once attendance is verified.')
+        raise ValueError('Your attendance needs re-verification before a meal can be claimed. Tap Verify Presence on your dashboard while you are at the workplace, or ask your manager to review it.')
     if existing.checkpoints.filter(checkpoint_type=action).exists():
         raise ValueError(f'{label} is already recorded for today.')
     AttendanceCheckpoint.objects.create(attendance=existing, checkpoint_type=action, method=AttendanceCheckpoint.Method.QR, ip_address=_ip(request), device_fingerprint=request.headers.get('User-Agent', '')[:128], note=f'{label} claimed with dynamic branch QR.')
@@ -371,7 +396,7 @@ def start_workday_with_qr(employee, token, request, location=None):
         existing = AttendanceRecord.objects.filter(employee=employee, date=local_now.date()).first()
         if _scan_needs_location(employee, local_now, existing):
             fix = check_scan_location(employee, location, request, 'QR scan')
-    action = _start_workday_with_qr_atomic(employee, token, request, max_age)
+    action = _start_workday_with_qr_atomic(employee, token, request, max_age, location_verified=fix is not None)
     if fix is not None:
         lat, lon, accuracy, distance = fix
         attendance = AttendanceRecord.objects.filter(employee=employee, date=timezone.localdate()).first()

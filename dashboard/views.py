@@ -526,9 +526,12 @@ def dashboard_home_view(request):
             ensure_ledgers_for_workday(workday)
             finalize_workday_meals(workday, now=timezone.now())
         meal_qs = MealLedger.objects.filter(employee=request.user, date=today)
-        from accounts.meal_services import meal_board_for
+        from accounts.meal_services import meal_board_for, attendance_at_work, attendance_needs_reverification
         from accounts.models import MealIssueReport
-        meal_board = meal_board_for(request.user, timezone.now(), attendance) if attendance and attendance.is_verified else []
+        # Checked-in employees always see their meal board, even while attendance waits for
+        # re-verification, so they can report a problem or request a rescan instead of being stuck.
+        attendance_in_review = attendance_needs_reverification(attendance)
+        meal_board = meal_board_for(request.user, timezone.now(), attendance) if attendance_at_work(attendance) else []
         board_by_type = {m['meal_type']: m for m in meal_board}
         _all_today = list(meal_qs.order_by('cutoff_at'))
         # Settled meals (Earned / Meal Debt / Missed) leave "Today's Meal Status" and live in Meal History.
@@ -539,15 +542,26 @@ def dashboard_home_view(request):
             _item = board_by_type.get(_ledger.meal_type)
             _ledger.board_state = _item['state'] if _item else ''
             _ledger.can_scan_now = bool(_item and _item['can_scan'])
+            _ledger.can_request_rescan = bool(_item and _item['can_late'] and _item['late_left'] > 0)
+            _ledger.rescan_exhausted = bool(_item and _item['can_late'] and _item['late_left'] <= 0)
+            _ledger.rescan_left = _item['late_left'] if _item else 0
             _cut = timezone.localtime(_ledger.cutoff_at).strftime('%H:%M')
             if _ledger.claimed_at:
                 _ledger.status_note = (f'Scan recorded. Settles automatically at {_cut} once branch sales are confirmed.'
                                        if _now < _ledger.cutoff_at else
                                        'Scan recorded. Settles as soon as a completed branch sale or the workday close is recorded.')
             elif _ledger.board_state == 'REVIEW':
-                _ledger.status_note = 'Your issue report is awaiting manager review.'
+                _issue = _item['issue'] if _item else None
+                _ledger.status_note = (f"Request {_issue.reference} sent at {timezone.localtime(_issue.reported_at).strftime('%H:%M')}. Waiting for your boss to approve. If approved, the meal is credited as if you scanned in time."
+                                       if _issue else 'Your request is awaiting manager review.')
             elif _ledger.board_state == 'OPEN' and _item:
                 _ledger.status_note = f"Scan the branch QR before {timezone.localtime(_item['end']).strftime('%H:%M')} to claim."
+            elif _ledger.board_state == 'MISSED' and _item:
+                _ledger.status_note = (f"Window ended at {timezone.localtime(_item['end']).strftime('%H:%M')}. "
+                                       + ('Use Request rescan in this row to ask your boss. If approved, the meal is credited as if you scanned in time.' if _item['can_late']
+                                          else 'It will settle automatically.'))
+            elif _ledger.board_state == 'SCAN_REOPENED':
+                _ledger.status_note = 'Your manager reopened this meal. Scan the branch QR now.'
             elif _ledger.board_state == 'UPCOMING' and _item:
                 _ledger.status_note = f"Opens at {timezone.localtime(_item['start']).strftime('%H:%M')}."
             else:
@@ -567,6 +581,7 @@ def dashboard_home_view(request):
             'today_meals': today_meals,
             'settled_today_count': settled_today_count,
             'meal_board': meal_board,
+            'attendance_in_review': attendance_in_review,
             'meal_issue_reasons': [c for c in MealIssueReport.Reason.choices if c[0] != 'BUSY_AT_WORK'],
             'meal_late_reasons': [c for c in MealIssueReport.Reason.choices if c[0] in ('BUSY_AT_WORK', 'NETWORK_PROBLEM', 'DEVICE_PROBLEM', 'OTHER')],
             'today_meal_earned': sum((x.amount for x in meal_qs.filter(status=MealLedger.Status.EARNED)), Decimal('0')),

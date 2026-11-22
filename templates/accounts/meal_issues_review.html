@@ -49,7 +49,7 @@
         <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
             <div>
                 <h2 class="text-lg font-bold text-ink-900">Recently closed workdays</h2>
-                <p class="text-sm text-ink-600 mt-1 max-w-3xl">If an employee closed their workday by mistake, you can reopen today’s workday. This also restores their open attendance state so they can continue working and submit a late-meal request when eligible.</p>
+                <p class="text-sm text-ink-600 mt-1 max-w-3xl">If an employee closed their workday by mistake, you can reopen today’s workday. This also restores their open attendance state so they can continue working and submit a rescan request when eligible.</p>
             </div>
             <span class="inline-flex rounded-full bg-white border border-blue-100 px-3 py-1.5 text-xs font-semibold text-blue-700">Today only</span>
         </div>
@@ -78,16 +78,28 @@
             <div class="p-4 sm:p-5">
                 <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                     <div class="min-w-0">
-                        <h3 class="font-semibold text-ink-900">{% firstof x.employee.get_full_name x.employee.username %} <span class="text-ink-400 font-normal">· {{ x.get_meal_type_display }}</span>{% if x.is_late %} <span class="ml-1 inline-flex rounded-full bg-red-50 text-red-700 px-2 py-0.5 text-[11px] font-semibold">Late request</span>{% endif %}</h3>
+                        <h3 class="font-semibold text-ink-900">{% firstof x.employee.get_full_name x.employee.username %} <span class="text-ink-400 font-normal">· {{ x.get_meal_type_display }}</span>{% if x.is_late %} <span class="ml-1 inline-flex rounded-full bg-red-50 text-red-700 px-2 py-0.5 text-[11px] font-semibold">Rescan request</span>{% endif %}{% if x.attendance_in_review %} <span class="ml-1 inline-flex rounded-full bg-amber-100 text-amber-800 px-2 py-0.5 text-[11px] font-semibold">Attendance needs review</span>{% elif x.attendance %} <span class="ml-1 inline-flex rounded-full bg-emerald-50 text-emerald-700 px-2 py-0.5 text-[11px] font-semibold">Attendance verified</span>{% endif %}</h3>
                         <p class="text-xs text-ink-500 mt-1">{{ x.reference }} · {{ x.date|date:"d M Y" }} · Window {{ x.window_start_at|date:"H:i" }}–{{ x.window_end_at|date:"H:i" }} · Reported {{ x.reported_at|date:"H:i" }}</p>
                     </div>
                     <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-50 text-amber-700 px-3 py-1.5 text-xs font-semibold self-start"><span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>Pending verification</span>
                 </div>
+                {% if x.attendance_in_review %}
+                <div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 sm:p-4 text-xs text-amber-900" role="note">
+                    <p class="font-semibold">This employee's attendance is waiting for re-verification</p>
+                    <p class="mt-1">Checked in {{ x.attendance.check_in_at|date:"H:i" }}{% if x.attendance.check_in_distance_m %} · {{ x.attendance.check_in_distance_m|floatformat:0 }} m from the branch at check-in{% endif %}.{% if x.attendance.review_note %} {{ x.attendance.review_note }}{% endif %}</p>
+                    <p class="mt-1">{% if branch_requires_location %}<strong>Reopen for scan</strong> is safe here: the employee re-verifies by scanning the QR at the workplace (GPS-checked).{% else %}This branch does not check GPS at scan time, so approve their attendance first, then reopen the meal.{% endif %} You can also <strong>verify the meal directly</strong> below, or <a href="{% url 'accounts:attendance_review' %}" class="font-semibold underline">review their attendance</a>.</p>
+                </div>
+                {% endif %}
                 <div class="mt-4 rounded-lg bg-ink-50 border border-ink-100 p-3 sm:p-4">
                     <p class="text-[11px] uppercase tracking-wider font-semibold text-ink-500 mb-1">Reason: {{ x.get_reason_display }}</p>
                     <p class="text-sm text-ink-800 whitespace-pre-line break-words">{{ x.details|default:"No details provided." }}</p>
                 </div>
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 mt-4">
+                    <form method="post" action="{% url 'accounts:meal_issue_decide' x.pk 'credit' %}" class="rounded-xl border-2 border-emerald-200 bg-emerald-50/60 p-3 space-y-3 lg:col-span-2" data-confirm="Approve this request and credit the meal as if the employee scanned in time?">
+                        {% csrf_token %}
+                        <div><h4 class="text-sm font-semibold text-ink-900">Approve &amp; credit meal</h4><p class="text-xs text-ink-500 mt-0.5">Records the meal as if {% firstof x.employee.get_full_name x.employee.username %} scanned in time. It follows normal meal accounting: earned when their sales fund it, otherwise meal debt that clears on their next sale. Salary is never affected. Saved with your name and time.</p></div>
+                        <div class="grid sm:grid-cols-[1fr_auto] gap-2"><input name="note" maxlength="500" class="form-input" placeholder="Optional note for the record"><button type="submit" class="btn btn-success">Approve &amp; credit</button></div>
+                    </form>
                     <form method="post" action="{% url 'accounts:meal_issue_decide' x.pk 'reopen' %}" class="rounded-xl border border-emerald-100 bg-emerald-50/40 p-3 space-y-3" data-confirm="Approve this request and reopen the meal for the employee to scan? The meal will NOT be recorded until the employee scans.">
                         {% csrf_token %}
                         <div><h4 class="text-sm font-semibold text-ink-900">Approve &amp; reopen for employee scan</h4><p class="text-xs text-ink-500 mt-0.5">The employee must scan the branch QR. This does not issue the meal on the manager's behalf.</p></div>
@@ -146,8 +158,8 @@
         <h2 class="text-lg font-bold text-ink-900 mb-3">By employee <span class="text-sm font-normal text-ink-400">{{ day|date:"d M Y" }}</span></h2>
         <table class="w-full text-sm"><thead><tr class="text-left text-ink-500 border-b border-ink-100"><th class="py-2">Employee</th><th>Meal</th><th>Status</th><th>Recorded</th><th>Action</th></tr></thead><tbody>
         {% for r in rows %}
-        <tr class="border-b border-ink-100"><td class="py-3">{% firstof r.employee.get_full_name r.employee.username %}</td><td>{{ r.meal_label }}</td>
-        <td>{% if r.state == 'NOT_ISSUED' %}<span class="px-2 py-1 rounded-full bg-amber-100 text-amber-700">Not issued</span>{% elif r.state == 'CLAIMED' %}<span class="px-2 py-1 rounded-full bg-green-100 text-green-700">Claimed</span>{% elif r.state == 'VERIFIED' %}<span class="px-2 py-1 rounded-full bg-blue-100 text-blue-700">Manually verified</span>{% elif r.state == 'REVIEW' %}<span class="px-2 py-1 rounded-full bg-amber-100 text-amber-700">{% if r.late %}Late request pending{% else %}Pending verification{% endif %}</span>{% elif r.state == 'SCAN_REOPENED' %}<span class="px-2 py-1 rounded-full bg-emerald-100 text-emerald-700">Waiting for employee scan</span>{% elif r.state == 'MISSED' %}<span class="px-2 py-1 rounded-full bg-red-100 text-red-700">Missed</span>{% else %}<span class="px-2 py-1 rounded-full bg-slate-100 text-slate-600">Awaiting scan</span>{% endif %}</td>
+        <tr class="border-b border-ink-100"><td class="py-3">{% firstof r.employee.get_full_name r.employee.username %}{% if r.attendance_review %}<a href="{% url 'accounts:attendance_review' %}" class="block text-[11px] font-semibold text-amber-700 underline">Attendance needs review</a>{% endif %}</td><td>{{ r.meal_label }}</td>
+        <td>{% if r.state == 'NOT_ISSUED' %}<span class="px-2 py-1 rounded-full bg-amber-100 text-amber-700">Not issued</span>{% elif r.state == 'CLAIMED' %}<span class="px-2 py-1 rounded-full bg-green-100 text-green-700">Claimed</span>{% elif r.state == 'VERIFIED' %}<span class="px-2 py-1 rounded-full bg-blue-100 text-blue-700">Manually verified</span>{% elif r.state == 'REVIEW' %}<span class="px-2 py-1 rounded-full bg-amber-100 text-amber-700">{% if r.late %}Rescan request pending{% else %}Pending verification{% endif %}</span>{% elif r.state == 'SCAN_REOPENED' %}<span class="px-2 py-1 rounded-full bg-emerald-100 text-emerald-700">Waiting for employee scan</span>{% elif r.state == 'MISSED' %}<span class="px-2 py-1 rounded-full bg-red-100 text-red-700">Missed</span>{% else %}<span class="px-2 py-1 rounded-full bg-slate-100 text-slate-600">Awaiting scan</span>{% endif %}</td>
         <td>{% if r.ledger and r.ledger.claimed_at %}{{ r.ledger.claimed_at|date:"H:i" }}{% if r.ledger.manual_reason %}<span class="block text-[11px] text-ink-400">{{ r.ledger.get_manual_reason_display }} · {% firstof r.ledger.verified_by.get_full_name r.ledger.verified_by.username %}</span>{% endif %}{% else %}—{% endif %}</td>
         <td>{% if r.state == 'NOT_ISSUED' %}{% if r.can_grant %}<details><summary class="text-xs text-brand-700 font-semibold cursor-pointer">Emergency verify</summary>
             <form method="post" action="{% url 'accounts:meal_manual_grant_missing' %}" class="mt-2 grid gap-2 min-w-[240px]" data-confirm="Verify this meal manually? It is recorded under your name.">{% csrf_token %}

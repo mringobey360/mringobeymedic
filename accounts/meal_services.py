@@ -393,6 +393,16 @@ def accrue_due_meals(now=None):
 # ---------------------------------------------------------------------------
 # Scan-to-claim: windows, claims, issue reports, manager verification
 # ---------------------------------------------------------------------------
+def attendance_at_work(attendance):
+    """Checked in and not checked out, whether verified or waiting for re-verification."""
+    return bool(attendance and attendance.check_in_at and not attendance.check_out_at
+                and attendance.status in (AttendanceRecord.Status.VERIFIED, AttendanceRecord.Status.REVIEW))
+
+
+def attendance_needs_reverification(attendance):
+    return bool(attendance_at_work(attendance) and attendance.status == AttendanceRecord.Status.REVIEW)
+
+
 def meal_windows(employee, date_value):
     """Return {meal_type: (start_dt, end_dt, label)} using the branch meal timing."""
     timing = meal_timing_for(employee)
@@ -479,8 +489,12 @@ def reopen_meal_for_scan(ledger, manager, reason, note='', now=None):
     if ledger.date != today:
         raise ValueError("A meal can only be reopened for an employee scan on today's workday.")
     attendance = AttendanceRecord.objects.filter(employee=employee, date=today).first()
-    if not attendance or not attendance.check_in_at or not attendance.is_verified or attendance.check_out_at:
-        raise ValueError(f'{employee.get_full_name() or employee.username} must have an open, verified workday.')
+    if not attendance_at_work(attendance):
+        raise ValueError(f'{employee.get_full_name() or employee.username} must have an open workday (checked in, not checked out).')
+    if attendance_needs_reverification(attendance) and not getattr(ledger.pharmacy, 'attendance_qr_requires_location', True):
+        raise ValueError(
+            f'{employee.get_full_name() or employee.username} is waiting for attendance review. '
+            'Verify their attendance first; this branch does not use GPS to re-verify on scan.')
     if ledger.claimed_at is not None:
         raise ValueError(f'{label} is already recorded for this employee.')
     if ledger.status not in (MealLedger.Status.PENDING, MealLedger.Status.MISSED):
@@ -509,7 +523,7 @@ LATE_REASONS = ('BUSY_AT_WORK', 'NETWORK_PROBLEM', 'DEVICE_PROBLEM', 'OTHER')
 
 
 def late_quota(employee, now=None):
-    """(used, limit) of late meal requests for the employee in the current Monday-Sunday week."""
+    """(used, limit) of rescan requests for the employee in the current Monday-Sunday week."""
     now = now or timezone.now()
     today = timezone.localtime(now).date()
     week_start = today - timedelta(days=today.weekday())
@@ -531,6 +545,12 @@ def meal_board_for(employee, now, attendance):
     if attendance:
         checkpoints = {cp.checkpoint_type: cp for cp in attendance.checkpoints.filter(checkpoint_type__in=MEAL_TYPES)}
     verified = bool(attendance and attendance.is_verified and attendance.check_in_at and not attendance.check_out_at)
+    at_work = attendance_at_work(attendance)
+    # An employee waiting for re-verification may still scan when the branch proves presence by GPS at
+    # scan time (the scan re-verifies them); otherwise they must be verified first. They can always
+    # send a request to the manager while they are checked in.
+    scan_ready = verified or (attendance_needs_reverification(attendance)
+                              and getattr(employee.pharmacy, 'attendance_qr_requires_location', True))
     late_used, late_limit = late_quota(employee, now)
     board = []
     for meal_type in MEAL_TYPES:
@@ -558,9 +578,9 @@ def meal_board_for(employee, now, attendance):
         board.append({
             'meal_type': meal_type, 'label': label, 'start': start, 'end': end, 'state': state,
             'claimed_at': claimed_at, 'issue': issue,
-            'can_scan': state in ('OPEN', 'SCAN_REOPENED') and verified,
-            'can_report': state == 'OPEN' and verified and issue is None,
-            'can_late': state == 'MISSED' and verified and (issue is None or issue.status == MealIssueReport.Status.RETURNED) and late_limit > 0,
+            'can_scan': state in ('OPEN', 'SCAN_REOPENED') and scan_ready,
+            'can_report': state == 'OPEN' and at_work and issue is None,
+            'can_late': state == 'MISSED' and at_work and (issue is None or issue.status == MealIssueReport.Status.RETURNED) and late_limit > 0,
             'late_left': max(late_limit - late_used, 0), 'late_limit': late_limit,
         })
     return board
@@ -596,8 +616,9 @@ def submit_meal_issue(employee, meal_type, reason, details, ip_address=None, lat
     now = timezone.now()
     local_date = timezone.localtime(now).date()
     attendance = AttendanceRecord.objects.filter(employee=employee, date=local_date).first()
-    if not attendance or not attendance.is_verified or not attendance.check_in_at or attendance.check_out_at:
-        raise ValueError('You must be at work with verified attendance before you can claim or request a meal.')
+    if not attendance_at_work(attendance):
+        raise ValueError('You must be checked in at work before you can claim or request a meal.')
+    in_review = attendance_needs_reverification(attendance)
     entitlements, _, _ = _entitlements(employee, local_date)
     if not entitlements.get(meal_type):
         raise ValueError('You are not entitled to this meal today.')
@@ -613,16 +634,16 @@ def submit_meal_issue(employee, meal_type, reason, details, ip_address=None, lat
     is_late = now > end
     if is_late:
         if not late:
-            raise ValueError(f'{label} window ended at {timezone.localtime(end):%H:%M}. Use "Request late meal" if you were busy at work.')
+            raise ValueError(f'{label} window ended at {timezone.localtime(end):%H:%M}. Use "Request rescan" to ask your manager to reopen it.')
         if reason not in LATE_REASONS:
             raise ValueError('Choose a valid reason for the late request.')
         if len(details) < 3:
-            raise ValueError('Please explain why you could not claim this meal on time.')
+            raise ValueError('Please explain why you could not scan this meal on time.')
         used, limit = late_quota(employee, now)
         if limit <= 0:
-            raise ValueError('Late meal requests are turned off for your branch.')
+            raise ValueError('Rescan requests are turned off for your branch.')
         if used >= limit:
-            raise ValueError(f'You have used all {limit} late meal requests for this week.')
+            raise ValueError(f'You have used all {limit} rescan requests for this week.')
     else:
         if late:
             raise ValueError(f'The {label.lower()} window is still open. Scan the QR, or report the problem.')
@@ -651,9 +672,10 @@ def submit_meal_issue(employee, meal_type, reason, details, ip_address=None, lat
     who = employee.get_full_name() or employee.username
     notify_many(
         management_recipients(employee.pharmacy),
-        'Late meal request' if is_late else 'Meal verification issue reported',
-        (f'{who} requested a late {label.lower()} at {employee.pharmacy.name} ({issue.reference}). Checked in at {timezone.localtime(attendance.check_in_at):%H:%M}.' if is_late
-         else f'{who} reported a problem claiming {label} at {employee.pharmacy.name} ({issue.reference}).'),
+        'Meal rescan request' if is_late else 'Meal verification issue reported',
+        ((f'{who} requested a rescan for {label.lower()} at {employee.pharmacy.name} ({issue.reference}). Checked in at {timezone.localtime(attendance.check_in_at):%H:%M}.' if is_late
+          else f'{who} reported a problem claiming {label} at {employee.pharmacy.name} ({issue.reference}).')
+         + (' Their attendance is also waiting for re-verification.' if in_review else '')),
         category='SYSTEM', level='WARNING', link_url='/accounts/meal-issues/', pharmacy=employee.pharmacy,
     )
     return issue
@@ -666,7 +688,7 @@ def decide_meal_issue(issue, manager, decision, note='', reason=''):
     if issue.status not in (MealIssueReport.Status.PENDING, MealIssueReport.Status.RETURNED):
         raise ValueError('This request has already been decided.')
     note = (note or '').strip()
-    if decision not in {'reopen', 'verify', 'return', 'reject'}:
+    if decision not in {'reopen', 'verify', 'credit', 'return', 'reject'}:
         raise ValueError('Invalid meal request decision.')
     if decision in {'return', 'reject', 'verify'} and len(note) < 3:
         raise ValueError('Please give a clear note for this decision.')
@@ -676,16 +698,25 @@ def decide_meal_issue(issue, manager, decision, note='', reason=''):
     if not ledger:
         # Employee checked in after the window, so no ledger was generated automatically.
         ledger = ensure_ledger_for_meal(issue.employee, issue.date, issue.meal_type)
-    if decision == 'verify':
+    if decision in ('verify', 'credit'):
         if issue.date != timezone.localdate() and (timezone.localdate() - issue.date).days > MANUAL_GRANT_MAX_AGE_DAYS:
             raise ValueError('Meals can only be verified for today or yesterday.')
-        manager_grant_meal(ledger, manager, reason or MealLedger.ManualReason.OTHER, note, now=now)
+        if decision == 'credit':
+            # Approve the employee's request: the meal is recorded as if scanned in time and then follows
+            # the normal accounting (EARNED when the employee's sales fund it, otherwise meal DEBT that
+            # clears automatically on the next sale). Salary is never touched.
+            manager_grant_meal(
+                ledger, manager, MealLedger.ManualReason.OTHER,
+                note or f'Approved employee request {issue.reference}.', now=now,
+                source_label='Approved employee request')
+        else:
+            manager_grant_meal(ledger, manager, reason or MealLedger.ManualReason.OTHER, note, now=now)
         issue.refresh_from_db()
         return issue
     if decision == 'reopen':
         if issue.date != timezone.localdate():
             raise ValueError("Only today's meal can be reopened for an employee scan.")
-        reopen_meal_for_scan(ledger, manager, note or 'Manager approved the late meal request.', '', now=now)
+        reopen_meal_for_scan(ledger, manager, note or 'Manager approved the rescan request.', '', now=now)
         issue.refresh_from_db()
         if issue.status != MealIssueReport.Status.SCAN_REOPENED:
             issue.status = MealIssueReport.Status.SCAN_REOPENED
@@ -720,7 +751,7 @@ def manual_grant_dates(now=None):
 
 
 @transaction.atomic
-def manager_grant_meal(ledger, manager, reason, note='', now=None):
+def manager_grant_meal(ledger, manager, reason, note='', now=None, source_label=None):
     """Manager verifies a meal directly (outage recovery). Reason is mandatory and fully audited.
 
     Allowed only for a meal that is still PENDING or already MISSED, for an employee with verified
@@ -744,14 +775,18 @@ def manager_grant_meal(ledger, manager, reason, note='', now=None):
     if ledger.status not in (MealLedger.Status.PENDING, MealLedger.Status.MISSED):
         raise ValueError('This meal has already been settled.')
     attendance = AttendanceRecord.objects.filter(employee=employee, date=ledger.date).first()
-    if not attendance or not attendance.check_in_at or not attendance.is_verified:
-        raise ValueError(f'{employee.get_full_name() or employee.username} has no verified attendance on that day.')
-    reason_label = dict(MealLedger.ManualReason.choices)[reason]
+    # A checked-in employee whose attendance is only waiting for re-verification (e.g. GPS drift) can
+    # still be verified by a manager: the decision is audited with reason, note and name.
+    awaiting_review = bool(attendance and attendance.status == AttendanceRecord.Status.REVIEW)
+    if not attendance or not attendance.check_in_at or not (attendance.is_verified or awaiting_review):
+        raise ValueError(f'{employee.get_full_name() or employee.username} has no checked-in attendance on that day.')
+    reason_label = source_label or dict(MealLedger.ManualReason.choices)[reason]
     mgr_name = manager.get_full_name() or manager.username
+    review_tag = ' Attendance was awaiting re-verification at the time.' if awaiting_review else ''
     AttendanceCheckpoint.objects.get_or_create(
         attendance=attendance, checkpoint_type=ledger.meal_type,
         defaults={'method': AttendanceCheckpoint.Method.MANUAL,
-                  'note': f'Manager verified by {mgr_name}: {reason_label}. {note}'.strip()[:255]},
+                  'note': f'Manager verified by {mgr_name}: {reason_label}. {note}{review_tag}'.strip()[:255]},
     )
     if ledger.status == MealLedger.Status.MISSED:
         ledger.status = MealLedger.Status.PENDING
@@ -764,7 +799,7 @@ def manager_grant_meal(ledger, manager, reason, note='', now=None):
     ledger.scan_reopened_at = None
     ledger.scan_reopened_by = None
     ledger.scan_reopen_note = ''
-    ledger.reason = f'Verified by manager ({reason_label}).'
+    ledger.reason = f'Verified by manager ({reason_label}).{review_tag}'
     ledger.save(update_fields=['status', 'missed_at', 'claimed_at', 'claim_method', 'verified_by',
                                'manual_reason', 'manual_note', 'scan_reopened_at', 'scan_reopened_by', 'scan_reopen_note', 'reason', 'updated_at'])
     MealIssueReport.objects.filter(
@@ -776,7 +811,7 @@ def manager_grant_meal(ledger, manager, reason, note='', now=None):
         finalize_workday_meals(workday, now=now)
     notify(
         employee, f'{label} verified',
-        f'Your {label.lower()} on {ledger.date:%d %b} was verified by your manager ({reason_label}).',
+        f'Your {label.lower()} on {ledger.date:%d %b} was approved by your manager ({reason_label}). It is recorded as if you had scanned in time.',
         category='SYSTEM', level='INFO', link_url='/accounts/meal-history/', pharmacy=ledger.pharmacy,
     )
     return ledger
@@ -807,6 +842,10 @@ def bulk_grant_meals(pharmacy, manager, meal_type, date_value, reason, note, now
     ).select_related('employee')
     for ledger in qs:
         try:
+            att = AttendanceRecord.objects.filter(employee=ledger.employee, date=date_value).first()
+            if not (att and att.check_in_at and att.is_verified):
+                skipped += 1  # bulk recovery only covers verified attendance; review cases are decided one by one
+                continue
             manager_grant_meal(ledger, manager, reason, note, now=now)
             granted += 1
         except ValueError:
@@ -827,6 +866,7 @@ def branch_meals_today(pharmacy, now=None, date_value=None, manager_user=None):
         for r in MealIssueReport.objects.filter(pharmacy=pharmacy, date=day, status=MealIssueReport.Status.PENDING)
     }
     rows, counts = [], {'scheduled': 0, 'claimed': 0, 'review': 0, 'missed': 0, 'not_issued': 0}
+    att_map = {a.employee_id: a for a in AttendanceRecord.objects.filter(pharmacy=pharmacy, date=day, check_in_at__isnull=False)}
     grantable = {t: 0 for t in MEAL_TYPES}
     can_grant_day = day in manual_grant_dates(now)
     for x in MealLedger.objects.filter(pharmacy=pharmacy, date=day).select_related('employee', 'verified_by').order_by('cutoff_at', 'employee__first_name'):
@@ -846,13 +886,15 @@ def branch_meals_today(pharmacy, now=None, date_value=None, manager_user=None):
                      and x.status in (MealLedger.Status.PENDING, MealLedger.Status.MISSED))
         if can_grant:
             grantable[x.meal_type] += 1
+        att = att_map.get(x.employee_id)
         rows.append({'ledger': x, 'employee': x.employee, 'meal_type': x.meal_type, 'meal_label': x.get_meal_type_display(),
-                     'state': state, 'can_grant': can_grant, 'late': bool(pending is not None and pending.is_late)})
+                     'state': state, 'can_grant': can_grant, 'late': bool(pending is not None and pending.is_late),
+                     'attendance_review': bool(att and att.status == AttendanceRecord.Status.REVIEW)})
     # Meals the employee is entitled to but that never got a ledger row (checked in after the window).
     # They are not scheduled, cost nothing and create no debt until a manager verifies them.
     present = AttendanceRecord.objects.filter(
         pharmacy=pharmacy, date=day, check_in_at__isnull=False,
-        status__in=[AttendanceRecord.Status.VERIFIED, AttendanceRecord.Status.CLOSED],
+        status__in=[AttendanceRecord.Status.VERIFIED, AttendanceRecord.Status.CLOSED, AttendanceRecord.Status.REVIEW],
         employee__role=User.Role.EMPLOYEE, employee__is_active=True,
     ).select_related('employee')
     existing = set(MealLedger.objects.filter(pharmacy=pharmacy, date=day).values_list('employee_id', 'meal_type'))
@@ -866,7 +908,8 @@ def branch_meals_today(pharmacy, now=None, date_value=None, manager_user=None):
                 continue
             counts['not_issued'] += 1
             rows.append({'ledger': None, 'employee': emp, 'meal_type': meal_type, 'meal_label': labels.get(meal_type, meal_type.title()),
-                         'state': 'NOT_ISSUED', 'can_grant': can_grant_day and emp.pk != getattr(manager_user, 'pk', None), 'late': False})
+                         'state': 'NOT_ISSUED', 'can_grant': can_grant_day and emp.pk != getattr(manager_user, 'pk', None), 'late': False,
+                         'attendance_review': att.status == AttendanceRecord.Status.REVIEW})
     return counts, rows, grantable
 
 
