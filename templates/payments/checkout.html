@@ -1,0 +1,256 @@
+{% load static humanize %}<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f766e">
+<title>Secure payment · SmartPOS</title>
+<link rel="icon" href="{% static 'img/smartPOS.svg' %}">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+{% include "payments/_pay_base_css.html" %}
+<style>
+body{background:#eef2f5;min-height:100dvh}
+.shell{max-width:1040px;margin:0 auto;padding:max(18px,env(safe-area-inset-top)) 16px max(18px,env(safe-area-inset-bottom))}
+.co{overflow:hidden;border-radius:18px;box-shadow:0 1px 2px rgba(15,23,42,.05),0 18px 40px -22px rgba(15,23,42,.28)}
+.co-top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 20px;background:#fff;border-bottom:1px solid var(--line)}
+.lk-short{display:none}.co-top .brand{gap:11px;min-width:0}.co-top .brand b{white-space:nowrap}.co-top .brand img{width:38px;height:38px;border-radius:10px;object-fit:contain;padding:5px;background:#fff;box-shadow:0 0 0 1px rgba(15,23,42,.10)}
+.co-top .brand b{display:block;font-size:15px;line-height:1.2}
+.co-top .brand small{display:block;font-size:11.5px;color:var(--ink3);font-weight:500}
+.sumbar{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:18px 20px;background:linear-gradient(120deg,#0b4f49 0%,#0f766e 60%,#14958a 100%);color:#fff}
+.sumbar .lab{font-size:11.5px;font-weight:600;opacity:.75}
+.sumbar .for{margin-top:2px;font-weight:700;font-size:16px;line-height:1.3}
+.sumbar .meta{margin-top:6px;display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;font-size:12px;opacity:.9}
+.sumbar .meta i{font-style:normal;opacity:.75}
+.chip{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.16);border-radius:999px;padding:3px 10px;font-weight:600}
+.chip:before{content:"";width:7px;height:7px;border-radius:50%;background:#7CF3D2;animation:pl 1.6s ease-in-out infinite}
+@keyframes pl{50%{opacity:.35}}
+.sumbar .tot{text-align:right;flex:none}
+.sumbar .big{font-size:32px;font-weight:800;letter-spacing:-.025em;line-height:1.05;white-space:nowrap}
+.sumbar .big small{font-size:13px;font-weight:700;opacity:.8;margin-right:6px;letter-spacing:0}
+.frame-box{position:relative;height:480px;background:#fff}
+.frame-box iframe{position:relative;z-index:1;width:100%;height:100%;border:0;display:block;background:transparent}
+.loader{position:absolute;inset:0;z-index:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--ink3);font-size:13px}
+.spin{width:28px;height:28px;border-radius:50%;border:3px solid var(--brand-l);border-top-color:var(--brand);animation:sp .8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.assure{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 18px;padding:12px 20px;border-top:1px solid var(--line);background:#f8fafb;font-size:12.5px;color:var(--ink2)}
+.assure .t{display:flex;align-items:center;gap:8px}
+.assure svg{width:16px;height:16px;color:var(--brand);flex:none}
+.assure .l{display:flex;align-items:center;gap:6px 14px;flex-wrap:wrap}
+.assure a{color:var(--ink2);font-weight:600;text-decoration:none;padding:6px 0}.assure a:hover{color:var(--brand);text-decoration:underline}
+.state{padding:40px 20px}
+.okrows{margin:18px auto 0;max-width:320px;text-align:left;font-size:13.5px}.okrows>div{display:flex;justify-content:space-between;gap:14px;padding:9px 0;border-bottom:1px dashed var(--line)}.okrows dt{color:var(--ink3)}.okrows dd{margin:0;font-weight:700;color:var(--ink);text-align:right}
+.mm-stay{display:flex;gap:10px;padding:11px 14px;border-radius:12px;background:#fffbeb;border:1px solid #fde68a;color:#92400e;font-size:13px;line-height:1.45}
+@media(max-width:900px){.frame-box{height:500px}}
+@media(max-width:560px){
+ .shell{padding:0 0 max(10px,env(safe-area-inset-bottom))}
+ .co{border-radius:0;border-left:0;border-right:0;box-shadow:none}
+ .co-top{padding:10px 14px}.co-top .brand small{display:none}.lk-full{display:none}.lk-short{display:inline}
+ .sumbar{padding:14px;gap:12px}.sumbar .big{font-size:26px}.sumbar .for{font-size:15px}
+ .frame-box{height:max(520px,calc(100dvh - 250px))}
+ .assure{padding:12px 14px;flex-direction:column;align-items:flex-start}
+}
+@media(max-width:360px){.sumbar{flex-direction:column;align-items:flex-start}.sumbar .tot{text-align:left}}
+@media(max-height:560px) and (orientation:landscape){.frame-box{height:520px}}
+
+.prog{display:flex;gap:4px;height:3px;background:#fff}
+.prog i{flex:1;background:var(--line)}.prog i.on{background:#14b8a6}
+.co-top{padding:10px 16px 10px 12px}
+.co-top .left{display:flex;align-items:center;gap:10px;min-width:0}
+.back{display:inline-flex;align-items:center;gap:6px;height:38px;padding:0 12px 0 8px;border-radius:999px;color:var(--ink2);font-weight:600;font-size:13px;text-decoration:none;border:1px solid var(--line);background:#fff;transition:background .15s,border-color .15s,color .15s;flex:none}
+.back:hover{background:#f1f5f9;color:var(--ink);border-color:#cbd5e1}
+.back svg{width:18px;height:18px}
+.vsep{width:1px;height:26px;background:var(--line);flex:none}
+.co-top .brand{gap:10px}
+.sumbar{background:linear-gradient(115deg,#073f3a 0%,#0c6a63 55%,#12857b 100%);position:relative}
+.sumbar:after{content:"";position:absolute;inset:0;background:radial-gradient(420px 160px at 92% -20%,rgba(255,255,255,.14),transparent 70%);pointer-events:none}
+.sumbar>*{position:relative;z-index:1}
+.assure{justify-content:center;text-align:center}
+.assure .l{justify-content:center}
+@media(max-width:560px){
+ .co-top{padding:9px 12px 9px 10px}
+ .back{width:38px;padding:0;justify-content:center}.back span{display:none}
+ .vsep{display:none}
+ .assure{align-items:center}
+}
+@media(max-width:420px){.lk-short{display:none}.lock{padding:7px}.co-top .brand b{font-size:14px}}
+.co-top .brand>div{min-width:0}.co-top .brand b{overflow:hidden;text-overflow:ellipsis}
+
+.steps{display:flex;list-style:none;margin:0;padding:12px 20px;background:#fff;border-bottom:1px solid var(--line);gap:8px}
+.steps li{flex:1;display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;color:var(--ink3);position:relative}
+.steps li b{width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;background:#e2e8f0;color:#64748b;flex:none}
+.steps li.now{color:var(--ink)}.steps li.now b{background:var(--brand);color:#fff;box-shadow:0 0 0 4px rgba(15,118,110,.15)}
+.steps li.done{color:var(--brand)}.steps li.done b{background:var(--brand);color:#fff}
+.steps li:not(:last-child):after{content:"";flex:1;height:2px;background:#e2e8f0;margin-left:4px;border-radius:2px}
+.steps li.done:not(:last-child):after{background:var(--brand)}
+.cols{display:grid;grid-template-columns:300px minmax(0,1fr);background:#fff}
+.side{padding:20px;background:#f8fafb;border-right:1px solid var(--line);font-size:13px;color:var(--ink2)}
+.side h3{margin:0 0 10px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);font-weight:700}
+.side h3:not(:first-child){margin-top:22px}
+.side dl{margin:0}.side dl>div{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px dashed #dbe3ea}
+.side dt{color:var(--ink3)}.side dd{margin:0;font-weight:600;color:var(--ink);text-align:right}
+.side dl .tot{border-bottom:0;padding-top:12px}.side dl .tot dt{font-weight:700;color:var(--ink)}.side dl .tot dd{font-size:16px;font-weight:800;color:var(--brand)}
+.ben,.how{margin:0;padding:0;list-style:none}
+.ben li{position:relative;padding:4px 0 4px 22px;line-height:1.45}
+.ben li:before{content:"";position:absolute;left:2px;top:9px;width:10px;height:6px;border-left:2px solid var(--brand);border-bottom:2px solid var(--brand);transform:rotate(-45deg)}
+.how{counter-reset:h}.how li{counter-increment:h;position:relative;padding:5px 0 5px 28px;line-height:1.45}
+.how li:before{content:counter(h);position:absolute;left:0;top:5px;width:19px;height:19px;border-radius:50%;background:#e6f4f1;color:var(--brand);font-weight:700;font-size:11px;display:flex;align-items:center;justify-content:center}
+.help{margin:20px 0 0;font-size:12.5px}.help a{color:var(--brand);font-weight:700;text-decoration:none}
+.main{min-width:0}
+@media(max-width:820px){.hide-sm{display:none}.cols{grid-template-columns:1fr}.side{order:2;border-right:0;border-top:1px solid var(--line)}}
+@media(max-width:560px){.steps{padding:10px 14px}.steps li span{display:none}.steps li.now span,.steps li.done:last-child span{display:inline}}
+
+/* fit: the payment box fills its column. Pesapal's content height can't be read across
+   origins, so use a height that fits the mobile-money form snugly (the taller card form
+   scrolls inside the box) instead of leaving a large empty gap under Pesapal's footer. */
+.cols{align-items:stretch}.cols.solo{grid-template-columns:1fr}
+.main{display:flex;flex-direction:column;background:#fff}
+#payment-shell{flex:1;display:flex;flex-direction:column}
+#payment-shell>.frame-box{flex:1;height:auto;min-height:420px}
+.frame-box iframe{position:absolute;inset:0;width:100%;height:100%}
+.side{display:flex;flex-direction:column}.side .help{margin-top:18px}
+@media(max-width:820px){#payment-shell>.frame-box{min-height:480px}.side{order:2}}
+@media(max-width:560px){#payment-shell>.frame-box{min-height:470px}}
+</style>
+<style>
+/* V43 mobile polish for the secure checkout (Pesapal) */
+html,body{overflow-x:hidden}
+.sumbar>div:first-child{min-width:0}
+.sumbar .for{overflow-wrap:anywhere}
+@media(max-width:560px){
+ .co-top{position:sticky;top:0;z-index:5}
+ .steps{padding:8px 12px}
+ .sumbar{align-items:center;gap:10px;padding:12px 14px}
+ .sumbar .for{font-size:14px}.sumbar .meta{font-size:11.5px;gap:3px 10px}
+ .sumbar .big{font-size:22px}.sumbar .big small{font-size:11px;margin-right:4px}
+ #payment-shell>.frame-box{min-height:max(560px,calc(100dvh - 190px))}
+ .frame-box iframe{-webkit-overflow-scrolling:touch}
+ .side{padding:16px 14px;font-size:12.5px}
+ .state{padding:28px 16px}.state .acts .btn{width:100%}
+ .assure{font-size:12px}
+}
+@media(max-width:360px){.sumbar .tot{width:100%}.sumbar .big{font-size:24px}}
+</style>
+<style id="sp-no-flash">
+/* Consistency: no default blue tap/selection flash on any clickable element, on every page. */
+html{-webkit-tap-highlight-color:transparent!important}
+a,button,input,select,textarea,label,summary,[role="button"],[onclick],.btn,.nav-link,.card{-webkit-tap-highlight-color:transparent!important;-webkit-touch-callout:none}
+a,button,summary,[role="button"],.btn,.nav-link{touch-action:manipulation}
+button,[role="button"],.btn,.nav-link,summary,.sidebar-text{-webkit-user-select:none;user-select:none}
+a:focus:not(:focus-visible),button:focus:not(:focus-visible),[role="button"]:focus:not(:focus-visible),summary:focus:not(:focus-visible),.btn:focus:not(:focus-visible),.nav-link:focus:not(:focus-visible){outline:none!important;box-shadow:none}
+</style>
+</head>
+<body>
+<main class="shell">
+  <section class="card co">
+    <ol class="steps" aria-label="Payment progress">
+      <li class="done"><b>1</b><span>Order</span></li>
+      <li class="{% if txn.status == 'COMPLETED' %}done{% else %}now{% endif %}"><b>2</b><span>Payment</span></li>
+      <li class="{% if txn.status == 'COMPLETED' and txn.is_processed %}done{% endif %}"><b>3</b><span>Activated</span></li>
+    </ol>
+    <div class="co-top">
+      <div class="left">
+        <a class="back" href="{{ final_url }}" aria-label="Back to SmartPOS"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg><span>Back</span></a>
+        <span class="vsep"></span>
+        <div class="brand"><img src="{% static 'img/smartpos-icon.svg' %}" alt="SmartPOS"><div><b>SmartPOS</b><small>Secure checkout</small></div></div>
+      </div>
+      <span class="lock"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg><span class="lk-full">Encrypted payment</span><span class="lk-short">Secure</span></span>
+    </div>
+
+    <div class="sumbar">
+      <div>
+        <div class="lab">Payment for</div>
+        <div class="for">{{ txn.get_purpose_display }}</div>
+        <div class="meta">
+          {% if txn.status == 'COMPLETED' %}<span class="chip" style="--x:0">Paid</span>{% elif txn.status == 'FAILED' or txn.status == 'CANCELLED' or txn.status == 'INVALID' or txn.status == 'REVERSED' %}<span class="chip">Not completed</span>{% else %}<span class="chip">Awaiting payment</span>{% endif %}
+          {% if txn.payer_name %}<span>{{ txn.payer_name }}</span>{% endif %}
+          <span><i>Ref</i> {{ txn.merchant_reference|truncatechars:13 }}</span>
+        </div>
+      </div>
+      <div class="tot"><div class="lab">Total due</div><div class="big"><small>{{ txn.currency }}</small>{{ txn.amount|floatformat:0|intcomma }}</div></div>
+    </div>
+
+    <div class="cols{% if not summary.rows and not summary.benefits %} solo{% endif %}">
+    {% if summary.rows or summary.benefits %}<aside class="side">
+      <h3>Order details</h3>
+      <dl>
+        {% for label, value in summary.rows %}<div><dt>{{ label }}</dt><dd>{{ value }}</dd></div>{% endfor %}
+      </dl>
+      {% if summary.benefits %}<h3 class="hide-sm">What you get</h3><ul class="ben hide-sm">{% for b in summary.benefits %}<li>{{ b }}</li>{% endfor %}</ul>{% endif %}
+    </aside>{% endif %}
+    <div class="main">
+    <div id="payment-shell" data-processed="{{ txn.is_processed|yesno:"1,0" }}" data-check-url="{% url 'payments:status_check' txn.merchant_reference %}" data-final-url="{{ final_url }}" data-status="{{ txn.status }}" data-poll="{% if ab and ab.show_form %}0{% else %}1{% endif %}">
+    {% if txn.status == 'COMPLETED' %}
+      <div class="state">
+        {% if txn.is_processed %}
+        <div class="ic" style="background:#ecfdf5;color:var(--ok)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"/></svg></div>
+        <h2>Payment successful. Thank you!</h2>
+        <p>{{ txn.currency }} {{ txn.amount|floatformat:0|intcomma }} was received and your {{ txn.get_purpose_display|lower }} is now active.</p>
+        {% if done.rows %}<dl class="okrows">{% for label, value in done.rows %}<div><dt>{{ label }}</dt><dd>{{ value }}</dd></div>{% endfor %}</dl>{% endif %}
+        {% else %}
+        <div class="ic" style="background:#f0fdfa;color:var(--brand)"><div class="spin"></div></div>
+        <h2>Payment received</h2>
+        <p>{{ txn.currency }} {{ txn.amount|floatformat:0|intcomma }} confirmed. Activating your {{ txn.get_purpose_display|lower }}&hellip;</p>
+        <div class="mm-stay" style="margin-top:16px;text-align:left"><span>Your payment is safe. If activation takes more than a minute, our team is alerted automatically.</span></div>
+        {% endif %}
+        {% if txn.confirmation_code %}<p style="margin-top:12px;font-size:12px;color:var(--ink3)">Confirmation code <b style="font-family:ui-monospace,monospace;color:var(--ink2)">{{ txn.confirmation_code }}</b></p>{% endif %}
+        <p style="margin-top:2px;font-size:12px;color:var(--ink3)">Reference <b style="font-family:ui-monospace,monospace;color:var(--ink2)">{{ txn.merchant_reference|truncatechars:13 }}</b></p>
+        <div class="acts"><a class="btn" href="{% url 'payments:receipt' txn.merchant_reference %}">View receipt</a>{% if txn.is_processed %}<a class="btn pri" href="{{ final_url }}">Continue to SmartPOS</a>{% endif %}</div>
+        {% if txn.is_processed %}<p style="margin-top:12px;font-size:12px;color:var(--ink3)">Taking you back automatically&hellip;</p>{% endif %}
+      </div>
+    {% elif txn.status == 'FAILED' or txn.status == 'CANCELLED' or txn.status == 'INVALID' or txn.status == 'REVERSED' %}
+      <div class="state">
+        <div class="ic" style="background:#fef2f2;color:var(--bad)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></div>
+        <h2>{{ fail.title }}</h2>
+        <p>{{ fail.body }}</p>
+        <p style="margin-top:10px;font-size:12px;color:var(--ink3)">Reference <b style="font-family:ui-monospace,monospace;color:var(--ink2)">{{ txn.merchant_reference|truncatechars:13 }}</b>{% if payment_settings.support_phone %} &middot; Help <a href="tel:{{ payment_settings.support_phone }}" style="font-weight:600">{{ payment_settings.support_phone }}</a>{% endif %}</p>
+        <form method="post" action="{% url 'payments:retry' txn.merchant_reference %}" class="acts">{% csrf_token %}<button class="btn pri" type="submit">Try again</button>{% if card_available and txn.gateway == 'ABLINER' %}<button class="btn" type="submit" name="gateway" value="PESAPAL">Pay by card</button>{% endif %}{% if manual_url %}<a class="btn" href="{{ manual_url }}">Pay manually (Lipa Namba)</a>{% endif %}</form>
+      </div>
+    {% elif ab %}
+      {% include "payments/_abliner_pay.html" %}
+    {% elif txn.redirect_url %}
+      <div class="frame-box">
+        <div class="loader"><div class="spin"></div>Loading secure checkout&hellip;</div>
+        <iframe id="pesapal-frame" onload="var l=this.parentNode.querySelector('.loader');if(l)l.style.display='none'" title="Secure online payment" src="{{ txn.redirect_url }}" allow="payment *" referrerpolicy="strict-origin-when-cross-origin"></iframe>
+      </div>
+    {% else %}
+      <div class="state"><div class="spin" style="margin:0 auto 14px"></div><p>Preparing your secure payment&hellip;</p></div>
+    {% endif %}
+    </div>
+    </div>
+    </div>
+
+    <div class="assure">
+      <span class="t"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 4v5c0 4.7-3 7.5-7 9-4-1.5-7-4.3-7-9V7l7-4Z"/><path d="m9 12 2 2 4-4"/></svg>Processed securely{% if txn.gateway == "ABLINER" %} by ABLiner{% else %} by PesaPal{% endif %}. We never see or store your card or PIN.</span>
+      <span class="l">{% if payment_settings.support_phone %}<a href="tel:{{ payment_settings.support_phone }}">Help: {{ payment_settings.support_phone }}</a>{% endif %}{% if txn.status != 'COMPLETED' %}{% if txn.redirect_url %}<a href="{{ txn.redirect_url }}" target="_blank" rel="noopener noreferrer">Open in new tab</a>{% endif %}{% endif %}</span>
+    </div>
+  </section>
+</main>
+
+<script>
+(function(){
+  var f=document.getElementById('pesapal-frame');
+  if(f){f.addEventListener('load',function(){var l=document.querySelector('.loader');if(l)l.style.display='none';});}
+  var shell=document.getElementById('payment-shell'); if(!shell) return;
+  var status=shell.dataset.status, checkUrl=shell.dataset.checkUrl, finalUrl=shell.dataset.finalUrl;
+  var FINAL=['FAILED','CANCELLED','INVALID','REVERSED'];
+  var processed=shell.dataset.processed==='1';
+  if(shell.dataset.poll==='0') return;          /* number form is open: nothing to wait for yet */
+  if(status==='COMPLETED'&&processed){setTimeout(function(){location.href=finalUrl;},6000);return;}
+  if(FINAL.indexOf(status)>=0) return;
+  var n=0,max=180;
+  function poll(){
+    n++;
+    fetch(checkUrl,{headers:{'X-Requested-With':'XMLHttpRequest'},cache:'no-store'})
+      .then(function(r){return r.json()})
+      .then(function(x){
+        // reload once Pesapal has settled it AND (if paid) activation has finished
+        if(x.is_final){location.reload();return;}
+        if(x.activation_pending&&window.mmStage)window.mmStage('activating',x.message);
+        if(n<max)setTimeout(poll,x.activation_pending?2000:3000);
+      }).catch(function(){if(n<max)setTimeout(poll,4500);});
+  }
+  setTimeout(poll,2500);
+})();
+</script>
+</body>
+</html>

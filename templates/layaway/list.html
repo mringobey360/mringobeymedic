@@ -1,0 +1,74 @@
+{% extends 'base.html' %}
+{% load humanize layaway_extras %}
+{% block title %}Layaway | SmartPOS{% endblock %}
+{% block content %}
+{% include 'layaway/_styles.html' %}
+<div class="sp-container ly">
+  <header class="ly-head">
+    <div>
+      <nav class="ly-crumbs" aria-label="Breadcrumb"><span>Sales</span>{% ly_icon 'chevron-right' 14 %}<span>Layaway</span></nav>
+      <h1 class="ly-title">Layaway</h1>
+      <p class="ly-sub">Customer instalment plans for {{ request.pharmacy.name|default:'this branch' }}. Track balances, record payments and keep customers informed by SMS.</p>
+    </div>
+    <div class="ly-actions">
+      {% if is_manager %}<a class="btn btn-secondary" href="{% url 'layaway:sms_packages' %}">{% ly_icon 'message' 16 %}Premium Messaging</a>{% endif %}
+      <a class="btn btn-secondary" href="{% url 'layaway:report_pdf' %}?{% if start %}start={{ start|date:'Y-m-d' }}{% endif %}{% if end %}{% if start %}&amp;{% endif %}end={{ end|date:'Y-m-d' }}{% endif %}{% if status %}&amp;status={{ status|urlencode }}{% endif %}{% if q %}&amp;q={{ q|urlencode }}{% endif %}" title="Export filtered Layaway analysis as PDF">{% ly_icon 'file-text' 16 %}Export PDF report</a>
+      <button type="button" class="btn btn-primary" data-spx-open="layaway-new">{% ly_icon 'plus' 16 %}New Layaway plan</button>
+    </div>
+  </header>
+
+  <section class="ly-card" aria-label="Summary">
+    <div class="ly-kpis">
+      <div class="ly-kpi"><span class="ly-ico">{% ly_icon 'banknote' %}</span><div><div class="ly-kpi-l">Outstanding balance</div><div class="ly-kpi-v">TZS {{ summary.outstanding|floatformat:0|intcomma }}</div><div class="ly-kpi-s">Across active plans</div></div></div>
+      <div class="ly-kpi"><span class="ly-ico info">{% ly_icon 'clock' %}</span><div><div class="ly-kpi-l">Active plans</div><div class="ly-kpi-v">{{ summary.active }}</div><div class="ly-kpi-s">{% if summary.overdue %}{{ summary.overdue }} overdue{% else %}None overdue{% endif %}</div></div></div>
+      <div class="ly-kpi"><span class="ly-ico ok">{% ly_icon 'package' %}</span><div><div class="ly-kpi-l">Ready for handover</div><div class="ly-kpi-v">{{ summary.pending }}</div><div class="ly-kpi-s">Fully paid</div></div></div>
+      <div class="ly-kpi"><span class="ly-ico {% if summary.resolution %}warn{% endif %}">{% ly_icon 'alert' %}</span><div><div class="ly-kpi-l">Needs resolution</div><div class="ly-kpi-v">{{ summary.resolution }}</div><div class="ly-kpi-s">Manager review</div></div></div>
+    </div>
+  </section>
+
+  <div class="ly-note">{% ly_icon 'info' 18 %}<div><strong>Stock is not locked while a plan is active.</strong> If another cashier sells a reserved product, flag the plan for resolution. Customer payments always stay on record.</div></div>
+
+  <section class="ly-card">
+    <nav class="ly-tabs" aria-label="Filter by status">
+      {% for t in tabs %}<a class="ly-tab {% if status == t.key %}on{% endif %}" href="?{% if start %}start={{ start|date:'Y-m-d' }}{% endif %}{% if end %}{% if start %}&amp;{% endif %}end={{ end|date:'Y-m-d' }}{% endif %}{% if t.key %}{% if start or end %}&amp;{% endif %}status={{ t.key }}{% endif %}{% if q %}{% if start or end or t.key %}&amp;{% endif %}q={{ q|urlencode }}{% endif %}">{{ t.label }}<b>{{ t.count }}</b></a>{% endfor %}
+    </nav>
+    <form method="get" class="ly-bar">
+      {% if status %}<input type="hidden" name="status" value="{{ status }}">{% endif %}
+      <div class="ly-search">{% ly_icon 'search' 16 %}<input class="form-input" type="search" name="q" value="{{ q }}" placeholder="Search reference, customer, phone or product" aria-label="Search plans" autocomplete="off"></div>
+      <label class="ly-muted" style="display:flex;align-items:center;gap:.35rem">From <input class="form-input" style="width:auto;min-width:135px" type="date" name="start" value="{{ start|date:'Y-m-d' }}"></label>
+      <label class="ly-muted" style="display:flex;align-items:center;gap:.35rem">To <input class="form-input" style="width:auto;min-width:135px" type="date" name="end" value="{{ end|date:'Y-m-d' }}"></label>
+      <button class="btn btn-secondary" type="submit">Apply filters</button>
+      {% if q or status or start or end %}<a class="btn btn-ghost" href="{% url 'layaway:list' %}">Clear</a>{% endif %}
+    </form>
+
+    {% if plans %}
+    <div class="ly-tw">
+      <table class="ly-table stack">
+        <thead><tr><th>Plan</th><th>Customer</th><th>Product</th><th>Payment progress</th><th class="r">Balance</th><th>Status</th><th></th></tr></thead>
+        <tbody>
+        {% for p in plans %}
+          <tr>
+            <td data-label=""><a class="ly-ref" href="{% url 'layaway:detail' p.pk %}">{{ p.reference }}</a><div class="ly-muted">{{ p.created_at|date:'d M Y' }}</div></td>
+            <td data-label="Customer"><div class="ly-person"><span class="ly-av">{{ p.customer_name|initials }}</span><div><div class="ly-strong">{{ p.customer_name }}</div><div class="ly-muted">{{ p.customer_phone }}</div></div></div></td>
+            <td data-label="Product"><div class="ly-strong">{{ p.product.name }}</div><div class="ly-muted">Qty {{ p.quantity }}</div></td>
+            <td data-label="Paid"><div class="ly-prog"><div class="ly-num" style="font-size:.8125rem"><b>{{ p.paid|floatformat:0|intcomma }}</b> <span class="ly-muted">of {{ p.total_amount|floatformat:0|intcomma }}</span></div><div class="ly-track"><i style="width:{{ p.pct }}%"></i></div></div></td>
+            <td data-label="Balance" class="r ly-nowrap ly-num ly-strong">TZS {{ p.bal|floatformat:0|intcomma }}</td>
+            <td data-label="Status" class="ly-nowrap">{% include 'layaway/_status.html' with plan=p %}</td>
+            <td data-label="" class="r"><a class="ly-go" href="{% url 'layaway:detail' p.pk %}" aria-label="View {{ p.reference }}">{% ly_icon 'chevron-right' 16 %}</a></td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="ly-empty">
+      <span class="ly-ico">{% ly_icon 'inbox' 22 %}</span>
+      <div class="ly-strong">No Layaway plans found</div>
+      <p class="ly-sub" style="margin:.35rem auto 1rem">{% if q or status %}Try another search or clear the filters.{% else %}Create the first plan to start tracking customer instalments.{% endif %}</p>
+      <button type="button" class="btn btn-primary" data-spx-open="layaway-new">{% ly_icon 'plus' 16 %}New Layaway plan</button>
+    </div>
+    {% endif %}
+  </section>
+</div>
+{% include 'layaway/_new_modal.html' %}
+{% endblock %}

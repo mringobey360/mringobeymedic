@@ -1,0 +1,65 @@
+{% extends "base.html" %}{% load humanize %}
+{% block title %}Shop orders · {{ store.public_name }}{% endblock %}
+{% block extra_head %}{% include 'marketplace/_mk_styles.html' %}{% endblock %}
+{% block content %}
+<div class="mk-page">
+ <nav class="mk-crumbs" aria-label="Breadcrumb"><a href="{% url 'marketplace:seller_dashboard' %}">Seller Centre</a><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg><b>Orders</b></nav>
+ <header class="mk-hero">
+  <div class="mk-hero-main">
+   <span class="mk-hero-icon"><svg viewBox="0 0 24 24"><path d="M6 3h12v17l-2.5-1.4L13 20l-2.5-1.4L8 20l-2-1.4V3z"/><path d="M9 8h6M9 12h6"/></svg></span>
+   <div><h1>Orders</h1><p>{{ store.public_name }} · confirm each paid order, send it out and mark it delivered.</p></div>
+  </div>
+ </header>
+
+ <section class="mk-summary" aria-label="Order summary">
+  <div class="{% if stats.new %}is-attn{% endif %}"><small>New · needs action</small><strong>{{ stats.new }}</strong><em>Confirm within the hour</em></div>
+  <div><small>Preparing</small><strong>{{ stats.preparing }}</strong><em>Contacted / confirmed</em></div>
+  <div><small>Out for delivery</small><strong>{{ stats.out }}</strong><em>On the way</em></div>
+  <div><small>Delivered</small><strong>{{ stats.delivered }}</strong><em>{{ stats.cancelled }} cancelled</em></div>
+  <div><small>Paid sales · 30 days</small><strong style="font-size:1.1rem;padding-top:.15rem">TSh {{ stats.revenue_30d|default:0|floatformat:0|intcomma }}</strong><em>All time: TSh {{ stats.revenue_total|default:0|floatformat:0|intcomma }}</em></div>
+ </section>
+
+ <section class="mk-card">
+  <div class="mk-toolbar">
+   <div class="mk-segment" role="navigation" aria-label="Order views">
+    <a class="{% if not view %}is-active{% endif %}" href="?q={{ q|urlencode }}">All</a>
+    <a class="{% if view == 'open' %}is-active{% endif %}" href="?view=open&q={{ q|urlencode }}">Open</a>
+    <a class="{% if view == 'new' %}is-active{% endif %}" href="?view=new&q={{ q|urlencode }}">New{% if stats.new %}<span>{{ stats.new }}</span>{% endif %}</a>
+    <a class="{% if view == 'confirmed' %}is-active{% endif %}" href="?view=confirmed&q={{ q|urlencode }}">Confirmed</a>
+    <a class="{% if view == 'out_for_delivery' %}is-active{% endif %}" href="?view=out_for_delivery&q={{ q|urlencode }}">Out for delivery</a>
+    <a class="{% if view == 'fulfilled' %}is-active{% endif %}" href="?view=fulfilled&q={{ q|urlencode }}">Delivered</a>
+    <a class="{% if view == 'cancelled' %}is-active{% endif %}" href="?view=cancelled&q={{ q|urlencode }}">Cancelled</a>
+   </div>
+   <form class="mk-search" method="get"><input type="hidden" name="view" value="{{ view }}"><input name="q" value="{{ q }}" placeholder="Search name, phone, location or Ticket ID" aria-label="Search orders"><button class="btn btn-primary" type="submit">Search</button>{% if q %}<a class="btn btn-ghost" href="?view={{ view }}">Reset</a>{% endif %}</form>
+  </div>
+  <div class="mk-table-wrap">
+   <table class="mk-table mk-cardtable" style="min-width:900px">
+    <thead><tr><th>Ticket</th><th>Customer</th><th>Deliver to</th><th>Items</th><th class="mk-num">Total</th><th>Status</th><th>Placed</th><th></th></tr></thead>
+    <tbody>
+    {% for o in page_obj %}
+     <tr>
+      <td data-label="Ticket" class="mk-ref">{{ o.reference|stringformat:"s"|slice:":8" }}</td>
+      <td data-label="Customer"><div class="mk-strong">{{ o.customer_name }}</div><div class="mk-muted">{{ o.phone }}</div></td>
+      <td data-label="Deliver to" style="max-width:220px;overflow-wrap:anywhere">{{ o.location }}</td>
+      <td data-label="Items">{% for item in o.items.all %}<div>{{ item.name }} <span class="mk-muted">× {{ item.quantity }}</span></div>{% endfor %}</td>
+      <td data-label="Total" class="mk-num">TSh {{ o.total|floatformat:0|intcomma }}</td>
+      <td data-label="Status"><span class="mk-badge mk-b-{{ o.status }}">{{ o.get_status_display }}</span>{% if o.payment_status != 'paid' %}<div><span class="mk-badge mk-b-{{ o.payment_status }}" style="margin-top:.25rem">{{ o.get_payment_status_display }}</span></div>{% endif %}</td>
+      <td data-label="Placed" class="mk-muted" style="white-space:nowrap">{{ o.created_at|date:'d M Y H:i' }}</td>
+      <td><div class="mk-cell-actions"><a class="btn {% if o.status == 'new' %}btn-primary{% else %}btn-secondary{% endif %} btn-sm" href="{% url 'marketplace:seller_order_detail' store.id o.reference %}">{% if o.status == 'new' %}Process{% else %}Open{% endif %}</a></div></td>
+     </tr>
+    {% empty %}
+     <tr><td colspan="8"><div class="mk-empty"><b>No orders here yet</b>{% if q or view %}Try another view or clear the search.{% else %}Share your shop link with customers — paid orders will show up here instantly.{% endif %}</div></td></tr>
+    {% endfor %}
+    </tbody>
+   </table>
+  </div>
+  <nav class="mk-pager" aria-label="Order pages">
+   <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }} · {{ page_obj.paginator.count }} order{{ page_obj.paginator.count|pluralize }}</span>
+   <div class="mk-pager-nav">
+    {% if page_obj.has_previous %}<a class="btn btn-secondary btn-sm" href="?view={{ view|urlencode }}&q={{ q|urlencode }}&page={{ page_obj.previous_page_number }}">Previous</a>{% endif %}
+    {% if page_obj.has_next %}<a class="btn btn-secondary btn-sm" href="?view={{ view|urlencode }}&q={{ q|urlencode }}&page={{ page_obj.next_page_number }}">Next</a>{% endif %}
+   </div>
+  </nav>
+ </section>
+</div>
+{% endblock %}

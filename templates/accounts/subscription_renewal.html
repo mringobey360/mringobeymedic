@@ -1,0 +1,160 @@
+{% extends 'base.html' %}
+{% block title %}Renew Subscription - SmartPOS{% endblock %}
+
+{% block extra_head %}
+<style data-spa-page-style="subscription-renewal">
+  .pay-tab[aria-selected="true"] { background: #fff; color: #0f172a; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+  .seg-opt:has(input:checked) { background: #fff; color: #0f172a; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+</style>
+
+<style id="smartpos-renewal-professional-layout-v1">
+#renew-app{width:min(100% - 24px,760px)!important;max-width:760px!important;margin:clamp(18px,4vh,44px) auto!important;padding-bottom:28px;color:#0f172a}
+#renew-app>div{overflow:hidden;border:1px solid #e2e8f0;border-radius:24px;box-shadow:0 24px 60px -38px rgba(15,23,42,.45)}
+#renew-app form{padding:clamp(18px,3vw,30px)!important;display:flex;flex-direction:column;gap:18px!important}
+#renew-app>div>div:first-child{padding:22px clamp(18px,3vw,30px)!important;background:linear-gradient(135deg,#f0fdfa,#fff 72%)}
+#renew-app h1{font-size:clamp(20px,3vw,28px)!important;line-height:1.25!important}
+#renew-app label,#renew-app form>div>p{letter-spacing:.04em}
+#renew-app select,#renew-app input:not([type=radio]):not([type=hidden]),#renew-app input[type=text],#renew-app input[type=tel]{min-height:44px;border-radius:12px}
+#renew-app [role=tablist]{gap:5px}
+#renew-app .pay-tab,#renew-app .seg-opt{min-height:42px;display:flex;align-items:center;justify-content:center;border-radius:10px;transition:background .15s,color .15s}
+#renew-app [data-pay-panel]{border-radius:16px;padding:18px!important}
+#renew-app button[type=submit]{min-height:46px;border-radius:12px;font-weight:800;box-shadow:0 8px 18px -12px rgba(15,118,110,.65)}
+#renew-app dl{padding:6px 0;border-radius:16px}
+#renew-app dl dd{font-variant-numeric:tabular-nums}
+@media(max-width:520px){#renew-app{width:calc(100% - 16px)!important;margin:10px auto!important}#renew-app>div{border-radius:18px}#renew-app form{gap:15px!important}#renew-app [data-pay-panel]{padding:14px!important}}
+</style>
+
+{% endblock %}
+
+{% block content %}
+<div class="max-w-md mx-auto py-6" id="renew-app">
+  <div class="rounded-2xl bg-white shadow-xl ring-1 ring-ink-900/10">
+
+    <!-- Header: same layout as Packages & Services / Branch payment -->
+    <div class="px-5 py-3.5 border-b border-ink-100 flex items-start justify-between gap-3">
+      <div class="min-w-0">
+        <p class="text-xs font-bold uppercase tracking-[.16em] text-brand-700">Renew subscription</p>
+        <h1 class="mt-0.5 text-lg font-extrabold text-ink-950">{% if subscription.is_expired %}Welcome back. Let's get you running again{% else %}Keep SmartPOS running smoothly{% endif %}</h1>
+        <p class="text-[13px] text-ink-500 mt-0.5">
+          {{ subscription.get_tier_display }} plan &middot;
+          {% if subscription.is_expired %}expired on {{ subscription.end_date|date:"d M Y" }}
+          {% else %}expires {{ subscription.end_date|date:"d M Y" }} ({{ subscription.days_remaining }} day{{ subscription.days_remaining|pluralize }} left){% endif %}
+        </p>
+      </div>
+      {% if subscription.is_expired %}<span class="badge bg-red-100 text-red-700 flex-none">Expired</span>
+      {% elif subscription.days_remaining <= 7 %}<span class="badge bg-amber-100 text-amber-800 flex-none">Expiring soon</span>
+      {% else %}<span class="badge bg-emerald-100 text-emerald-700 flex-none">Active</span>{% endif %}
+    </div>
+
+    <form method="post" id="renew-form" class="px-5 py-4 space-y-3">
+      {% csrf_token %}
+      <input type="hidden" name="current_tier" value="{{ subscription.tier }}">
+
+      <!-- 1. Package (branded dropdown: main.js converts the native select) -->
+      <div>
+        <label for="renew-tier" class="block text-xs font-bold uppercase tracking-wider text-ink-500 mb-1.5">Package</label>
+        <select id="renew-tier" name="tier" class="form-input">
+          {% for value,label,monthly,yearly,branches,users in tier_options %}
+          <option value="{{ value }}" data-monthly="{{ monthly|floatformat:0 }}" data-yearly="{{ yearly|floatformat:0 }}" data-branches="{{ branches }}" data-users="{{ users }}" {% if subscription.tier == value %}selected{% endif %}>{{ label }} &middot; {% if branches == 1 %}1 branch{% else %}{{ branches }} branches{% endif %} &middot; {{ users }} users</option>
+          {% endfor %}
+        </select>
+        <p class="mt-1.5 text-xs text-ink-500" id="renew-tier-hint"></p>
+      </div>
+
+      <!-- 2. Billing period -->
+      <div>
+        <p class="text-xs font-bold uppercase tracking-wider text-ink-500 mb-1.5">Billing period</p>
+        <div class="inline-flex w-full rounded-xl bg-ink-100 p-1">
+          <label class="seg-opt flex-1 text-center cursor-pointer rounded-lg px-3 py-1.5 text-sm font-semibold text-ink-600">
+            <input type="radio" name="plan" value="MONTHLY" class="sr-only" {% if subscription.plan != 'YEARLY' %}checked{% endif %}>Monthly
+          </label>
+          <label class="seg-opt flex-1 text-center cursor-pointer rounded-lg px-3 py-1.5 text-sm font-semibold text-ink-600">
+            <input type="radio" name="plan" value="YEARLY" class="sr-only" {% if subscription.plan == 'YEARLY' %}checked{% endif %}>Yearly
+          </label>
+        </div>
+      </div>
+
+      <!-- Summary -->
+      <dl class="rounded-2xl bg-ink-50 border border-ink-100 text-sm">
+        <div class="flex justify-between items-center gap-4 px-4 py-2">
+          <dt class="text-ink-500">Amount to pay</dt>
+          <dd class="text-xl font-extrabold text-ink-950">TZS <span class="tabular-nums" id="renew-total">&mdash;</span><span class="text-xs font-medium text-ink-400" id="renew-per"></span></dd>
+        </div>
+      </dl>
+
+      <!-- Payment method tabs (identical to Packages & Services) -->
+      <div class="inline-flex w-full rounded-xl bg-ink-100 p-1" role="tablist" aria-label="Payment method">
+        {% if online_payment_ready %}<button type="button" role="tab" class="pay-tab flex-1 rounded-lg px-3 py-1.5 text-sm font-semibold text-ink-600" data-pay-tab="online" aria-selected="true">{{ PAYMENT_BRAND_NAME }}</button>{% endif %}
+        <button type="button" role="tab" class="pay-tab flex-1 rounded-lg px-3 py-1.5 text-sm font-semibold text-ink-600" data-pay-tab="manual" aria-selected="{% if online_payment_ready %}false{% else %}true{% endif %}">Lipa Namba</button>
+      </div>
+
+      {% if online_payment_ready %}
+      <div data-pay-panel="online" class="rounded-2xl border-2 border-brand-600 bg-gradient-to-br from-brand-50 to-white p-3.5">
+        <p class="text-sm font-bold text-ink-900">Renew in a minute</p>
+        {% if online_gateway_is_abliner %}
+        <p class="text-xs text-ink-500 mt-0.5 mb-3">Pay with mobile money. Choose your network, enter your number and approve the request on your phone. Your plan renews automatically.</p>
+        {% else %}
+        <p class="text-xs text-ink-500 mt-0.5 mb-3">Pay securely by card or mobile money. Your plan renews automatically once payment is confirmed.</p>
+        {% endif %}
+        <button type="submit" formaction="{% url 'payments:pay_renewal' %}" class="btn btn-primary w-full">Continue to secure checkout</button>
+      </div>
+      {% endif %}
+
+      <div data-pay-panel="manual" class="space-y-2.5 {% if online_payment_ready %}hidden{% endif %}">
+        <div class="rounded-xl border border-ink-100 px-4 py-2.5 text-sm flex items-center justify-between gap-3">
+          <div class="min-w-0">
+            <span class="text-ink-400 text-xs block truncate">Pay to Lipa Namba &middot; {{ payment_settings.payee_name }}</span>
+            <strong class="text-lg tracking-wide">{{ payment_settings.lipa_namba }}</strong>
+          </div>
+          <button type="button" class="copy-btn rounded-lg border border-ink-200 px-3 py-1.5 text-xs font-semibold hover:bg-ink-50 flex-none" data-copy="{{ payment_settings.lipa_namba }}">Copy</button>
+        </div>
+        <input id="payment_reference" name="payment_reference" type="text" maxlength="150" autocomplete="off" class="form-input" placeholder="Transaction reference (from your payment SMS)">
+        <button type="submit" class="btn btn-secondary w-full">I have paid &mdash; submit for verification</button>
+        <p class="text-xs text-ink-400">We will restore your access as soon as our team confirms your payment.</p>
+        {% if payment_settings.instructions_text %}
+        <p class="text-xs text-ink-500 whitespace-pre-line">{{ payment_settings.instructions_text }}</p>
+        {% endif %}
+      </div>
+
+      <p class="text-center text-[11px] text-ink-400 !mt-2">Need a hand? Call us on {{ payment_settings.support_phone }}</p>
+    </form>
+  </div>
+
+  <div class="text-center mt-5">
+    <a href="{% if subscription.is_expired %}{% url 'accounts:subscription_expired' %}{% else %}{% url 'dashboard:home' %}{% endif %}" class="text-sm text-brand-700 font-medium hover:text-brand-800 transition">&larr; Back</a>
+  </div>
+</div>
+
+<script>
+(function () {
+  var root = document.getElementById('renew-app'); if (!root) return;
+  function fmt(n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+  function updateTotal() {
+    var sel = root.querySelector('select[name=tier]');
+    var plan = root.querySelector('input[name=plan]:checked');
+    if (!sel || !plan || !sel.options.length) return;
+    var opt = sel.options[sel.selectedIndex];
+    var yearly = plan.value === 'YEARLY';
+    document.getElementById('renew-total').textContent = fmt(opt.getAttribute(yearly ? 'data-yearly' : 'data-monthly'));
+    document.getElementById('renew-per').textContent = yearly ? '/year' : '/month';
+    var hint = document.getElementById('renew-tier-hint');
+    if (hint) hint.textContent = 'TZS ' + fmt(opt.getAttribute('data-monthly')) + ' per month \u00b7 TZS ' + fmt(opt.getAttribute('data-yearly')) + ' per year';
+  }
+  root.querySelectorAll('select[name=tier], input[name=plan]').forEach(function (i) { i.addEventListener('change', updateTotal); });
+  updateTotal();
+
+  function showPayTab(name) {
+    root.querySelectorAll('[data-pay-tab]').forEach(function (b) { b.setAttribute('aria-selected', b.getAttribute('data-pay-tab') === name); });
+    root.querySelectorAll('[data-pay-panel]').forEach(function (p) { p.classList.toggle('hidden', p.getAttribute('data-pay-panel') !== name); });
+  }
+  root.querySelectorAll('[data-pay-tab]').forEach(function (b) { b.addEventListener('click', function () { showPayTab(b.getAttribute('data-pay-tab')); }); });
+  root.querySelectorAll('.copy-btn').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var v = b.getAttribute('data-copy');
+      var done = function () { var t = b.textContent; b.textContent = 'Copied'; setTimeout(function () { b.textContent = t; }, 1400); };
+      if (navigator.clipboard) { navigator.clipboard.writeText(v).then(done); } else { var ta = document.createElement('textarea'); ta.value = v; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); done(); }
+    });
+  });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Void &amp; Return Review{% endblock %}
+{% block content %}
+<div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-5">
+  <div class="min-w-0">
+    <h1 class="text-2xl font-bold text-ink-900 tracking-tight">Void &amp; Return Review</h1>
+    <p class="text-sm text-ink-500 mt-0.5 max-w-2xl">Approved corrections with risk flags. This page only reads data; nothing here changes a sale, stock or cash.</p>
+  </div>
+  <a href="{% url 'sales:returns' %}" class="btn btn-secondary btn-nav text-sm self-start sm:self-auto shrink-0"><span>Back to Returns &amp; Voids</span></a>
+</div>
+
+<form method="get" class="card p-4 mb-5 flex flex-wrap items-end gap-3">
+  <label class="text-xs font-semibold text-ink-500">From<input type="date" name="start" value="{{ start|date:'Y-m-d' }}" class="block mt-1 rounded-lg border border-ink-200 px-3 py-2 text-sm"></label>
+  <label class="text-xs font-semibold text-ink-500">To<input type="date" name="end" value="{{ end|date:'Y-m-d' }}" class="block mt-1 rounded-lg border border-ink-200 px-3 py-2 text-sm"></label>
+  <label class="text-sm text-ink-700 flex items-center gap-2 pb-2"><input type="checkbox" name="flagged" value="1" {% if only_flagged %}checked{% endif %}> Flagged only</label>
+  <button type="submit" class="btn btn-primary text-sm">Apply</button>
+  <div class="flex flex-wrap gap-2">
+    <a href="?start={{ start|date:'Y-m-d' }}&end={{ end|date:'Y-m-d' }}{% if only_flagged %}&flagged=1{% endif %}&format=pdf" class="btn btn-primary text-sm">Export PDF</a>
+    <a href="?start={{ start|date:'Y-m-d' }}&end={{ end|date:'Y-m-d' }}{% if only_flagged %}&flagged=1{% endif %}&format=csv" class="btn btn-secondary text-sm">Export CSV</a>
+  </div>
+</form>
+
+<div class="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4 mb-6">
+  <div class="rounded-2xl bg-white p-4 ring-1 ring-ink-900/5"><p class="text-xs text-ink-500">Corrections</p><p class="text-2xl font-bold tabular-nums mt-1">{{ summary.count }}</p><p class="text-xs text-ink-400">{{ summary.voids }} full void · {{ summary.partial }} partial</p></div>
+  <div class="rounded-2xl bg-white p-4 ring-1 ring-ink-900/5"><p class="text-xs text-ink-500">Value returned</p><p class="text-2xl font-bold tabular-nums mt-1">TZS {{ summary.value|floatformat:0|intcomma }}</p></div>
+  <div class="rounded-2xl bg-amber-50 p-4 ring-1 ring-amber-200"><p class="text-xs text-amber-700">Flagged for review</p><p class="text-2xl font-bold tabular-nums mt-1 text-amber-900">{{ summary.flagged }}</p></div>
+  <div class="rounded-2xl bg-white p-4 ring-1 ring-ink-900/5"><p class="text-xs text-ink-500">Flag rules</p><p class="text-xs text-ink-700 mt-1">Late &gt; {{ cfg.late_hours }}h · Cross-day · High ≥ TZS {{ cfg.high_value|floatformat:0|intcomma }} · Repeat ≥ {{ cfg.repeat_count }}</p></div>
+</div>
+
+{% if summary.by_user %}
+<div class="card mb-6 overflow-x-auto">
+  <table class="w-full text-sm"><thead><tr class="text-left text-xs text-ink-500"><th class="px-4 py-2">Requested by</th><th class="px-4 py-2 text-right">Corrections</th><th class="px-4 py-2 text-right">Value (TZS)</th><th class="px-4 py-2 text-right">Flagged</th></tr></thead><tbody>
+  {% for name, d in summary.by_user %}<tr class="border-t border-ink-100"><td class="px-4 py-2 font-semibold">{{ name }}</td><td class="px-4 py-2 text-right tabular-nums">{{ d.count }}</td><td class="px-4 py-2 text-right tabular-nums">{{ d.value|floatformat:0|intcomma }}</td><td class="px-4 py-2 text-right tabular-nums">{{ d.flagged }}</td></tr>{% endfor %}
+  </tbody></table>
+</div>
+{% endif %}
+
+<div id="corrections" class="card overflow-x-auto">
+  <table class="w-full text-sm">
+    <thead><tr class="text-left text-xs text-ink-500">
+      <th class="px-4 py-3">Sale #</th><th class="px-4 py-3">Type</th><th class="px-4 py-3">Payment</th><th class="px-4 py-3 text-right">Refund (TZS)</th>
+      <th class="px-4 py-3">Requested by</th><th class="px-4 py-3">Approved by</th><th class="px-4 py-3">Decided</th><th class="px-4 py-3 text-right">Time after sale</th><th class="px-4 py-3">Flags</th><th class="px-4 py-3">Reason</th>
+    </tr></thead>
+    <tbody>
+    {% for r in page_obj %}
+      <tr class="border-t border-ink-100 {% if r.flags %}bg-amber-50/50{% endif %}">
+        <td class="px-4 py-3 font-semibold">#{{ r.sale_number }}<span class="block text-[11px] font-normal text-ink-400">{{ r.sale.business_date|date:"d M Y" }}</span></td>
+        <td class="px-4 py-3">{% if r.is_void %}Full void{% else %}Partial return{% endif %}</td>
+        <td class="px-4 py-3">{{ r.sale.payment_summary }}</td>
+        <td class="px-4 py-3 text-right tabular-nums">{{ r.rr.refund_amount|floatformat:0|intcomma }}</td>
+        <td class="px-4 py-3">{% firstof r.requested_by.get_full_name r.requested_by.username "—" %}</td>
+        <td class="px-4 py-3">{% firstof r.decided_by.get_full_name r.decided_by.username "—" %}{% if r.direct %}<span class="block text-[11px] text-ink-400">done directly</span>{% endif %}</td>
+        <td class="px-4 py-3 whitespace-nowrap">{{ r.rr.decided_at|date:"d M Y, H:i" }}</td>
+        <td class="px-4 py-3 text-right tabular-nums">{{ r.delay_display }}</td>
+        <td class="px-4 py-3">{% for f in r.flags %}<span class="inline-block mr-1 mb-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[11px] font-bold">{{ f }}</span>{% empty %}<span class="text-ink-300">—</span>{% endfor %}</td>
+        <td class="px-4 py-3 max-w-xs text-ink-700">{{ r.rr.reason|truncatechars:140 }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="10" class="px-4 py-8 text-center text-ink-500">No approved corrections in this period.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% include "partials/pagination.html" with page_obj=page_obj page_anchor="corrections" %}
+<p class="text-xs text-ink-400 mt-3">A flag is a reason to look, not proof of a problem. Check the written reason, then ask the people involved.</p>
+{% endblock %}

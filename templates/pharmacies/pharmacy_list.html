@@ -1,0 +1,337 @@
+{% extends "base.html" %}
+{% block title %}My Branches{% endblock %}
+
+{% block extra_head %}
+<style data-spa-page-style="pharmacy-branches">
+    .branch-page { max-width: 1440px; }
+    .branch-hero { display:flex; align-items:flex-end; justify-content:space-between; gap:1rem; margin-bottom:1.5rem; }
+    .branch-eyebrow { display:inline-flex; align-items:center; gap:.45rem; color:#0f766e; font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.08em; }
+    .branch-eyebrow-dot { width:.45rem; height:.45rem; border-radius:999px; background:#14b8a6; }
+    .branch-title { margin:.35rem 0 0; font-size:clamp(1.45rem,2vw,2rem); line-height:1.15; font-weight:800; letter-spacing:-.03em; color:#0f172a; }
+    .branch-subtitle { margin:.5rem 0 0; max-width:760px; font-size:.9rem; line-height:1.55; color:#64748b; }
+    .branch-stat { display:flex; align-items:center; gap:.75rem; padding:.75rem .9rem; border:1px solid #e2e8f0; background:#fff; border-radius:.9rem; box-shadow:0 5px 18px rgba(15,23,42,.05); white-space:nowrap; }
+    .branch-stat-icon { width:2.25rem; height:2.25rem; display:flex; align-items:center; justify-content:center; border-radius:.7rem; background:#f0fdfa; color:#0f766e; }
+    .branch-stat-label { font-size:.68rem; color:#94a3b8; text-transform:uppercase; letter-spacing:.06em; font-weight:700; }
+    .branch-stat-value { margin-top:.1rem; font-size:.95rem; color:#0f172a; font-weight:700; }
+
+    .branch-grid { display:grid; grid-template-columns:minmax(0,1.28fr) minmax(390px,.82fr); gap:1.25rem; align-items:start; }
+    .branch-panel { background:#fff; border:1px solid #e2e8f0; border-radius:1rem; box-shadow:0 8px 30px rgba(15,23,42,.05); overflow:hidden; }
+    .branch-panel-header { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1rem 1.15rem; border-bottom:1px solid #eef2f7; }
+    .branch-panel-title { font-size:.95rem; font-weight:750; color:#0f172a; }
+    .branch-panel-meta { margin-top:.2rem; font-size:.75rem; color:#94a3b8; }
+
+    .branch-table-wrap { overflow-x:auto; }
+    .branch-table { width:100%; min-width:720px; border-collapse:separate; border-spacing:0; }
+    .branch-table th { padding:.75rem 1rem; background:#f8fafc; border-bottom:1px solid #e2e8f0; font-size:.67rem; letter-spacing:.07em; color:#64748b; }
+    .branch-table td { padding:.9rem 1rem; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
+    .branch-table tbody tr:last-child td { border-bottom:0; }
+    .branch-table tbody tr:hover { background:#fbfefd; }
+    .branch-name { display:flex; align-items:center; gap:.7rem; min-width:190px; }
+    .branch-avatar { width:2.35rem; height:2.35rem; border-radius:.7rem; display:flex; align-items:center; justify-content:center; flex:0 0 auto; background:#f0fdfa; color:#0f766e; border:1px solid #ccfbf1; }
+    .branch-name-text { min-width:0; }
+    .branch-name-title { font-size:.86rem; font-weight:700; color:#0f172a; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .branch-name-sub { margin-top:.15rem; font-size:.7rem; color:#94a3b8; }
+    .branch-location { font-size:.78rem; color:#475569; }
+    .branch-billing { display:flex; flex-direction:column; gap:.3rem; }
+    .branch-actions { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:.35rem; min-width:190px; }
+    .branch-action { display:inline-flex; align-items:center; gap:.35rem; min-height:34px; padding:.42rem .65rem; border-radius:.55rem; border:1px solid #e2e8f0; background:#fff; color:#334155; font-size:.72rem; font-weight:650; transition:.15s ease; }
+    .branch-action:hover { background:#f8fafc; border-color:#cbd5e1; color:#0f172a; }
+    .branch-action-primary { background:#0f766e; color:#fff; border-color:#0f766e; }
+    .branch-action-primary:hover { background:#115e59; color:#fff; border-color:#115e59; }
+    .branch-action-danger { color:#b91c1c; }
+    .branch-action-danger:hover { background:#fef2f2; border-color:#fecaca; color:#991b1b; }
+
+    .branch-empty { padding:3.75rem 1.5rem; text-align:center; }
+    .branch-empty-icon { width:3.5rem; height:3.5rem; margin:0 auto 1rem; border-radius:1rem; display:flex; align-items:center; justify-content:center; background:#f0fdfa; color:#0f766e; }
+    .branch-empty-title { font-size:.95rem; font-weight:750; color:#0f172a; }
+    .branch-empty-text { max-width:410px; margin:.4rem auto 0; font-size:.78rem; line-height:1.55; color:#94a3b8; }
+
+    .branch-form-header { padding:1.1rem 1.15rem; border-bottom:1px solid #eef2f7; }
+    .branch-form-title { font-size:1rem; font-weight:750; color:#0f172a; }
+    .branch-form-description { margin-top:.25rem; font-size:.74rem; line-height:1.5; color:#64748b; }
+    .branch-form-body { padding:1.15rem; }
+    .branch-form-section + .branch-form-section { margin-top:1.15rem; padding-top:1.15rem; border-top:1px solid #eef2f7; }
+    .branch-form-section-title { display:flex; align-items:center; gap:.55rem; margin-bottom:.75rem; font-size:.72rem; text-transform:uppercase; letter-spacing:.07em; color:#475569; font-weight:750; }
+    .branch-form-section-title span { width:1.65rem; height:1.65rem; display:inline-flex; align-items:center; justify-content:center; border-radius:.5rem; background:#f0fdfa; color:#0f766e; }
+    .branch-form-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.8rem; }
+    .branch-field-full { grid-column:1 / -1; }
+    .branch-field label { display:block; margin-bottom:.35rem; font-size:.72rem; font-weight:700; color:#334155; }
+    .branch-field .form-input { min-height:42px; border-radius:.65rem; }
+    .branch-field input[type=file].form-input { padding:.48rem .55rem; font-size:.72rem; }
+    .branch-field-error { margin-top:.3rem; font-size:.7rem; color:#dc2626; }
+    .branch-form-note { display:flex; align-items:flex-start; gap:.55rem; margin-top:.75rem; padding:.7rem .75rem; border:1px solid #e2e8f0; border-radius:.7rem; background:#f8fafc; color:#64748b; font-size:.7rem; line-height:1.45; }
+    .branch-form-note svg { flex:0 0 auto; margin-top:.05rem; color:#0f766e; }
+    .branch-form-actions { display:flex; align-items:center; justify-content:flex-end; gap:.6rem; margin-top:1rem; padding-top:1rem; border-top:1px solid #eef2f7; }
+    .branch-form-actions .btn { min-height:42px; }
+    .branch-package-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.7rem; }
+    .branch-package-card { position:relative; display:block; padding:.85rem; border:1px solid #e2e8f0; border-radius:.8rem; background:#fff; cursor:pointer; transition:border-color .15s, box-shadow .15s, background .15s; }
+    .branch-package-card:hover { border-color:#99f6e4; box-shadow:0 5px 18px rgba(15,118,110,.08); }
+    .branch-package-card.is-selected { border-color:#0f766e; background:#f0fdfa; box-shadow:0 0 0 1px #0f766e; }
+    .branch-package-card input { position:absolute; opacity:0; pointer-events:none; }
+    .branch-package-name { font-size:.82rem; font-weight:800; color:#0f172a; }
+    .branch-package-price { margin-top:.2rem; font-size:.76rem; font-weight:750; color:#0f766e; }
+    .branch-package-limits { margin-top:.25rem; font-size:.68rem; color:#64748b; line-height:1.4; }
+    .branch-plan-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.7rem; }
+    .branch-plan-card { display:block; padding:.75rem .85rem; border:1px solid #e2e8f0; border-radius:.75rem; cursor:pointer; background:#fff; }
+    .branch-plan-card.is-selected { border-color:#0f766e; background:#f0fdfa; box-shadow:0 0 0 1px #0f766e; }
+    .branch-plan-card input { margin-right:.4rem; accent-color:#0f766e; }
+    .branch-plan-seg { grid-template-columns:repeat(2,minmax(0,1fr)); padding:.25rem; background:#f1f5f9; border-radius:.75rem; gap:.25rem; }
+    .branch-plan-seg .branch-plan-card { border:0; background:transparent; text-align:center; padding:.45rem .5rem; border-radius:.55rem; }
+    .branch-plan-seg .branch-plan-card.is-selected { background:#fff; box-shadow:0 1px 2px rgba(15,23,42,.1); }
+    .branch-plan-seg .branch-plan-card input { position:absolute; opacity:0; pointer-events:none; }
+    .branch-plan-seg .branch-plan-card { position:relative; }
+    .branch-package-card { padding:.6rem .7rem; }
+    .branch-total { display:flex; align-items:center; justify-content:space-between; gap:.75rem; margin-top:.7rem; padding:.65rem .8rem; border-radius:.75rem; background:#f0fdfa; border:1px solid #ccfbf1; }
+    .branch-total-label { font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:#0f766e; }
+    .branch-total-limits { margin-top:.1rem; font-size:.68rem; color:#64748b; }
+    .branch-total-amount { font-size:1.05rem; font-weight:800; color:#0f172a; white-space:nowrap; }
+    .branch-optional { margin-top:1rem; border:1px solid #e2e8f0; border-radius:.75rem; padding:.2rem .85rem; background:#fff; }
+    .branch-optional[open] { padding-bottom:.85rem; }
+    .branch-optional summary { display:flex; align-items:center; justify-content:space-between; gap:.5rem; padding:.6rem 0; cursor:pointer; list-style:none; font-size:.78rem; font-weight:700; color:#334155; }
+    .branch-optional summary::-webkit-details-marker { display:none; }
+    .branch-optional summary em { margin-left:.35rem; font-style:normal; font-weight:600; font-size:.68rem; color:#94a3b8; }
+    .branch-optional-chevron { color:#94a3b8; transition:transform .2s ease; }
+    .branch-optional[open] .branch-optional-chevron { transform:rotate(180deg); }
+    @media (max-width:420px){ .branch-package-grid{grid-template-columns:1fr;} }
+
+    @media (max-width: 1100px) { .branch-grid { grid-template-columns:minmax(0,1fr); } }
+    @media (max-width: 700px) {
+        .branch-hero { align-items:flex-start; flex-direction:column; }
+        .branch-stat { width:100%; }
+        .branch-form-grid { grid-template-columns:1fr; }
+        .branch-field-full { grid-column:auto; }
+        .branch-table { min-width:660px; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+{% if user.is_assistant_role %}<div class="max-w-6xl mx-auto px-4 pt-4"><div class="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900"><strong>Assistant access:</strong> You have the Manager’s operational branch access. New branches are created under your Manager’s business ownership and follow the normal activation/payment workflow.</div></div>{% endif %}
+<div class="branch-page">
+    <div class="branch-hero">
+        <div>
+            <div class="branch-eyebrow"><span class="branch-eyebrow-dot"></span> Branch management</div>
+            <h1 class="branch-title">My Branches</h1>
+            <p class="branch-subtitle">Manage branch details, billing status and active locations from one workspace. Each branch keeps its stock, sales, employees and reports separate.</p>
+        </div>
+        <div class="branch-stat">
+            <div class="branch-stat-icon">
+                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V8l8-5 8 5v13"/><path d="M9 21v-6h6v6"/></svg>
+            </div>
+            <div>
+                <div class="branch-stat-label">Total branches</div>
+                <div class="branch-stat-value">{{ page_obj.paginator.count }}</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="branch-grid">
+        <section class="branch-panel">
+            <div class="branch-panel-header">
+                <div>
+                    <div class="branch-panel-title">Branch portfolio</div>
+                    <div class="branch-panel-meta">Review access, billing and branch actions.</div>
+                </div>
+                {% if page_obj.paginator.count %}
+                <span class="badge bg-ink-100 text-ink-600">{{ page_obj.paginator.count }} branch{{ page_obj.paginator.count|pluralize }}</span>
+                {% endif %}
+            </div>
+
+            {% if page_obj.object_list %}
+            <div class="branch-table-wrap">
+                <table class="branch-table">
+                    <thead>
+                        <tr class="text-left">
+                            <th>Branch</th>
+                            <th>Location</th>
+                            <th>Billing</th>
+                            <th class="text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for pharmacy in page_obj.object_list %}
+                        <tr>
+                            <td>
+                                <div class="branch-name">
+                                    <div class="branch-avatar">
+                                        {% if pharmacy.logo %}<img loading="lazy" decoding="async" src="{{ pharmacy.logo.url }}" alt="" class="w-full h-full object-cover rounded-[.65rem]">{% else %}<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V8l8-5 8 5v13"/><path d="M9 21v-6h6v6"/></svg>{% endif %}
+                                    </div>
+                                    <div class="branch-name-text">
+                                        <div class="branch-name-title">{{ pharmacy.name }}</div>
+                                        <div class="branch-name-sub">{% if pharmacy.pk == request.pharmacy.pk %}Current active branch{% else %}Managed branch{% endif %}</div>
+                                    </div>
+                                    {% if pharmacy.pk == request.pharmacy.pk %}<span class="badge bg-brand-50 text-brand-700">Active</span>{% endif %}
+                                </div>
+                            </td>
+                            <td><div class="branch-location">{{ pharmacy.location|default:"Location not set" }}</div></td>
+                            <td>
+                                <div class="branch-billing">
+                                {% if pharmacy.addon %}
+                                    {% if pharmacy.addon.status == 'PENDING_PAYMENT' %}
+                                    <span class="badge bg-amber-100 text-amber-700 w-fit">Payment pending</span>
+                                    <span class="text-[11px] text-ink-500">{{ pharmacy.addon.get_package_tier_display }} · {{ pharmacy.addon.get_billing_plan_display }}</span>
+                                    <span class="text-[11px] text-ink-400">TSh {{ pharmacy.addon.billing_amount|floatformat:0 }}</span>
+                                    {% elif pharmacy.addon.status == 'ACTIVE' %}
+                                    {% if pharmacy.addon.is_overdue %}<span class="badge bg-red-100 text-red-700 w-fit">Payment overdue</span>{% elif pharmacy.addon.renewal_due %}<span class="badge bg-amber-100 text-amber-700 w-fit">Renewal due soon</span>{% else %}<span class="badge bg-emerald-100 text-emerald-700 w-fit">Active add-on</span>{% endif %}
+                                    <span class="text-[11px] text-ink-400">Next billing: {{ pharmacy.addon.next_billing_date|date:"d M Y" }}</span>
+                                    {% else %}
+                                    <span class="badge bg-red-100 text-red-700 w-fit">Cancelled</span>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="badge bg-slate-100 text-slate-600 w-fit">Included plan</span>
+                                    <span class="text-[11px] text-ink-400">Primary branch</span>
+                                {% endif %}
+                                </div>
+                            </td>
+                            <td>
+                                <div class="branch-actions">
+                                    <a href="{% url 'pharmacies:edit' pharmacy.pk %}" class="branch-action">
+                                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L8 18l-4 1 1-4z"/></svg> Edit
+                                    </a>
+                                    <a href="{% url 'pharmacies:receipt_design_branch' pharmacy.pk %}" class="branch-action">
+                                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h12v20l-3-2-3 2-3-2-3 2z"/><path d="M9 7h6M9 11h6"/></svg> Receipt
+                                    </a>
+                                    {% if pharmacy.addon and pharmacy.addon.status != 'ACTIVE' and pharmacy.addon.status == 'PENDING_PAYMENT' %}
+                                    <a href="{% url 'pharmacies:branch_addon_payment' pharmacy.pk %}" class="branch-action branch-action-primary">Pay now</a>
+                                    {% elif pharmacy.addon and pharmacy.addon.status == 'ACTIVE' and pharmacy.pk != request.pharmacy.pk %}
+                                    <form method="post" action="{% url 'pharmacies:switch' pharmacy.pk %}" class="inline branch-switch-form" data-branch-switch="true">
+                                        {% csrf_token %}
+                                        <button type="submit" class="branch-action branch-action-primary">Switch</button>
+                                    </form>
+                                    {% elif not pharmacy.addon and pharmacy.pk != request.pharmacy.pk %}
+                                    <form method="post" action="{% url 'pharmacies:switch' pharmacy.pk %}" class="inline branch-switch-form" data-branch-switch="true">
+                                        {% csrf_token %}
+                                        <button type="submit" class="branch-action branch-action-primary">Switch</button>
+                                    </form>
+                                    {% else %}
+                                    <span class="branch-action bg-slate-50 text-slate-400 border-slate-100 cursor-default">Current</span>
+                                    {% endif %}
+                                    {% if pharmacy.addon and pharmacy.addon.renewal_due %}
+                                    <a href="{% url 'pharmacies:branch_addon_payment' pharmacy.pk %}" class="branch-action branch-action-primary">Renew</a>
+                                    {% endif %}
+                                    {% if pharmacy.addon and pharmacy.addon.status == 'ACTIVE' %}
+                                    <form method="post" action="{% url 'pharmacies:cancel_addon' pharmacy.pk %}" class="inline" onsubmit="return confirm('Cancel this branch? Its data will be kept, but it will no longer be usable.');">
+                                        {% csrf_token %}<button type="submit" class="branch-action branch-action-danger">Cancel</button>
+                                    </form>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="branch-empty">
+                <div class="branch-empty-icon">
+                    <svg class="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V8l8-5 8 5v13"/><path d="M9 21v-6h6v6"/><path d="M4 21h16"/></svg>
+                </div>
+                <div class="branch-empty-title">No branches yet</div>
+                <p class="branch-empty-text">Create your first branch using the form on the right. Once created, you can manage its details and switch between active branches here.</p>
+            </div>
+            {% endif %}
+
+            {% include "partials/pagination.html" with page_obj=page_obj %}
+        </section>
+
+        <aside class="branch-panel">
+            <div class="branch-form-header">
+                <div class="flex items-center gap-3">
+                    <div class="branch-stat-icon"><svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg></div>
+                    <div>
+                        <div class="branch-form-title">Add new branch</div>
+                        <div class="branch-form-description">{% if is_additional_branch %}Your included branch capacity is full. You can add this branch as a low-cost add-on or upgrade your core plan first.{% else %}Name and location are all you need to start. This branch uses one of your included plan slots.{% endif %}</div>
+                    </div>
+                </div>
+            </div>
+
+            <form method="post" enctype="multipart/form-data" class="branch-form-body" id="branch-create-form">
+                {% csrf_token %}
+                {% if form.non_field_errors %}<div class="branch-field-error" role="alert">{% for e in form.non_field_errors %}{{ e }} {% endfor %}</div>{% endif %}
+
+                <div class="branch-form-grid">
+                    <div class="branch-field">
+                        <label for="{{ form.name.id_for_label }}">Branch name <span class="text-red-500">*</span></label>{{ form.name }}{% if form.name.errors %}<div class="branch-field-error">{{ form.name.errors.0 }}</div>{% endif %}
+                    </div>
+                    <div class="branch-field">
+                        <label for="{{ form.location.id_for_label }}">Location <span class="text-red-500">*</span></label>{{ form.location }}{% if form.location.errors %}<div class="branch-field-error">{{ form.location.errors.0 }}</div>{% endif %}
+                    </div>
+                </div>
+
+                {% if is_additional_branch %}
+                <div class="branch-form-section">
+                    <div class="branch-form-section-title">Branch capacity &amp; billing</div>
+                    <div class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                        <div class="font-bold">{{ subscription.get_tier_display|default:"Current plan" }} has {{ included_branches }} included branch{{ included_branches|pluralize }}.</div>
+                        <p class="mt-1 text-xs leading-5 text-amber-800">All included slots are currently used. This branch will <strong>not</strong> change your main subscription. It will use the separate branch add-on price.</p>
+                    </div>
+                    <div class="grid sm:grid-cols-2 gap-3 mt-3">
+                        <div class="rounded-xl border border-ink-100 bg-white p-3">
+                            <p class="text-xs font-semibold text-ink-500 uppercase tracking-wide">Add branch</p>
+                            <p class="mt-1 text-lg font-extrabold text-ink-950">TZS {{ addon_price|floatformat:0 }} <span class="text-xs font-medium text-ink-400">/ month</span></p>
+                            <p class="text-xs text-ink-500 mt-1">Keeps your current core plan unchanged.</p>
+                        </div>
+                        <a href="{% url 'hq:packages_center' %}#core" class="rounded-xl border border-brand-200 bg-brand-50 p-3 hover:border-brand-400 transition">
+                            <p class="text-xs font-semibold text-brand-700 uppercase tracking-wide">Alternative</p>
+                            <p class="mt-1 text-lg font-extrabold text-brand-900">Upgrade plan</p>
+                            <p class="text-xs text-brand-700 mt-1">Get more included branches, users and features.</p>
+                        </a>
+                    </div>
+                    <input type="hidden" name="package_tier" value="{{ current_tier }}">
+                    <input type="hidden" name="billing_plan" value="{{ current_plan }}">
+                </div>
+                {% endif %}
+
+                <details class="branch-optional" {% if form.phone_number.errors or form.email.errors or form.registration_number.errors or form.logo.errors or form.receipt_header.errors or form.receipt_footer.errors %}open{% endif %}>
+                    <summary>
+                        <span>Contact, licence &amp; receipt <em>optional</em></span>
+                        <svg class="branch-optional-chevron w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                    </summary>
+                    <div class="branch-form-grid" style="margin-top:.8rem;">
+                        {% for field in form %}
+                            {% if field.name == 'phone_number' or field.name == 'email' or field.name == 'registration_number' or field.name == 'receipt_header' or field.name == 'receipt_footer' or field.name == 'logo' %}
+                            <div class="branch-field {% if field.name == 'registration_number' or field.name == 'logo' %}branch-field-full{% endif %}">
+                                <label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.errors %}<div class="branch-field-error">{{ field.errors.0 }}</div>{% endif %}
+                            </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                </details>
+
+                <div class="branch-form-actions">
+                    <button type="reset" class="btn btn-secondary">Reset</button>
+                    {% if not user.is_assistant_role %}
+                    <button type="submit" class="btn btn-primary">
+                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+                        {% if is_additional_branch %}Create &amp; continue to payment{% else %}Create branch{% endif %}
+                    </button>
+                    {% endif %}
+                </div>
+            </form>
+        </aside>
+    </div>
+</div>
+
+<script>
+(function(){
+  const packageCards=[...document.querySelectorAll('.branch-package-card')];
+  const planCards=[...document.querySelectorAll('.branch-plan-card')];
+  const update=function(){
+    const plan=document.querySelector('input[name="billing_plan"]:checked')?.value || 'MONTHLY';
+    packageCards.forEach(card=>{
+      const input=card.querySelector('input[name="package_tier"]');
+      const price=card.querySelector('.branch-package-price');
+      card.classList.toggle('is-selected', !!input?.checked);
+      if(price){ const raw=plan==='YEARLY'?price.dataset.yearly:price.dataset.monthly; price.textContent='TZS '+Number(raw||0).toLocaleString()+(plan==='YEARLY'?' / year':' / month'); }
+    });
+    planCards.forEach(card=>card.classList.toggle('is-selected', !!card.querySelector('input')?.checked));
+    const sel=packageCards.find(c=>c.querySelector('input')?.checked);
+    const amt=document.getElementById('branch-total-amount'), lim=document.getElementById('branch-total-limits');
+    if(sel&&amt){ const pr=sel.querySelector('.branch-package-price'); const raw=plan==='YEARLY'?pr.dataset.yearly:pr.dataset.monthly; amt.textContent='TZS '+Number(raw||0).toLocaleString()+(plan==='YEARLY'?' / year':' / month'); if(lim) lim.textContent=(sel.querySelector('.branch-package-name')?.textContent||'')+' · '+(sel.dataset.limits||''); }
+  };
+  document.getElementById('branch-create-form')?.addEventListener('reset', function(){ setTimeout(update,0); });
+  document.addEventListener('change', function(e){ if(e.target.matches('input[name="package_tier"],input[name="billing_plan"]')) update(); });
+  update();
+})();
+</script>
+{% endblock %}

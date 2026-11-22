@@ -1,0 +1,137 @@
+{% extends 'marketplace/base.html' %}
+{% load humanize static l10n %}
+{% block title %}Shopping cart · SmartPOS Marketplace{% endblock %}
+{% block body %}
+<div class="sp-page">
+  <nav class="sp-crumbs" aria-label="Breadcrumb"><a class="sp-back" href="{% url 'marketplace:catalog' %}" aria-label="Back to marketplace"><svg class="i"><use href="#i-back"/></svg></a><a href="{% url 'marketplace:catalog' %}">Marketplace</a><span class="sep">/</span><b>Cart</b></nav>
+
+  {% if items %}
+  <header class="sp-cart-head">
+    <div><h1>Shopping cart</h1><p>Review your items, then continue to secure payment.</p></div>
+    <ol class="sp-steps" aria-label="Checkout progress"><li class="on"><i>1</i>Cart</li><li><i>2</i>Delivery</li><li><i>3</i>Payment</li></ol>
+  </header>
+
+  <div class="sp-cart-layout">
+    <div>
+      <section class="sp-box" id="sp-cart-list" aria-label="Cart items">
+        <div class="sp-cart-list-head"><h2>Items <span class="sp-count" id="sp-items-count">{{ cart_count }}</span></h2><a href="{% url 'marketplace:catalog' %}">+ Add more products</a></div>
+        {% for item in items %}
+        <article class="sp-cart-row" data-product-id="{{ item.product.pk }}" data-price="{{ item.product.price|unlocalize }}" data-stock="{{ item.product.max_cart_qty }}" data-name="{{ item.product.name }}">
+          <a class="sp-cart-img" href="{% url 'marketplace:detail' item.product.slug %}" aria-label="View {{ item.product.name }}">{% if item.product.image %}<img src="{{ item.product.image.url }}" alt="{{ item.product.name }}">{% else %}<svg class="i"><use href="#i-image"/></svg>{% endif %}</a>
+          <div class="sp-cart-main">
+            <a class="sp-cart-name" href="{% url 'marketplace:detail' item.product.slug %}">{{ item.product.name }}</a>
+            <p class="sp-cart-seller">{% if item.product.seller_store %}{{ item.product.seller_store.public_name }}<svg class="i sp-ver"><use href="#i-verified"/></svg>{% elif item.product.seller_name %}{{ item.product.seller_name }}{% else %}SmartPOS Marketplace<svg class="i sp-ver"><use href="#i-verified"/></svg>{% endif %}</p>
+            <p class="sp-cart-unit">TSh {{ item.product.price|floatformat:0|intcomma }} {% if item.product.is_digital %} · Digital download · instant access after payment{% else %} each · {{ item.product.stock }} available{% endif %}</p>
+            <div class="sp-cart-ctrl">
+              <div class="sp-stepper" role="group" aria-label="Quantity for {{ item.product.name }}"><button type="button" data-step="-1" aria-label="Decrease quantity">−</button><output data-qty aria-live="polite">{{ item.quantity }}</output><button type="button" data-step="1" aria-label="Increase quantity"{% if item.quantity >= item.product.max_cart_qty %} disabled{% endif %}>+</button></div>
+              <button class="sp-remove" type="button" data-remove><svg class="i"><use href="#i-trash"/></svg> Remove</button>
+            </div>
+          </div>
+          <div class="sp-cart-line"><span class="lbl">Subtotal</span><strong data-line>TSh {{ item.subtotal|floatformat:0|intcomma }}</strong></div>
+        </article>
+        {% endfor %}
+        <div class="sp-list-empty" id="sp-list-empty" hidden><b>Your cart is empty</b>Removed an item by mistake? Use Undo in the notification above.<br><a class="sp-btn primary" href="{% url 'marketplace:catalog' %}">Explore products</a></div>
+      </section>
+      <div class="sp-assure">
+        <div><svg class="i"><use href="#i-shield"/></svg><span><b>Secure checkout</b>Payment is confirmed before your order is created.</span></div>
+        <div><svg class="i"><use href="#i-check"/></svg><span><b>Stock verified</b>Availability is re-checked before payment.</span></div>
+        <div><svg class="i"><use href="#i-box"/></svg><span><b>Track your order</b>Use your Ticket ID after payment.</span></div>
+      </div>
+    </div>
+
+    <aside class="sp-summary" aria-label="Order summary">
+      <div class="sp-box sp-summary-card">
+        <h2>Order summary</h2>
+        <div class="sp-sum"><span>Items (<span id="sum-count">{{ cart_count }}</span>)</span><strong id="sum-sub">TSh {{ total|floatformat:0|intcomma }}</strong></div>
+        <div class="sp-sum"><span>Delivery</span><span>Confirmed with you</span></div>
+        <div class="sp-sum-total"><span>Total to pay</span><strong id="sum-total">TSh {{ total|floatformat:0|intcomma }}</strong></div>
+        <hr class="sp-divider">
+        <h3><svg class="i"><use href="#i-truck"/></svg> Delivery details</h3>
+        <p class="hint">{% with shop=items.0.product.seller_store %}{% if shop %}<b>{{ shop.public_name }}</b> {% if has_physical %}will deliver this order.{% else %}is the seller.{% endif %} {% endif %}{% endwith %}{% if has_digital and has_physical %}Digital items are available to download right after payment; the rest will be delivered. {% endif %}Tell us who receives it and how to reach you. You will pay on the next page.</p>
+        <form method="post" action="{% url 'marketplace:checkout' %}" class="sp-form" id="marketplace-checkout-form">{% csrf_token %}
+          <label for="customer-name">Full name <span aria-hidden="true">*</span></label>
+          <input id="customer-name" name="name" placeholder="Recipient's full name" maxlength="150" autocomplete="name" required>
+          <label for="customer-phone">Phone number <span aria-hidden="true">*</span></label>
+          <input id="customer-phone" name="phone" type="tel" inputmode="tel" placeholder="e.g. 0712345678" maxlength="25" autocomplete="tel" required>
+          {% if has_physical %}
+          <label for="customer-location">Delivery location <span aria-hidden="true">*</span></label>
+          <input id="customer-location" name="location" placeholder="Street, area, town or city" maxlength="250" autocomplete="street-address" required>
+          {% else %}
+          <input id="customer-location" name="location" type="hidden" value="">
+          <p class="hint" style="margin:.4rem 0 0">Nothing to deliver: your download link appears on the confirmation page right after payment.</p>
+          {% endif %}
+          <label for="customer-notes">Delivery notes <span style="font-weight:500;color:var(--muted)">(optional)</span></label>
+          <textarea id="customer-notes" name="notes" placeholder="Landmark, preferred time or other instructions" rows="3" maxlength="1000"></textarea>
+          <p class="sp-err" id="delivery-error" role="alert"></p>
+          <button class="sp-pay-btn" id="continue-payment" type="submit"><svg class="i"><use href="#i-lock"/></svg> Continue to secure payment</button>
+        </form>
+        <div class="sp-secure"><svg class="i"><use href="#i-shield"/></svg><span>No payment is taken on this page. Your official Ticket ID appears after payment is confirmed.</span></div>
+        <div class="sp-paylogos"><span>Pay with</span><img src="{% static 'img/payments/vodacom-mpesa.png' %}" alt="M-Pesa"><img src="{% static 'img/payments/airtel-money.png' %}" alt="Airtel Money"><img src="{% static 'img/payments/mixx-by-yas.png' %}" alt="Mixx by Yas"><img src="{% static 'img/payments/halopesa.png' %}" alt="HaloPesa"></div>
+      </div>
+    </aside>
+  </div>
+
+  {% else %}
+  <div class="sp-box sp-cart-empty"><div class="ico"><svg class="i"><use href="#i-bag"/></svg></div><h2>Your cart is empty</h2><p>Explore the Marketplace and add the products you want to order.</p><a class="sp-btn primary" href="{% url 'marketplace:catalog' %}">Explore products</a></div>
+  {% endif %}
+</div>
+
+{% if items %}
+<script>
+document.addEventListener('DOMContentLoaded',function(){
+  var list=document.getElementById('sp-cart-list');if(!list||!window.SP)return;
+  var emptyBox=document.getElementById('sp-list-empty'),payBtn=document.getElementById('continue-payment');
+  var fmt=function(n){return 'TSh '+Math.round(n).toLocaleString('en-US');};
+  function rows(){return list.querySelectorAll('.sp-cart-row:not(.removing)');}
+  function qtyOf(r){return Number(r.querySelector('[data-qty]').textContent);}
+  function totals(){
+    var sub=0,count=0;rows().forEach(function(r){var q=qtyOf(r);sub+=q*Number(r.dataset.price);count+=q;});
+    document.getElementById('sum-sub').textContent=fmt(sub);document.getElementById('sum-total').textContent=fmt(sub);
+    document.getElementById('sum-count').textContent=count;document.getElementById('sp-items-count').textContent=count;
+    var none=!rows().length;emptyBox.hidden=!none;if(payBtn)payBtn.disabled=none;
+  }
+  function apply(row,qty,stock){
+    row.querySelector('[data-qty]').textContent=qty;
+    row.querySelector('[data-line]').textContent=fmt(qty*Number(row.dataset.price));
+    row.querySelector('[data-step="1"]').disabled=qty>=stock;
+  }
+  function fail(e){SP.toast(e.message||'Unable to update cart.','error');}
+  function setQty(row,qty,btn){
+    row.classList.add('is-busy');SP.busy(btn,true);
+    SP.post(row.dataset.productId,'set',qty).then(function(p){SP.setCount(p.cart_count);apply(row,p.quantity,p.stock);totals();})
+      .catch(fail).then(function(){row.classList.remove('is-busy');SP.busy(btn,false);});
+  }
+  function remove(row,btn){
+    var qty=qtyOf(row),next=row.nextElementSibling,name=row.dataset.name;
+    row.classList.add('is-busy');SP.busy(btn,true);
+    SP.post(row.dataset.productId,'set',0).then(function(p){
+      SP.setCount(p.cart_count);SP.busy(btn,false);row.classList.remove('is-busy');row.classList.add('removing');totals();
+      setTimeout(function(){if(row.classList.contains('removing'))row.remove();},320);
+      SP.toast(name+' removed from cart','',{action:'Undo',onAction:function(){restore(row,qty,next,name);}});
+    }).catch(function(e){row.classList.remove('is-busy');SP.busy(btn,false);fail(e);});
+  }
+  function restore(row,qty,next,name){
+    SP.post(row.dataset.productId,'set',qty).then(function(p){
+      if(!row.isConnected){if(next&&next.parentNode===list&&next!==emptyBox)list.insertBefore(row,next);else list.insertBefore(row,emptyBox);}
+      apply(row,p.quantity,p.stock);row.classList.remove('removing');row.classList.add('restoring');
+      setTimeout(function(){row.classList.remove('restoring');},350);
+      SP.setCount(p.cart_count);totals();SP.toast(name+' restored to cart');
+    }).catch(fail);
+  }
+  list.addEventListener('click',function(e){
+    var row=e.target.closest('.sp-cart-row');if(!row||row.classList.contains('removing'))return;
+    var step=e.target.closest('[data-step]');
+    if(step){var next=qtyOf(row)+Number(step.dataset.step);if(next<=0)remove(row,step);else setQty(row,next,step);return;}
+    var rm=e.target.closest('[data-remove]');if(rm)remove(row,rm);
+  });
+  var form=document.getElementById('marketplace-checkout-form');
+  if(form)form.addEventListener('submit',function(e){
+    var name=form.elements.name.value.trim(),loc=form.elements.location.value.trim(),phone=form.elements.phone.value.replace(/\D/g,''),err=document.getElementById('delivery-error');
+    if(!name||(!loc&&form.elements.location.type!=='hidden')){e.preventDefault();err.textContent='Please enter your full name and delivery location to continue.';(!name?form.elements.name:form.elements.location).focus();return;}
+    if(!(phone.length===10&&phone.charAt(0)==='0')&&!(phone.length===12&&phone.indexOf('255')===0)&&phone.length!==9){e.preventDefault();err.textContent='Enter a valid mobile number such as 0712345678 so the shop can reach you.';form.elements.phone.focus();return;}
+    err.textContent='';
+  });
+});
+</script>
+{% endif %}
+{% endblock %}

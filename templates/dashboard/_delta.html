@@ -1,0 +1,8 @@
+{# Change vs previous period. `pct` is a float or None (no previous data). #}
+{% if pct is None %}
+<p class="text-[11px] text-ink-400 mt-1">No previous data to compare</p>
+{% elif pct >= 0 %}
+<p class="text-[11px] mt-1 font-semibold text-emerald-700">▲ {{ pct|floatformat:0 }}% <span class="font-normal text-ink-400">vs previous</span></p>
+{% else %}
+<p class="text-[11px] mt-1 font-semibold text-red-600">▼ {{ pct|floatformat:0 }}% <span class="font-normal text-ink-400">vs previous</span></p>
+{% endif %}

@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+{% block title %}Scan Attendance QR{% endblock %}
+{% block content %}
+<div class="max-w-xl mx-auto">
+  <div class="mb-5"><p class="text-xs uppercase tracking-wider text-brand-700 font-bold">Attendance verification</p><h1 class="text-2xl font-bold mt-1">Scan Attendance QR</h1><p class="text-sm text-ink-500 mt-1">Point your camera at the live QR displayed at {{ branch.name }}. Scanning starts automatically.</p></div>
+  <div class="card p-4 sm:p-6">
+    <div id="reader-wrap" class="relative overflow-hidden rounded-2xl bg-black aspect-square">
+      <video id="scanner-video" class="w-full h-full object-cover" playsinline muted autoplay></video>
+      <div class="absolute inset-0 pointer-events-none flex items-center justify-center"><div class="w-[68%] aspect-square border-2 border-white/90 rounded-2xl shadow-[0_0_0_9999px_rgba(0,0,0,.28)]"></div></div>
+      <div id="scanner-status" class="absolute left-3 right-3 bottom-3 rounded-xl bg-black/70 text-white text-xs px-3 py-2 text-center">Starting camera…</div>
+    </div>
+    <div id="scanner-error" class="hidden mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"></div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-4">
+      <button type="button" id="start-camera" class="btn btn-primary hidden">Try Again</button>
+      <button type="button" id="photo-btn" class="btn btn-secondary">Not detecting? Take a photo of the QR</button>
+      <input type="file" id="photo-input" accept="image/*" capture="environment" class="hidden">
+      <a href="{% url 'dashboard:home' %}" class="btn btn-nav btn-secondary btn-nav text-center">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg><span>Back to Dashboard</span>
+    </a>
+    </div>
+    <div class="mt-5 rounded-xl border border-ink-100 bg-ink-50 p-4 text-xs text-ink-600 leading-5">
+      <strong>Before scanning:</strong> make sure you are at the assigned branch and the QR is currently visible on the branch display. The code rotates automatically and expired codes cannot be reused.
+    </div>
+  </div>
+</div>
+<script>
+(function(){
+  var video=document.getElementById('scanner-video'),
+      status=document.getElementById('scanner-status'),
+      error=document.getElementById('scanner-error'),
+      retry=document.getElementById('start-camera'),
+      photoBtn=document.getElementById('photo-btn'),
+      photoInput=document.getElementById('photo-input');
+  var stream=null, raf=null, nativeDetector=null, busy=false, starting=false, canvas=null, ctx=null, lastTick=0;
+  var frames=0, decoder='', lastErr='', lastUi=0, notAttendance=0;
+  var JSQR_SOURCES=[
+    'https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js',
+    'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js'
+  ];
+
+  function showError(msg){
+    error.textContent=msg; error.classList.remove('hidden');
+    retry.classList.remove('hidden'); status.textContent='Scanner unavailable';
+  }
+  function stop(){
+    if(raf){cancelAnimationFrame(raf);raf=null;}
+    if(stream){stream.getTracks().forEach(function(t){t.stop();});stream=null;}
+  }
+  function loadScript(src){
+    return new Promise(function(res,rej){
+      var s=document.createElement('script'); s.src=src; s.async=true;
+      s.onload=res; s.onerror=rej; document.head.appendChild(s);
+    });
+  }
+  async function ensureJsQR(){
+    if(window.jsQR) return true;
+    for(var i=0;i<JSQR_SOURCES.length;i++){
+      try{ await loadScript(JSQR_SOURCES[i]); if(window.jsQR) return true; }catch(e){}
+    }
+    return false;
+  }
+
+  /* true = valid attendance link, navigating. */
+  function handle(raw){
+    var u=String(raw||'');
+    try{
+      var x=new URL(u,window.location.origin);
+      if(x.pathname.indexOf('/accounts/attendance/qr/verify/')===-1 || !x.searchParams.get('t')) throw new Error('bad');
+      busy=true; stop();
+      status.textContent='QR detected. Opening verification…';
+      window.location.href=window.location.origin+x.pathname+x.search;
+      return true;
+    }catch(e){
+      notAttendance++;
+      error.textContent='A QR code was read, but it is not a SmartPOS attendance code. Scan the live code shown on the branch display.';
+      error.classList.remove('hidden');
+      return false;
+    }
+  }
+
+  /* Decode any drawable (video frame or image) with the best decoder available. */
+  async function decodeSource(src,sw,sh,maxSide){
+    if(nativeDetector){
+      var codes=await nativeDetector.detect(src);
+      if(codes&&codes.length) return codes[0].rawValue;
+      if(!window.jsQR) return null;          // native only
+    }
+    if(!window.jsQR) return null;
+    var scale=Math.min(1,maxSide/Math.max(sw,sh));
+    var w=Math.max(1,Math.round(sw*scale)), h=Math.max(1,Math.round(sh*scale));
+    if(!canvas){canvas=document.createElement('canvas');ctx=canvas.getContext('2d',{willReadFrequently:true});}
+    if(canvas.width!==w) canvas.width=w;
+    if(canvas.height!==h) canvas.height=h;
+    ctx.drawImage(src,0,0,w,h);
+    var img=ctx.getImageData(0,0,w,h);
+    var r=window.jsQR(img.data,w,h,{inversionAttempts:'attemptBoth'});
+    return r?r.data:null;
+  }
+
+  function ui(ts){
+    if(ts-lastUi<400) return; lastUi=ts;
+    var msg='Scanning ('+decoder+') · '+video.videoWidth+'×'+video.videoHeight+' · frames '+frames+'. Hold the phone 15–30 cm from the screen and keep the QR inside the frame.';
+    if(lastErr) msg='Decoder error: '+lastErr;
+    status.textContent=msg;
+  }
+
+  async function loop(ts){
+    if(busy||!stream) return;
+    if(video.videoWidth && video.readyState>=2 && ts-lastTick>=110){
+      lastTick=ts;
+      try{
+        var raw=await decodeSource(video,video.videoWidth,video.videoHeight,1280);
+        frames++;
+        if(raw && handle(raw)) return;
+      }catch(e){ lastErr=(e&&e.message)||String(e); }
+    }
+    ui(ts);
+    raf=requestAnimationFrame(loop);
+  }
+
+  async function getCamera(){
+    var tries=[
+      {video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}},audio:false},
+      {video:{facingMode:{ideal:'environment'}},audio:false},
+      {video:true,audio:false}
+    ];
+    var last;
+    for(var i=0;i<tries.length;i++){
+      try{ return await navigator.mediaDevices.getUserMedia(tries[i]); }
+      catch(e){
+        last=e;
+        if(e&&(e.name==='NotAllowedError'||e.name==='SecurityError')) throw e;
+      }
+    }
+    throw last;
+  }
+
+  async function startCamera(){
+    if(starting) return; starting=true;
+    error.classList.add('hidden'); retry.classList.add('hidden');
+    status.textContent='Starting camera…'; stop(); busy=false; frames=0; lastErr='';
+    try{
+      if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+        showError(window.isSecureContext
+          ? 'Camera access is not supported by this browser. Use the “Take a photo of the QR” button below.'
+          : 'The camera needs a secure (HTTPS) connection. Open the system using its https:// address.');
+        return;
+      }
+      try{ stream=await getCamera(); }
+      catch(e){
+        showError('Camera permission was denied or the camera is busy. Allow camera access for this site, then press Try Again — or use “Take a photo of the QR”.');
+        return;
+      }
+      video.srcObject=stream;
+      try{ await video.play(); }catch(e){}
+      /* Ask for continuous autofocus where the device supports it. */
+      try{
+        var track=stream.getVideoTracks()[0], caps=track.getCapabilities?track.getCapabilities():{};
+        if(caps.focusMode && caps.focusMode.indexOf('continuous')!==-1)
+          await track.applyConstraints({advanced:[{focusMode:'continuous'}]});
+      }catch(e){}
+
+      nativeDetector=null;
+      try{
+        if('BarcodeDetector' in window){
+          var formats=BarcodeDetector.getSupportedFormats?await BarcodeDetector.getSupportedFormats():['qr_code'];
+          if(formats.indexOf('qr_code')!==-1) nativeDetector=new BarcodeDetector({formats:['qr_code']});
+        }
+      }catch(e){ nativeDetector=null; }
+
+      /* Always load jsQR too: it is the safety net if the native detector misses a dense code. */
+      status.textContent='Preparing scanner…';
+      var haveJs=await ensureJsQR();
+      if(!nativeDetector && !haveJs){
+        stop();
+        showError('Could not load the QR decoder. Check your internet connection and press Try Again, or use “Take a photo of the QR”.');
+        return;
+      }
+      decoder=nativeDetector?(haveJs?'native+jsQR':'native'):'jsQR';
+      raf=requestAnimationFrame(loop);
+    }finally{ starting=false; }
+  }
+
+  /* Photo fallback: works on every phone, even when live decoding struggles. */
+  photoBtn.addEventListener('click',function(){photoInput.click();});
+  photoInput.addEventListener('change',async function(){
+    var f=photoInput.files&&photoInput.files[0]; if(!f) return;
+    status.textContent='Reading photo…';
+    try{
+      if(!nativeDetector && !window.jsQR) await ensureJsQR();
+      var bmp=await createImageBitmap(f);
+      var raw=await decodeSource(bmp,bmp.width,bmp.height,2000);
+      if(raw){ if(handle(raw)) return; }
+      else{ error.textContent='No QR code found in that photo. Retake it closer, with the whole QR visible and in focus.'; error.classList.remove('hidden'); }
+    }catch(e){
+      error.textContent='Could not read that photo. Try again.'; error.classList.remove('hidden');
+    }
+    photoInput.value='';
+  });
+
+  retry.addEventListener('click',startCamera);
+  window.addEventListener('pagehide',stop);
+  document.addEventListener('visibilitychange',function(){
+    if(document.visibilityState==='visible' && !stream && !busy) startCamera();
+    else if(document.visibilityState==='hidden') stop();
+  });
+  window.addEventListener('pageshow',function(e){ if(e.persisted && !stream && !busy) startCamera(); });
+  startCamera();   // automatic: no button press needed
+})();
+</script>
+{% endblock %}

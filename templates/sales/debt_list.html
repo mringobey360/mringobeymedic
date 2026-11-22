@@ -1,0 +1,240 @@
+{% extends "base.html" %}
+{% block title %}Customer Debts{% endblock %}
+{% block content %}
+<div class="page-shell">
+  <div class="page-header mb-5">
+    <div>
+      <p class="eyebrow">Receivables</p>
+      <h1 class="page-title text-2xl font-bold tracking-tight">Customer Debts</h1>
+      <p class="page-subtitle mt-1">See who was lent, when, and what is still owed. Reminder SMS is a separate Premium monthly service.</p>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      <a href="{% url 'sales:debt_reports' %}" class="btn btn-secondary">Debt Reports</a>
+      <a href="{% url 'sms_integration:debt_sms' %}" class="btn btn-secondary"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/></svg> Premium SMS</a>
+    </div>
+  </div>
+
+  <form method="get" id="debt-filter-form" class="card dbt-filters mb-4" role="search" aria-label="Filter customer debts" data-no-global-loading autocomplete="off">
+    <div class="dbt-filter-grid">
+      <div class="dbt-f-search">
+        <label for="debt-q" class="form-label">Search</label>
+        <div class="relative">
+          <input id="debt-q" name="q" type="search" value="{{ filters.q }}" class="form-input w-full" style="padding-right:2.5rem" placeholder="Name, phone, sale # or date — e.g. 13/10/2026, Oct 2026">
+          <span class="dbt-search-icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></span>
+        </div>
+      </div>
+      <div>
+        <label for="debt-status" class="form-label">Status</label>
+        <select id="debt-status" name="status" class="form-input w-full">
+          <option value="all" {% if filters.status == 'all' %}selected{% endif %}>All debts</option>
+          <option value="pending" {% if filters.status == 'pending' %}selected{% endif %}>Pending</option>
+          <option value="settled" {% if filters.status == 'settled' %}selected{% endif %}>Settled</option>
+        </select>
+      </div>
+      <div>
+        <label for="debt-from" class="form-label">Lent from</label>
+        <input id="debt-from" name="date_from" type="date" max="{{ today }}" value="{{ filters.date_from }}" class="form-input w-full">
+      </div>
+      <div>
+        <label for="debt-to" class="form-label">Lent to</label>
+        <input id="debt-to" name="date_to" type="date" max="{{ today }}" value="{{ filters.date_to }}" class="form-input w-full">
+      </div>
+      <div>
+        <label for="debt-sort" class="form-label">Sort by</label>
+        <select id="debt-sort" name="sort" class="form-input w-full">
+          <option value="status" {% if filters.sort == 'status' %}selected{% endif %}>Pending first</option>
+          <option value="newest" {% if filters.sort == 'newest' %}selected{% endif %}>Newest lent</option>
+          <option value="oldest" {% if filters.sort == 'oldest' %}selected{% endif %}>Oldest lent</option>
+          <option value="balance" {% if filters.sort == 'balance' %}selected{% endif %}>Highest balance</option>
+          <option value="name" {% if filters.sort == 'name' %}selected{% endif %}>Customer A–Z</option>
+        </select>
+      </div>
+    </div>
+
+    <input type="hidden" name="period" id="debt-period" value="{{ filters.period }}">
+    <div class="dbt-chips" role="group" aria-label="Quick date range">
+      <span class="dbt-chips-label">Quick range</span>
+      <button type="button" data-period="" class="dbt-chip">Any date</button>
+      <button type="button" data-period="today" class="dbt-chip">Today</button>
+      <button type="button" data-period="7d" class="dbt-chip">7 days</button>
+      <button type="button" data-period="30d" class="dbt-chip">30 days</button>
+      <button type="button" data-period="month" class="dbt-chip">This month</button>
+      <button type="button" data-period="over30" class="dbt-chip">Over 30 days old</button>
+      <span id="debt-loading" class="dbt-loading hidden" aria-live="polite"><i></i> Updating…</span>
+    </div>
+    <p class="text-xs text-ink-500 mt-2">Results update automatically as you type or change a filter. Dates refer to the day the customer was lent.</p>
+    <noscript><button class="btn btn-primary mt-3">Apply filters</button></noscript>
+  </form>
+
+  <div id="debt-results-wrap">{% include "sales/_debt_results.html" %}</div>
+</div>
+
+<style>
+  /* Scoped to the Customer Debts page; palette matches the SmartPOS teal/slate system. */
+  .dbt-filters .form-label{display:block;font-size:.75rem;font-weight:600;color:#475569;margin-bottom:.25rem}
+  .dbt-filter-grid{display:grid;gap:.75rem;grid-template-columns:1fr}
+  @media(min-width:640px){.dbt-filter-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.dbt-f-search{grid-column:1/-1}}
+  @media(min-width:1024px){.dbt-filter-grid{grid-template-columns:minmax(0,2fr) repeat(4,minmax(0,1fr))}.dbt-f-search{grid-column:auto}}
+  .dbt-search-icon{position:absolute;right:.75rem;top:50%;transform:translateY(-50%);color:#94a3b8;pointer-events:none;display:flex}
+  .dbt-chips{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin-top:.875rem;padding-top:.875rem;border-top:1px solid #f1f5f9}
+  .dbt-chips-label{font-size:.75rem;font-weight:600;color:#64748b;margin-right:.25rem}
+  .dbt-chip{font-size:.75rem;font-weight:600;padding:.35rem .8rem;border-radius:999px;border:1px solid #e2e8f0;background:#fff;color:#334155;min-height:32px;transition:background-color .15s,border-color .15s,color .15s}
+  .dbt-chip:hover{background:#f0fdfa;border-color:#99f6e4;color:#0f766e}
+  .dbt-chip.is-active{background:#0f766e;border-color:#0f766e;color:#fff}
+  .dbt-chip:focus-visible,.dbt-link:focus-visible{outline:2px solid #0d9488;outline-offset:2px}
+  .dbt-loading{margin-left:auto;font-size:.75rem;color:#64748b;display:inline-flex;align-items:center;gap:.4rem}
+  .dbt-loading i{width:.75rem;height:.75rem;border-radius:50%;border:2px solid #99f6e4;border-top-color:#0f766e;animation:dbt-spin .7s linear infinite}
+  @keyframes dbt-spin{to{transform:rotate(360deg)}}
+  @media(prefers-reduced-motion:reduce){.dbt-loading i{animation:none}}
+
+  #debt-results-wrap{transition:opacity .15s}
+  .dbt-bar{display:block;height:6px;border-radius:999px;background:#e2e8f0;overflow:hidden}
+  .dbt-bar>span{display:block;height:100%;border-radius:inherit;background:#0d9488}
+  .dbt-bar-sm{height:4px;margin-top:.3rem}
+
+  .dbt-panel{padding:0;overflow:hidden}
+  .dbt-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .dbt-panel-head{display:flex;align-items:center;justify-content:space-between;gap:.75rem;padding:1rem 1.25rem;border-bottom:1px solid #f1f5f9}
+  .dbt-link{font-size:.8125rem;font-weight:600;color:#0f766e;background:none;border:0;padding:.25rem .5rem;border-radius:.375rem}
+  .dbt-link:hover{background:#f0fdfa}
+  .dbt-table{width:100%;border-collapse:collapse;font-size:.875rem}
+  .dbt-table th{padding:.7rem 1rem;text-align:left;font-size:.6875rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#64748b;background:#f8fafc;border-bottom:1px solid #e2e8f0;white-space:nowrap}
+  .dbt-table td{padding:.85rem 1rem;border-bottom:1px solid #f1f5f9;vertical-align:middle}
+  .dbt-table tbody tr{transition:background-color .12s}
+  .dbt-table tbody tr:hover{background:#f8fafc}
+  .dbt-table tbody tr:last-child td{border-bottom:0}
+  .dbt-table .num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+  .dbt-table .paid{color:#047857;min-width:7.5rem}
+  .dbt-table .bal{font-weight:700;color:#0f172a}
+  .dbt-table tr.is-settled .bal{color:#94a3b8;font-weight:500}
+  .dbt-table tr.is-overdue td:first-child{box-shadow:inset 3px 0 0 #dc2626}
+  .dbt-table .act{text-align:right}
+  .dbt-table .cust{display:flex;align-items:center;gap:.75rem;min-width:13rem}
+  .dbt-avatar{flex:none;width:2.25rem;height:2.25rem;border-radius:.625rem;background:#ccfbf1;color:#0f766e;font-weight:700;display:flex;align-items:center;justify-content:center}
+  .dbt-name{display:block;font-weight:600;color:#0f172a;overflow:hidden;text-overflow:ellipsis}
+  .dbt-sub{display:block;font-size:.75rem;color:#64748b;margin-top:.1rem}
+  .dbt-date{display:block;font-weight:600;color:#1e293b;white-space:nowrap}
+  /* Actions column: fixed, compact stack so nothing is ever pushed off-screen */
+  .dbt-table th.act,.dbt-table td.act{width:21rem;min-width:21rem}
+  .dbt-actions{display:flex;flex-direction:column;gap:.45rem;width:100%}
+  .dbt-pay{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:.4rem}
+  .dbt-pay .form-input{width:100%;min-width:0;padding:.4rem .6rem;font-size:.8125rem;min-height:36px}
+  .dbt-pay .dbt-pay-btn{grid-column:1/-1;width:100%}
+  .dbt-pay .btn,.dbt-row-actions .btn{min-height:36px;padding:.35rem .75rem;justify-content:center}
+  .dbt-row-actions{display:flex;gap:.4rem}
+  .dbt-row-actions>*{flex:1;min-width:0}
+  .dbt-row-actions form{display:flex}
+  .dbt-row-actions .btn{width:100%;height:36px;white-space:nowrap}
+  .dbt-table .paid{min-width:7rem}
+  .dbt-table .cust{min-width:12rem}
+  .dbt-empty{display:flex;flex-direction:column;align-items:center;gap:.4rem;padding:2.5rem 1rem;color:#94a3b8;text-align:center}
+  .dbt-empty .btn{margin-top:.5rem}
+
+  /* Tablet/mobile: each debt becomes a clean card instead of a cramped table */
+  @media(max-width:1199px){
+    .dbt-table,.dbt-table tbody,.dbt-table tr,.dbt-table td{display:block;width:100%}
+    .dbt-table thead{display:none}
+    .dbt-table tbody{padding:.75rem;display:grid;gap:.75rem}
+    .dbt-table tbody tr{border:1px solid #e2e8f0;border-radius:.875rem;padding:.25rem 0;background:#fff}
+    .dbt-table tbody tr:hover{background:#fff}
+    .dbt-table tr.is-overdue{border-color:#fecaca}
+    .dbt-table tr.is-overdue td:first-child{box-shadow:none}
+    .dbt-table td{border:0;padding:.45rem 1rem;display:flex;justify-content:space-between;align-items:center;gap:1rem;text-align:right;min-width:0 !important}
+    .dbt-table td[data-label]::before{content:attr(data-label);flex:none;font-size:.6875rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#64748b;text-align:left}
+    .dbt-table td.cust{display:flex;text-align:left;padding-top:.8rem;padding-bottom:.6rem;border-bottom:1px solid #f1f5f9}
+    .dbt-table td.cust::before{display:none}
+    .dbt-table td.date>span,.dbt-table td.paid{text-align:right}
+    .dbt-table td.paid{display:block}
+    .dbt-table td.paid::before{display:inline;margin-right:.5rem}
+    .dbt-table td.paid .dbt-bar{margin-left:auto;width:100%}
+    .dbt-table td.act{display:block;width:100%;min-width:0 !important;text-align:left;border-top:1px solid #f1f5f9;padding:.75rem 1rem .85rem}
+    .dbt-table td.act::before{display:none}
+    .dbt-empty-row,.dbt-empty-row td{display:block;border:0}
+    .dbt-table tbody tr.dbt-empty-row{border:0;grid-column:1/-1}
+  }
+  @media(min-width:760px) and (max-width:1199px){
+    .dbt-table tbody{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}
+  }
+</style>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+  var form = document.getElementById('debt-filter-form');
+  var wrap = document.getElementById('debt-results-wrap');
+  var q = document.getElementById('debt-q');
+  var from = document.getElementById('debt-from');
+  var to = document.getElementById('debt-to');
+  var period = document.getElementById('debt-period');
+  var loading = document.getElementById('debt-loading');
+  var timer = null, controller = null;
+
+  function paint() {
+    document.querySelectorAll('.dbt-chip').forEach(function (b) {
+      var on = b.dataset.period === period.value;
+      b.classList.toggle('is-active', on);
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+  }
+  function buildUrl() {
+    var params = new URLSearchParams(new FormData(form));
+    ['q', 'period', 'date_from', 'date_to'].forEach(function (k) { if (!params.get(k)) params.delete(k); });
+    if (params.get('status') === 'all') params.delete('status');
+    if (params.get('sort') === 'status') params.delete('sort');
+    var qs = params.toString();
+    return window.location.pathname + (qs ? '?' + qs : '');
+  }
+  function load(url) {
+    if (controller) controller.abort();
+    controller = new AbortController();
+    wrap.style.opacity = '0.55';
+    loading.classList.remove('hidden');
+    fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' }, signal: controller.signal, credentials: 'same-origin' })
+      .then(function (r) { if (!r.ok) throw new Error('bad'); return r.text(); })
+      .then(function (html) {
+        wrap.innerHTML = html;
+        wrap.style.opacity = '';
+        loading.classList.add('hidden');
+        history.replaceState(null, '', url);
+      })
+      .catch(function (err) {
+        if (err.name !== 'AbortError') { wrap.style.opacity = ''; loading.classList.add('hidden'); window.location.href = url; }
+      });
+  }
+  function schedule(delay) { clearTimeout(timer); timer = setTimeout(function () { load(buildUrl()); }, delay); }
+
+  q.addEventListener('input', function () { schedule(300); });
+  form.addEventListener('submit', function (e) { e.preventDefault(); schedule(0); });
+  ['debt-status', 'debt-sort'].forEach(function (id) {
+    document.getElementById(id).addEventListener('change', function () { schedule(0); });
+  });
+  [from, to].forEach(function (el) {
+    el.addEventListener('change', function () {
+      period.value = '';  // manual dates replace any quick range
+      if (from.value && to.value && from.value > to.value) { var t = from.value; from.value = to.value; to.value = t; }
+      paint(); schedule(0);
+    });
+  });
+  document.querySelectorAll('.dbt-chip').forEach(function (b) {
+    b.addEventListener('click', function () {
+      period.value = b.dataset.period;
+      from.value = ''; to.value = '';
+      paint(); schedule(0);
+    });
+  });
+  function clearAll() {
+    q.value = ''; from.value = ''; to.value = ''; period.value = '';
+    document.getElementById('debt-status').value = 'all';
+    document.getElementById('debt-sort').value = 'status';
+    paint(); schedule(0);
+  }
+  document.addEventListener('click', function (e) {
+    if (e.target.closest('[data-debt-reset]')) { e.preventDefault(); clearAll(); return; }
+    var a = e.target.closest('#debt-results-wrap nav[aria-label="Pagination"] a');
+    if (a) { e.preventDefault(); load(window.location.pathname + a.getAttribute('href')); }
+  });
+  paint();
+})();
+</script>
+{% endblock %}

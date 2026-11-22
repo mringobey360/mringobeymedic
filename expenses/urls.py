@@ -1,0 +1,27 @@
+from django.urls import path
+from . import views
+app_name='expenses'
+urlpatterns=[
+    path('', views.expense_list, name='list'),
+    path('new/', views.expense_create, name='create'),
+    path('<int:pk>/', views.expense_detail, name='detail'),
+    path('<int:pk>/approve/', views.expense_approve, name='approve'),
+    path('<int:pk>/reject/', views.expense_reject, name='reject'),
+    path('report/', views.expense_report, name='report'),
+    path('report/pdf/', views.expense_report_pdf, name='report_pdf'),
+    path('report/excel/', views.expense_report_excel, name='report_excel'),
+    path('cash/', views.cash_control, name='cash'),
+    path('cash/reset-cycle/', views.cash_reset_cycle, name='cash_reset_cycle'),
+    path('cash/open/', views.cash_open, name='cash_open'),
+    path('cash/<int:pk>/adjust-opening/', views.cash_opening_adjust, name='cash_opening_adjust'),
+    path('cash/<int:pk>/count/', views.cash_count, name='cash_count'),
+    path('cash/<int:pk>/count/correct/', views.cash_count_correct, name='cash_count_correct'),
+    path('cash/transfer/', views.cash_transfer_create, name='cash_transfer'),
+    path('cash/transfers/', views.cash_transfer_history, name='cash_transfer_history'),
+    path('cash/transfers/download/', views.cash_transfer_export, name='cash_transfer_export'),
+    path('cash/<int:pk>/mobile-money/', views.mobile_money_check, name='mobile_money_check'),
+    path('cash/<int:pk>/close/', views.cash_close, name='cash_close'),
+    path('cash/<int:pk>/verify-previous-from-opening/', views.cash_verify_previous_from_opening, name='cash_verify_previous_from_opening'),
+    path('cash/<int:pk>/reopen/', views.cash_reopen, name='cash_reopen'),
+    path('cash/<int:pk>/activity/', views.cash_activity_detail, name='cash_activity_detail'),
+]

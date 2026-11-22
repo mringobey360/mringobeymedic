@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Bulk Customer Registration{% endblock %}
+{% block content %}
+<div class="page-shell max-w-5xl">
+  <div class="page-header">
+    <div>
+      <a href="{% url 'customer_registry:list' %}" class="row-action px-0">← Customer Registry</a>
+      <p class="eyebrow mt-3">Customer Management</p>
+      <h1 class="page-title">Bulk Customer Registration</h1>
+      <p class="page-subtitle">Register many customers at once using a simple Excel or CSV file. You only enter customer information—the system manages status automatically.</p>
+    </div>
+    <a href="{% url 'customer_registry:bulk_template' %}" class="btn btn-secondary">Download Excel Template</a>
+  </div>
+
+  <div class="grid lg:grid-cols-3 gap-5">
+    <section class="lg:col-span-2 card space-y-5">
+      <div>
+        <h2 class="section-title">Upload customer file</h2>
+        <p class="section-subtitle">Required: Customer Name and Phone Number. Optional: Notes.</p>
+      </div>
+      <div class="grid sm:grid-cols-3 gap-3">
+        <div class="soft-panel"><p class="text-xs font-bold text-ink-400 uppercase">Required</p><p class="font-semibold mt-1">Customer Name</p></div>
+        <div class="soft-panel"><p class="text-xs font-bold text-ink-400 uppercase">Required</p><p class="font-semibold mt-1">Phone Number</p></div>
+        <div class="soft-panel"><p class="text-xs font-bold text-ink-400 uppercase">Optional</p><p class="font-semibold mt-1">Notes</p></div>
+      </div>
+      <form method="post" enctype="multipart/form-data" class="space-y-5">
+        {% csrf_token %}
+        {% for field in form %}
+          <div>
+            {% if field.name == 'update_existing' %}
+              <label class="flex gap-3 items-start rounded-xl border border-ink-100 bg-ink-50/50 p-3 cursor-pointer">{{ field }}<span><span class="block text-sm font-semibold text-ink-800">{{ field.label }}</span><span class="block text-xs text-ink-500 mt-0.5">If the phone already exists, update the customer's name and notes instead of creating a duplicate.</span></span></label>
+            {% else %}
+              <label class="block text-sm font-semibold mb-1.5">{{ field.label }}</label>{{ field }}{% if field.help_text %}<p class="text-xs text-ink-400 mt-1">{{ field.help_text }}</p>{% endif %}
+            {% endif %}
+            {% if field.errors %}<p class="text-xs text-red-600 mt-1">{{ field.errors.0 }}</p>{% endif %}
+          </div>
+        {% endfor %}
+        <div class="flex flex-col-reverse sm:flex-row gap-2 pt-2">
+          <a class="btn btn-secondary sm:min-w-32" href="{% url 'customer_registry:list' %}">Cancel</a>
+          <button class="btn btn-primary flex-1">Import Customers</button>
+        </div>
+      </form>
+    </section>
+
+    <aside class="space-y-5">
+      <div class="card">
+        <div class="flex items-center gap-3"><div class="w-10 h-10 rounded-xl bg-brand-50 text-brand-700 flex items-center justify-center font-bold">1</div><div><p class="font-bold">Use the template</p><p class="text-xs text-ink-500">Status is automatic</p></div></div>
+        <div class="mt-4 space-y-2 text-sm text-ink-600"><p>✓ Customer Name</p><p>✓ Phone Number</p><p>✓ Notes (optional)</p><p>✓ Status is automatic</p></div>
+      </div>
+      <div class="soft-panel">
+        <p class="font-bold text-ink-800">Automatic checks</p>
+        <ul class="mt-3 space-y-2 text-xs text-ink-600"><li>• Phone numbers are normalized to +255 format.</li><li>• Duplicate customers are detected by phone number per branch.</li><li>• New customers start as <strong>Active</strong>.</li><li>• Invalid rows are reported without stopping the whole import.</li></ul>
+      </div>
+    </aside>
+  </div>
+</div>
+{% endblock %}

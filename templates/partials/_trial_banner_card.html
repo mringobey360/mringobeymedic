@@ -1,0 +1,57 @@
+{% with can_upgrade=user.is_admin_role %}
+<div class="sp-container sp-container-top w-full fp-wrap">
+<section class="fp{% if usage.reached %} fp--limit{% elif usage.near %} fp--near{% endif %}" role="status" aria-live="polite">
+  <div class="fp__lead">
+    <span class="fp__chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l2.4 5.2 5.6.7-4.1 3.9 1.1 5.6L12 15.6 7 18.4l1.1-5.6L4 8.9l5.6-.7z"/></svg>Free Plan</span>
+    {% if usage.reached %}
+      <p class="fp__title">You have used all {{ usage.limit }} free sales this month</p>
+      <p class="fp__sub">Ili kuendelea kuuza, tafadhali lipia akaunti ya Starter. Your products, reports and customers stay available. Free sales return on the 1st of next month.</p>
+    {% elif usage %}
+      <p class="fp__title">{{ usage.remaining }} free sale{{ usage.remaining|pluralize }} left this month</p>
+      <p class="fp__sub">1 shop &middot; 2 users &middot; {{ usage.limit }} sales a month{% if value and value.sales_total %} &middot; {{ value.sales_total }} sale{{ value.sales_total|pluralize }} already recorded in your account{% endif %}. {% if can_upgrade %}Upgrade any time to remove every limit.{% else %}Ask your account owner to upgrade.{% endif %}</p>
+    {% else %}
+      <p class="fp__title">You are on the Free Plan</p>
+      <p class="fp__sub">1 shop &middot; 2 users &middot; limited monthly sales. {% if can_upgrade %}Upgrade any time to remove every limit.{% else %}Ask your account owner to upgrade.{% endif %}</p>
+    {% endif %}
+  </div>
+  {% if usage %}
+  <div class="fp__meter" aria-label="Free sales used this month">
+    <div class="fp__count"><b>{{ usage.used }}</b><i>/ {{ usage.limit }} sales</i></div>
+  </div>
+  {% endif %}
+  {% if can_upgrade %}
+  <a href="{{ href }}{% if '?' not in href %}?renew=1{% endif %}" class="fp__cta">{% if usage.reached %}Upgrade to continue selling{% else %}Upgrade account{% endif %}
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+  {% endif %}
+  {% if usage %}<div class="fp__bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ usage.percent }}" aria-label="Free sales used"><span style="width:{{ usage.percent }}%"></span></div>{% endif %}
+</section>
+</div>
+{% endwith %}
+<style>
+.fp-wrap{padding-bottom:0!important}
+.fp{--c1:#0f766e;--c2:#14b8a6;--bg:linear-gradient(135deg,#f0fdfa,#ffffff 60%);--bd:#99f6e4;--ink:#134e4a;--soft:#0f766e;
+  position:relative;display:flex;align-items:center;gap:1rem;padding:.8rem 1rem .95rem 1.1rem;border:1px solid var(--bd);border-radius:.9rem;overflow:hidden;
+  background:var(--bg);color:var(--ink);box-shadow:0 6px 18px -12px rgba(15,118,110,.5);animation:fp-in .35s ease both}
+.fp--near{--c1:#b45309;--c2:#f59e0b;--bg:linear-gradient(135deg,#fffbeb,#fff 60%);--bd:#fde68a;--ink:#78350f;--soft:#92400e}
+.fp--limit{--c1:#c2410c;--c2:#f97316;--bg:linear-gradient(135deg,#fff4ec,#fff 60%);--bd:#fdba74;--ink:#7c2d12;--soft:#9a3412}
+.fp::before{content:"";position:absolute;inset:0 auto 0 0;width:4px;background:linear-gradient(180deg,var(--c2),var(--c1))}
+.fp__lead{flex:1 1 auto;min-width:0}
+.fp__chip{display:inline-flex;align-items:center;gap:.3rem;padding:.12rem .55rem;border-radius:999px;font-size:.675rem;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#fff;background:linear-gradient(145deg,var(--c2),var(--c1))}
+.fp__chip svg{width:.75rem;height:.75rem}
+.fp__title{margin:.3rem 0 0;font-size:1rem;font-weight:800;line-height:1.25;letter-spacing:-.01em}
+.fp__sub{margin:.15rem 0 0;font-size:.75rem;line-height:1.4;color:var(--soft)}
+.fp__count{flex:none;padding:.35rem .8rem;border-radius:.6rem;text-align:center;background:#fff;border:1px solid var(--bd);box-shadow:0 1px 2px rgba(15,23,42,.05)}
+.fp__count b{font-size:1.35rem;line-height:1.1;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums}
+.fp__count i{display:block;font-style:normal;font-size:.6rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--soft)}
+.fp__cta{flex:none;display:inline-flex;align-items:center;justify-content:center;gap:.4rem;padding:.6rem 1.1rem;min-height:42px;border-radius:.65rem;font-size:.875rem;font-weight:800;color:#fff;text-decoration:none;white-space:nowrap;
+  background:linear-gradient(145deg,var(--c2),var(--c1));box-shadow:0 8px 16px -10px var(--c1);transition:filter .15s,transform .15s}
+.fp__cta:hover{filter:brightness(1.07);transform:translateY(-1px)}.fp__cta svg{width:.95rem;height:.95rem}
+.fp__cta:focus-visible{outline:2px solid var(--c2);outline-offset:2px}
+.fp__bar{position:absolute;left:0;right:0;bottom:0;height:4px;background:rgba(0,0,0,.06)}
+.fp__bar span{display:block;height:100%;background:linear-gradient(90deg,var(--c1),var(--c2));transition:width .8s ease}
+@keyframes fp-in{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+@media (max-width:900px){.fp{flex-wrap:wrap}.fp__lead{flex:1 1 100%}.fp__count{flex:1 1 auto}.fp__cta{flex:1 1 auto}}
+@media (max-width:480px){.fp__cta{flex:1 1 100%}.fp__title{font-size:.9375rem}}
+@media print{.fp-wrap{display:none}}
+@media (prefers-reduced-motion:reduce){.fp,.fp__cta,.fp__bar span{animation:none!important;transition:none!important}}
+</style>

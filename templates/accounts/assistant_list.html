@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+{% block title %}Manager Assistants{% endblock %}
+{% block content %}
+<div class="pro">
+  <div class="pro-head">
+    <div class="pro-head-main">
+      <p class="pro-eyebrow">Team access</p>
+      <h1 class="pro-title">Manager Assistants</h1>
+      <p class="pro-sub">Delegate day-to-day branch operations without sharing your manager password.</p>
+    </div>
+    <div class="pro-tools">
+      {% if can_add_assistant %}
+        <a href="{% url 'accounts:assistant_create' %}" class="btn btn-primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Add Assistant</a>
+      {% else %}
+        <a href="{% url 'accounts:assistant_create' %}" class="btn btn-primary">Upgrade / Add Assistant</a>
+      {% endif %}
+    </div>
+  </div>
+
+  <section class="pro-panel" aria-label="Assistant seats">
+    <div class="pro-seat">
+      <div>
+        <span class="pro-kpi-l">Assistant seats</span>
+        <div class="pro-seat-n">{{ active_assistant_count }} <span>of {{ assistant_limit }} used</span></div>
+        <span class="pro-kpi-n">Included in your {{ subscription.get_tier_display|default:'current' }} plan.</span>
+      </div>
+      <div class="pro-seat-m">
+        <div class="pro-meter {% if not can_add_assistant %}full{% endif %}" role="progressbar" aria-valuemin="0" aria-valuemax="{{ assistant_limit }}" aria-valuenow="{{ active_assistant_count }}"><i style="width:{% widthratio active_assistant_count assistant_limit 100 %}%"></i></div>
+        <span class="pro-kpi-n">{% if can_add_assistant %}You can add more assistants.{% else %}Seat limit reached.{% endif %}</span>
+      </div>
+    </div>
+  </section>
+
+  {% if not can_add_assistant %}
+  <div class="pro-cta">
+    <div class="pro-cta-ic" aria-hidden="true">★</div>
+    <div style="flex:1 1 auto">
+      <h2 style="margin:0;font-size:1rem;font-weight:700">Need another assistant?</h2>
+      <p class="pro-sub" style="margin-top:.25rem">Your current plan has reached its active Assistant limit. Upgrade your subscription to unlock additional Assistant seats.</p>
+      <a href="{% url 'hq:packages_center' %}" class="btn btn-nav btn-secondary" style="margin-top:.75rem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>View subscription</a>
+    </div>
+  </div>
+  {% endif %}
+
+  <section class="pro-panel" aria-label="Your assistants">
+    <div class="pro-panel-h"><div><h2>Your assistants</h2><p>{{ assistants|length }} assistant{{ assistants|length|pluralize }} added.</p></div></div>
+    {% if assistants %}
+      {% for item in assistants %}
+      <div class="pro-row">
+        <div class="pro-who">
+          {% if item.assistant.profile_photo %}<img loading="lazy" decoding="async" src="{{ item.assistant.profile_photo.url }}" class="pro-av" alt="">{% else %}<span class="pro-av" aria-hidden="true">{{ item.assistant.first_name|default:item.assistant.username|slice:':1'|upper }}</span>{% endif %}
+          <div>
+            <div class="pro-cell-main">{% firstof item.assistant.get_full_name item.assistant.username %}</div>
+            <div class="pro-cell-sub">@{{ item.assistant.username }} · Default: {{ item.pharmacy.name }}</div>
+            <div class="pro-cell-sub">{% if item.branch_access_mode == "ALL" %}All manager branches{% else %}Selected branches: {{ item.branches.count }}{% endif %}</div>
+            <div style="margin-top:.4rem;display:flex;flex-wrap:wrap;align-items:center;gap:.5rem">
+              <span class="pro-b {% if item.active %}ok{% else %}plain{% endif %}">{% if item.active %}Active{% else %}Inactive{% endif %}</span>
+              <span class="pro-cell-sub" style="margin:0">{{ item.permissions|length }} permissions</span>
+            </div>
+          </div>
+        </div>
+        <div class="pro-actions">
+          <a href="{% url 'accounts:assistant_permissions' item.pk %}" class="pro-link bd">Permissions</a>
+          <form method="post" action="{% url 'accounts:assistant_reset_pin' item.pk %}" data-confirm="Reset this assistant's PIN?" data-confirm-detail="Their PIN and remembered devices are removed. They must sign in with their password and create a new PIN.">{% csrf_token %}<button class="pro-link bd">Reset PIN</button></form>
+          <form method="post" action="{% url 'accounts:assistant_release_device' item.pk %}" data-confirm="Release this assistant's device?" data-confirm-detail="Use this if they are stuck as 'signed in on another device'. The other device is signed out and they can sign in anywhere.">{% csrf_token %}<button class="pro-link bd">Release device</button></form>
+          <form method="post" action="{% url 'accounts:assistant_toggle_active' item.pk %}">{% csrf_token %}<button class="pro-link bd {% if item.active %}danger{% endif %}">{% if item.active %}Deactivate{% else %}Activate{% endif %}</button></form>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="pro-empty"><strong>No Manager Assistant has been added yet</strong>Add an assistant to share daily operations without sharing your password.</div>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

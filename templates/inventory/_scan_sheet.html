@@ -1,0 +1,73 @@
+{# Fragment loaded into the scan sheet (register new product / restock). Re-rendered with errors on invalid POST. #}
+<form class="pqs-form" method="post" action="{{ action_url }}" novalidate data-mode="{{ mode }}"{% if mode == 'restock' %} data-current-stock="{{ stock|stringformat:'d' }}"{% if last %} data-last-cost="{{ last.purchase_price|stringformat:'s' }}"{% endif %}{% endif %}>
+    {% csrf_token %}
+    {% if stay %}<input type="hidden" name="stay" value="1">{% endif %}
+    {% if mode == "register" %}<input type="hidden" name="scanned_barcode" value="{{ code }}" data-pqs-scanned-barcode>{% endif %}
+    <div class="pqs-head">
+        {% if mode == 'register' %}
+        <span class="pqs-badge is-new">NEW PRODUCT</span>
+        <h2>Register new product</h2>
+        <p class="pqs-sub">Barcode <b>{{ code|default:"(auto-generated)" }}</b> is not in this branch yet.</p>
+        {% if lookup %}
+        <p class="pqs-found"><b>Name suggested</b> from {% if lookup.from_shop %}your SmartPOS catalog{% else %}{{ lookup.source_label }}{% endif %}. Please confirm it before saving. Prices and stock are entered by you.</p>
+        {% elif no_match %}
+        <p class="pqs-note"><b>No catalog match.</b> Enter the product name once; it will be filled in automatically the next time this barcode is scanned.</p>
+        {% endif %}
+        {% else %}
+        <span class="pqs-badge is-restock">RESTOCK</span>
+        <h2>{{ product.name }}</h2>
+        <p class="pqs-sub">{% if product.barcode %}Barcode {{ product.barcode }} &middot; {% endif %}Receive a new batch. Existing stock is never overwritten.</p>
+        <div class="pqs-stock is-{{ stock_state }}" aria-label="Current stock">
+            <div class="pqs-stock-top">
+                <span class="pqs-stock-label">Current stock</span>
+                <span class="pqs-stock-num">{{ stock }}</span>
+                <span class="pqs-stock-unit">{{ product.get_unit_display }}</span>
+                <span class="pqs-chip is-{{ stock_state }}">{% if stock_state == 'out' %}Out of stock{% elif stock_state == 'low' %}Low stock{% else %}In stock{% endif %}</span>
+            </div>
+            <dl class="pqs-meta">
+                <div><dt>Reorder level</dt><dd>{{ reorder_level }}</dd></div>
+                <div><dt>Batches in stock</dt><dd>{{ batch_count }}</dd></div>
+                <div><dt>Nearest expiry</dt><dd>{% if nearest_expiry %}{{ nearest_expiry|date:"d M Y" }}{% else %}&mdash;{% endif %}</dd></div>
+                <div><dt>Last cost / unit</dt><dd>{% if last %}TSh {{ last.purchase_price|floatformat:"-2" }}{% else %}&mdash;{% endif %}</dd></div>
+                <div><dt>Last price / unit</dt><dd>{% if last %}TSh {{ last.selling_price|floatformat:"-2" }}{% else %}&mdash;{% endif %}</dd></div>
+                <div><dt>Average cost</dt><dd>{% if avg_cost %}TSh {{ avg_cost|floatformat:"-2" }}{% else %}&mdash;{% endif %}</dd></div>
+            </dl>
+        </div>
+        {% endif %}
+    </div>
+
+    {% if mode == 'register' %}
+        {% if pform.non_field_errors %}<p class="pqs-err">{{ pform.non_field_errors.0 }}</p>{% endif %}
+        <div class="pqs-sec">1. Product</div>
+        <div class="pqs-grid">
+            {% include "inventory/_scan_field.html" with field=pform.name wide=True %}
+            {% include "inventory/_scan_field.html" with field=pform.category hint="Not listed? Choose Add new category." %}
+            {% include "inventory/_scan_field.html" with field=pform.unit hint="Smallest unit you sell. Not listed? Choose Add new unit." %}
+            {% include "inventory/_scan_field.html" with field=pform.reorder_level hint="Low-stock alert level." %}
+            {% include "inventory/_scan_field.html" with field=pform.barcode %}
+            {% include "inventory/_scan_field.html" with field=pform.requires_expiry wide=True %}
+        </div>
+    {% endif %}
+
+    {% if bform.non_field_errors %}<p class="pqs-err">{{ bform.non_field_errors.0 }}</p>{% endif %}
+    <div class="pqs-sec">{% if mode == 'register' %}2. Opening stock &amp; prices{% else %}Stock received &amp; prices{% endif %}</div>
+    <div class="pqs-grid">
+        {% include "inventory/_scan_field.html" with field=bform.purchase_quantity %}
+        {% include "inventory/_scan_field.html" with field=bform.purchase_unit hint="e.g. Box. Leave blank if bought per unit." %}
+        {% include "inventory/_scan_field.html" with field=bform.units_per_purchase_unit hint="e.g. 100 tablets in 1 Box." %}
+        {% include "inventory/_scan_field.html" with field=bform.purchase_unit_price hint="Buying price of ONE purchase unit." %}
+        {% include "inventory/_scan_field.html" with field=bform.selling_price hint="Selling price of ONE base unit." %}
+        {% include "inventory/_scan_field.html" with field=bform.expiry_date %}
+        {% include "inventory/_scan_field.html" with field=bform.batch_number %}
+        {% include "inventory/_scan_field.html" with field=bform.note %}
+    </div>
+
+    <div class="pqs-preview" aria-live="polite"><b>Check</b><span data-pqs-preview>Enter quantity and prices.</span></div>
+
+    <div class="pqs-foot">
+        <a class="pqs-more" href="{{ full_url }}">Full form</a>
+        <button type="button" class="pqs-btn" data-pqs-cancel>Cancel</button>
+        <button type="submit" name="next" value="0" class="pqs-btn is-primary">{% if stay %}{% if mode == 'restock' %}Confirm restock{% else %}Save product{% endif %}{% else %}Save &amp; view product{% endif %}</button>
+        <button type="submit" name="next" value="1" class="pqs-btn is-primary is-strong">Save &amp; scan next</button>
+    </div>
+</form>

@@ -1,0 +1,26 @@
+{% extends 'marketplace/base.html' %}{% load humanize %}{% block title %}Payment result · SmartPOS Marketplace{% endblock %}{% block body %}
+<section class="panel" style="max-width:780px;margin:32px auto;padding:clamp(22px,4vw,40px)">
+  {% if order %}
+    <p class="eyebrow">SMARTPOS MARKETPLACE · PAYMENT CONFIRMED</p>
+    <h1>Payment confirmed</h1>
+    <p class="muted">Your payment has been verified and your official order has been created.</p>
+    <div class="summary-line"><span>Ticket ID</span><strong><code>{{ short_ref }}</code></strong></div>
+    <div class="summary-line"><span>Payment status</span><strong>Paid</strong></div>
+    <div class="summary-line"><span>Total paid</span><strong>TSh {{ order.total|floatformat:0|intcomma }}</strong></div>
+    <h2 style="font-size:1.05rem;margin-top:24px">Order summary</h2>
+    {% for item in order.items.all %}<div class="summary-line"><span>{{ item.name }} × {{ item.quantity }}</span><strong>TSh {{ item.unit_price|floatformat:0|intcomma }}</strong></div>{% endfor %}
+    <p class="muted">Save this Ticket ID and the phone number used at checkout. They let you retrieve your paid downloads from Track Order.</p>
+    {% include 'marketplace/_download_links.html' %}
+    <div class="pay-actions"><a class="btn outline" href="{% url 'marketplace:customer_receipt' order.reference %}?phone={{ order.phone|urlencode }}">Download watermarked receipt (PDF)</a></div>
+    <div class="pay-actions"><a class="btn checkout-btn" href="{% url 'marketplace:track' %}?reference={{ order.reference }}&phone={{ order.phone|urlencode }}">Track this order</a></div>
+  {% else %}
+    <p class="eyebrow">SMARTPOS MARKETPLACE · PAYMENT STATUS</p>
+    {% if txn.status == 'CANCELLED' %}<h1>Payment cancelled</h1><p class="muted">You cancelled the payment, so no money was taken and no official order or Ticket ID was created. Your cart is still available.</p>
+    {% elif txn.status == 'FAILED' or attempt.status == 'failed' %}<h1>Payment was not completed</h1><p class="muted">No official order or Ticket ID has been created and nothing was charged. Your cart is still available so you can retry.</p>
+    {% else %}<h1>Payment is being verified</h1><p class="muted">SmartPOS has not confirmed the payment yet. No official order or Ticket ID will be issued until confirmation is received. This page will not charge you twice.</p>{% endif %}
+    <div class="summary-line"><span>Payment reference</span><strong class="pay-ref">{{ short_ref }}</strong></div>
+    <div class="summary-line"><span>Amount</span><strong>TSh {{ attempt.total|floatformat:0|intcomma }}</strong></div>
+    <div class="pay-actions"><a class="btn checkout-btn" href="{% url 'marketplace:cart' %}">Return to cart</a><a class="btn outline" href="{% url 'marketplace:track' %}">Track an order</a></div>
+  {% endif %}
+</section>
+{% endblock %}

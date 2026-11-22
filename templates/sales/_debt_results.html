@@ -1,0 +1,134 @@
+{% load tz %}
+{% comment %}Customer Debts results — summary + table/cards. Swapped in place by the live auto-filter and included on first load.{% endcomment %}
+<div id="debt-results" data-total="{{ summary.count }}">
+
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-4">
+    <div class="card stat-card">
+      <div class="stat-head">
+        <div class="stat-icon bg-red-50 text-red-600"><svg class="w-4 h-4" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/></svg></div>
+        <p class="stat-label">Outstanding balance</p>
+      </div>
+      {% with amount=summary.balance|floatformat:0 %}<p class="stat-value text-ink-900" style="--n: {{ amount|length }}"><span class="stat-cur">TZS</span>{{ amount }}</p>{% endwith %}
+      <p class="text-xs text-ink-400 mt-1">{{ summary.pending_count }} pending debt{{ summary.pending_count|pluralize }}</p>
+    </div>
+    <div class="card stat-card">
+      <div class="stat-head">
+        <div class="stat-icon bg-brand-50 text-brand-700"><svg class="w-4 h-4" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5L20 7"/></svg></div>
+        <p class="stat-label">Collected</p>
+      </div>
+      {% with amount=summary.paid|floatformat:0 %}<p class="stat-value text-brand-700" style="--n: {{ amount|length }}"><span class="stat-cur">TZS</span>{{ amount }}</p>{% endwith %}
+      <div class="dbt-bar mt-2" role="img" aria-label="Collection rate {{ summary.collection_rate }}%"><span style="width:{{ summary.collection_rate }}%"></span></div>
+      <p class="text-xs text-ink-400 mt-1">{{ summary.collection_rate }}% of TZS {{ summary.owed|floatformat:0 }} lent</p>
+    </div>
+    <div class="card stat-card">
+      <div class="stat-head">
+        <div class="stat-icon bg-ink-100 text-ink-600"><svg class="w-4 h-4" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg></div>
+        <p class="stat-label">Records shown</p>
+      </div>
+      <p class="stat-value text-ink-900" style="--n: 4">{{ summary.count }}</p>
+      <p class="text-xs text-ink-400 mt-1">matching current filters</p>
+    </div>
+    <div class="card stat-card">
+      <div class="stat-head">
+        <div class="stat-icon {% if summary.overdue_count %}bg-red-50 text-red-600{% else %}bg-ink-100 text-ink-600{% endif %}"><svg class="w-4 h-4" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
+        <p class="stat-label">Over 30 days</p>
+      </div>
+      <p class="stat-value {% if summary.overdue_count %}text-red-600{% else %}text-ink-900{% endif %}" style="--n: 4">{{ summary.overdue_count }}</p>
+      <p class="text-xs text-ink-400 mt-1">need follow-up</p>
+    </div>
+  </div>
+
+  <div class="card dbt-panel pc-table-keep">
+    <div class="dbt-panel-head">
+      <div>
+        <h2 class="font-semibold text-ink-900">Debt ledger</h2>
+        <p class="text-xs text-ink-500">{% if page_obj.paginator.count %}Showing {{ page_obj.start_index }}–{{ page_obj.end_index }} of {{ page_obj.paginator.count }}{% else %}No records{% endif %}</p>
+      </div>
+      {% if has_filters %}<button type="button" class="dbt-link" data-debt-reset>Clear filters</button>{% endif %}
+    </div>
+
+    <div class="dbt-scroll">
+    <table class="dbt-table pc-table">
+      <thead>
+        <tr>
+          <th>Customer</th>
+          <th>Date lent</th>
+          <th class="num">Owed</th>
+          <th class="num">Paid</th>
+          <th class="num">Balance</th>
+          <th>Status</th>
+          <th class="act">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for debt in page_obj %}
+        <tr class="{% if debt.is_overdue %}is-overdue{% elif debt.is_settled %}is-settled{% endif %}">
+          <td data-label="Customer" class="cust">
+            <span class="dbt-avatar" aria-hidden="true">{{ debt.customer_name|slice:":1"|upper }}</span>
+            <span class="min-w-0">
+              <span class="dbt-name">{{ debt.customer_name }}</span>
+              <span class="dbt-sub">{% if debt.customer_phone %}{{ debt.customer_phone }}{% else %}No phone{% endif %}{% if debt.sale.sale_number %} · Sale #{{ debt.sale.sale_number }}{% endif %}</span>
+            </span>
+          </td>
+          <td data-label="Date lent" class="date">
+            <span class="dbt-date">{{ debt.created_at|localtime|date:"d M Y" }}</span>
+            <span class="dbt-sub">{{ debt.created_at|localtime|date:"H:i" }} · {% if debt.age_days == 0 %}Today{% elif debt.age_days == 1 %}Yesterday{% else %}{{ debt.age_days }} days ago{% endif %}</span>
+          </td>
+          <td data-label="Owed" class="num">TZS {{ debt.amount_owed|floatformat:0 }}</td>
+          <td data-label="Paid" class="num paid">
+            TZS {{ debt.amount_paid|floatformat:0 }}
+            {% if debt.deposit_amount %}<span class="dbt-sub">at sale {{ debt.deposit_amount|floatformat:0 }}{% if debt.repaid_amount %} · later {{ debt.repaid_amount|floatformat:0 }}{% endif %}</span>{% endif %}
+            <span class="dbt-bar dbt-bar-sm" aria-hidden="true"><span style="width:{{ debt.paid_pct }}%"></span></span>
+          </td>
+          <td data-label="Balance" class="num bal">TZS {{ debt.balance|floatformat:0 }}</td>
+          <td data-label="Status">
+            {% if debt.is_settled %}<span class="badge bg-green-100 text-green-700">Settled</span>
+            {% elif debt.is_overdue %}<span class="badge bg-red-100 text-red-700">Overdue</span>
+            {% elif debt.is_aging %}<span class="badge bg-amber-100 text-amber-700">Ageing</span>
+            {% else %}<span class="badge bg-blue-100 text-blue-700">Pending</span>{% endif %}
+          </td>
+          <td data-label="Actions" class="act">
+            <div class="dbt-actions">
+              {% if not debt.is_settled %}
+              <form method="post" action="{% url 'sales:debt_pay' debt.pk %}" class="dbt-pay">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                <input type="number" name="amount" min="1" max="{{ debt.balance|floatformat:0 }}" step="1" placeholder="Amount (TZS)" inputmode="decimal" autocomplete="off" aria-label="Payment amount for {{ debt.customer_name }}" class="currency-field form-input">
+                <select name="payment_method" class="form-input" aria-label="How {{ debt.customer_name }} paid" title="Cash goes into the cash drawer; mobile money / bank does not">
+                  <option value="CASH" selected>Cash (drawer)</option>
+                  <option value="MOBILE_MONEY">Mobile / bank</option>
+                </select>
+                <button type="submit" class="btn btn-success dbt-pay-btn">Record Payment</button>
+              </form>
+              {% endif %}
+              <div class="dbt-row-actions">
+                <a href="{% url 'sales:debt_detail' debt.pk %}" class="btn btn-secondary">Trace</a>
+                <a href="{% url 'sales:debt_edit' debt.pk %}" class="btn btn-secondary">Edit</a>
+                {% if not debt.is_settled and debt.customer_phone %}
+                <form method="post" action="{% url 'sales:debt_remind' debt.pk %}">
+                  {% csrf_token %}
+                  <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                  <button type="submit" class="btn btn-secondary" title="Premium: send SMS reminder"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/></svg> SMS</button>
+                </form>
+                {% endif %}
+              </div>
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr class="dbt-empty-row"><td colspan="7">
+          <div class="dbt-empty">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            <p class="font-semibold text-ink-700">{% if has_filters %}No debts match your filters{% else %}No debts recorded yet{% endif %}</p>
+            <p class="text-xs text-ink-500">{% if has_filters %}Try a different name, phone, date or status.{% else %}Credit sales will appear here with the date the customer was lent.{% endif %}</p>
+            {% if has_filters %}<button type="button" class="btn btn-secondary" data-debt-reset>Clear all filters</button>{% endif %}
+          </div>
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </div>
+
+  {% include "partials/pagination.html" with page_obj=page_obj %}
+</div>

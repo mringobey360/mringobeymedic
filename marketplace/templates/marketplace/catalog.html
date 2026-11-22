@@ -1,0 +1,52 @@
+{% extends 'marketplace/base.html' %}
+{% load humanize cart_tags %}
+{% block title %}Marketplace{% endblock %}
+{% block body %}
+<div class="sp-page">
+  <section aria-labelledby="trend-h">
+    <div class="sp-sec-head"><h2 id="trend-h"><svg class="i"><use href="#i-flame"/></svg> Trending now</h2>
+      <div class="sp-seg" role="tablist" aria-label="Trending period"><a class="{% if period == 'today' %}active{% endif %}" href="?period=today">Today</a><a class="{% if period == 'week' %}active{% endif %}" href="?period=week">This week</a><a class="{% if period == 'month' %}active{% endif %}" href="?period=month">This month</a></div></div>
+    {% if trending %}<div class="sp-trend" id="sp-auto-trend" aria-label="Trending products">{% for p in trending %}{% include 'marketplace/_product_card.html' with product=p rank=forloop.counter compact=True %}{% endfor %}</div>
+    {% else %}<p class="sub" style="color:var(--muted);margin:0 0 30px">Products will appear here soon.</p>{% endif %}
+  </section>
+
+  <section id="products" aria-labelledby="explore-h">
+    <div class="sp-sec-head"><h2 id="explore-h">Explore products</h2><span class="sub">{{ products.paginator.count }} product{{ products.paginator.count|pluralize }}</span></div>
+    <div class="sp-cats"><a class="sp-chip-link {% if not selected_category %}active{% endif %}" href="{% url 'marketplace:catalog' %}">All categories</a>{% for c in categories %}<a class="sp-chip-link {% if selected_category == c.slug %}active{% endif %}" href="?category={{ c.slug|urlencode }}">{{ c.name }}</a>{% endfor %}</div>
+    {% if selected_seller %}<div class="sp-filter-note">Seller: {{ selected_seller }} <a href="{% url 'marketplace:catalog' %}" aria-label="Clear seller filter"><svg class="i"><use href="#i-x"/></svg></a></div>{% endif %}
+    {% if q %}<div class="sp-filter-note">Results for “{{ q }}” <a href="{% url 'marketplace:catalog' %}" aria-label="Clear search"><svg class="i"><use href="#i-x"/></svg></a></div>{% endif %}
+    <div class="sp-grid" id="marketplace-product-grid">
+      {% for product in products %}{% include 'marketplace/_product_card.html' %}
+      {% empty %}<div class="sp-empty sp-empty-rich"><div class="sp-sg-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></div>
+        {% if q %}<h3>No product found for “{{ q }}”</h3><p>We could not find a matching product right now. It may be out of stock or not listed yet.</p>
+        <ul><li>Check the spelling or try a shorter word</li><li>Search by product type, e.g. “shoes” instead of a full model name</li><li>Browse a category below to see what is available</li></ul>
+        {% else %}<h3>No products here yet</h3><p>There is nothing in this section at the moment. Please check back soon or explore another category.</p>{% endif %}
+        <div class="sp-empty-actions"><a class="sp-pill-btn" href="{% url 'marketplace:catalog' %}">Show all products</a></div></div>{% endfor %}
+    </div>
+    {% if products.has_other_pages %}<nav class="sp-pager" aria-label="Product pages">{% if products.has_previous %}<a class="sp-pill-btn" href="?q={{ q|urlencode }}&category={{ selected_category|urlencode }}&seller={{ selected_seller|urlencode }}&page={{ products.previous_page_number }}">← Previous</a>{% endif %}<span>Page {{ products.number }} of {{ products.paginator.num_pages }}</span>{% if products.has_next %}<a class="sp-pill-btn" href="?q={{ q|urlencode }}&category={{ selected_category|urlencode }}&seller={{ selected_seller|urlencode }}&page={{ products.next_page_number }}">Next →</a>{% endif %}</nav>{% endif %}
+  </section>
+</div>
+<script>
+(function(){
+ const track=document.getElementById('sp-auto-trend');
+ if(!track || track.children.length<2 || window.matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+ let paused=false, last=0, raf;
+ const tick=function(now){
+   if(!last)last=now;
+   const dt=Math.min(now-last,50);last=now;
+   if(!paused && !document.hidden){
+     const limit=track.scrollWidth-track.clientWidth;
+     if(limit>0){track.scrollLeft+=dt*.035;if(track.scrollLeft>=limit-1)track.scrollLeft=0;}
+   }
+   raf=requestAnimationFrame(tick);
+ };
+ track.addEventListener('mouseenter',()=>paused=true);
+ track.addEventListener('mouseleave',()=>paused=false);
+ track.addEventListener('focusin',()=>paused=true);
+ track.addEventListener('focusout',()=>paused=false);
+ track.addEventListener('touchstart',()=>paused=true,{passive:true});
+ track.addEventListener('touchend',()=>paused=false,{passive:true});
+ raf=requestAnimationFrame(tick);
+})();
+</script>
+{% endblock %}

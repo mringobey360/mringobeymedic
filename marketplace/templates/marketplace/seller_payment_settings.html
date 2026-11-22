@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Payment connection · SmartPOS{% endblock %}
+{% block extra_head %}{% include 'marketplace/_mk_styles.html' %}{% endblock %}
+{% block content %}
+<div class="mk-page">
+ <nav class="mk-crumbs" aria-label="Breadcrumb"><a href="{% url 'marketplace:seller_dashboard' %}">Seller Centre</a><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg><span>Payments &amp; billing</span><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg><b>Payment connection</b></nav>
+ <header class="mk-hero">
+  <div class="mk-hero-main">
+   <span class="mk-hero-icon"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M7 15h4"/></svg></span>
+   <div><h1>Payment connection</h1><p>{{ store.public_name }} · connect your own payment provider so customers pay you directly.</p></div>
+  </div>
+  <div class="mk-actions">{% if profile.ready_for_direct_payment %}<span class="mk-badge mk-b-active">Ready for direct payments</span>{% else %}<span class="mk-badge mk-b-warn">Not verified</span>{% endif %}</div>
+ </header>
+
+ <form method="post" id="mk-pay-form" class="mk-form" autocomplete="off">{% csrf_token %}
+ <div class="mk-layout">
+  <div class="mk-main">
+   <section class="mk-sect">
+    <div class="mk-sect-h"><span class="mk-sect-ico"><svg viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 4.5 3.2 7.6 8 9 4.8-1.4 8-4.5 8-9V6l-8-3z"/><path d="m9 12 2 2 4-4"/></svg></span><div><h2>Payment provider</h2><p>Choose the provider you have a merchant account with. Only that provider's credentials are needed.</p></div></div>
+    <div class="mk-sect-b">
+     <div class="mk-choices" role="radiogroup" aria-label="Payment provider">
+      <label class="mk-choice-opt"><input type="radio" name="provider" value="ABLINER" required {% if profile.provider == 'ABLINER' %}checked{% endif %}><span class="mk-choice-card"><span class="mk-radio"></span><span><strong>ABLiner</strong><small>Mobile money and cards through your ABLiner merchant account.</small></span></span></label>
+      <label class="mk-choice-opt"><input type="radio" name="provider" value="PESAPAL" {% if profile.provider == 'PESAPAL' %}checked{% endif %}><span class="mk-choice-card"><span class="mk-radio"></span><span><strong>Pesapal</strong><small>Mobile money and cards through your Pesapal merchant account.</small></span></span></label>
+     </div>
+    </div>
+   </section>
+
+   <section class="mk-sect" data-provider-panel="ABLINER">
+    <div class="mk-sect-h"><span class="mk-sect-ico"><svg viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="m10.8 12.2 8.2-8.2M16 7l3 3M14 9l2 2"/></svg></span><div><h2>ABLiner credentials</h2><p>Found in your ABLiner merchant dashboard. Leave a field blank to keep what is already saved.</p></div></div>
+    <div class="mk-sect-b"><div class="mk-form-grid">
+     <div class="mk-field"><label class="mk-label" for="abliner_api_key">Merchant API key{% if profile.abliner_api_key %}<span class="mk-saved">✓ Saved</span>{% endif %}</label><div class="mk-secret"><input id="abliner_api_key" name="abliner_api_key" type="password" autocomplete="new-password" data-lpignore="true" data-1p-ignore spellcheck="false" placeholder="{% if profile.abliner_api_key %}•••••••• (leave blank to keep){% else %}Paste your API key{% endif %}"><button type="button" data-reveal="abliner_api_key">Show</button></div></div>
+     <div class="mk-field"><label class="mk-label" for="abliner_webhook_secret">Webhook signing secret{% if profile.abliner_webhook_secret %}<span class="mk-saved">✓ Saved</span>{% endif %}</label><div class="mk-secret"><input id="abliner_webhook_secret" name="abliner_webhook_secret" type="password" autocomplete="new-password" data-lpignore="true" data-1p-ignore spellcheck="false" placeholder="{% if profile.abliner_webhook_secret %}•••••••• (leave blank to keep){% else %}Paste your signing secret{% endif %}"><button type="button" data-reveal="abliner_webhook_secret">Show</button></div></div>
+     <div class="mk-field full"><label class="mk-label" for="abliner_base_url">ABLiner base URL</label><input id="abliner_base_url" name="abliner_base_url" value="{{ profile.abliner_base_url|default:'https://abliner.net' }}"><small class="mk-help">Change this only if ABLiner gave you a different address.</small></div>
+    </div></div>
+   </section>
+
+   <section class="mk-sect" data-provider-panel="PESAPAL">
+    <div class="mk-sect-h"><span class="mk-sect-ico"><svg viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="m10.8 12.2 8.2-8.2M16 7l3 3M14 9l2 2"/></svg></span><div><h2>Pesapal credentials</h2><p>Use Sandbox while testing, then switch to Live once Pesapal approves your account.</p></div></div>
+    <div class="mk-sect-b"><div class="mk-form-grid">
+     <div class="mk-field full"><span class="mk-label">Environment</span>
+      <div class="mk-choices">
+       <label class="mk-choice-opt"><input type="radio" name="pesapal_environment" value="SANDBOX" {% if profile.pesapal_environment != 'LIVE' %}checked{% endif %}><span class="mk-choice-card"><span class="mk-radio"></span><span><strong>Sandbox</strong><small>Test mode. No real money moves.</small></span></span></label>
+       <label class="mk-choice-opt is-live"><input type="radio" name="pesapal_environment" value="LIVE" {% if profile.pesapal_environment == 'LIVE' %}checked{% endif %}><span class="mk-choice-card"><span class="mk-radio"></span><span><strong>Live</strong><small>Real customer payments. Use only after approval.</small></span></span></label>
+      </div></div>
+     <div class="mk-field"><label class="mk-label" for="pesapal_consumer_key">Merchant Consumer Key{% if profile.pesapal_consumer_key %}<span class="mk-saved">✓ Saved</span>{% endif %}</label><div class="mk-secret"><input id="pesapal_consumer_key" name="pesapal_consumer_key" type="password" autocomplete="new-password" data-lpignore="true" data-1p-ignore spellcheck="false" placeholder="{% if profile.pesapal_consumer_key %}•••••••• (leave blank to keep){% else %}Paste your consumer key{% endif %}"><button type="button" data-reveal="pesapal_consumer_key">Show</button></div></div>
+     <div class="mk-field"><label class="mk-label" for="pesapal_consumer_secret">Merchant Consumer Secret{% if profile.pesapal_consumer_secret %}<span class="mk-saved">✓ Saved</span>{% endif %}</label><div class="mk-secret"><input id="pesapal_consumer_secret" name="pesapal_consumer_secret" type="password" autocomplete="new-password" data-lpignore="true" data-1p-ignore spellcheck="false" placeholder="{% if profile.pesapal_consumer_secret %}•••••••• (leave blank to keep){% else %}Paste your consumer secret{% endif %}"><button type="button" data-reveal="pesapal_consumer_secret">Show</button></div></div>
+    </div></div>
+   </section>
+
+   <div class="mk-actionbar"><span>Saving never switches on live collection by itself.</span><div class="mk-actions"><a class="btn btn-secondary" href="{% url 'marketplace:seller_dashboard' %}">Cancel</a><button class="btn btn-primary" type="submit">Save payment details</button></div></div>
+  </div>
+
+  <aside class="mk-aside" aria-label="Connection status">
+   <div class="mk-aside-card">
+    <h3><svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Go-live checklist</h3>
+    <ul class="mk-checklist">
+     <li class="{% if profile.provider %}is-done{% endif %}"><i><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg></i><span><b>Provider chosen</b><br>ABLiner or Pesapal</span></li>
+     <li class="{% if profile.abliner_api_key or profile.pesapal_consumer_key %}is-done{% endif %}"><i><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg></i><span><b>Credentials saved</b><br>Stored encrypted</span></li>
+     <li class="{% if profile.verified %}is-done{% endif %}"><i><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg></i><span><b>Provider approval and callback test</b><br>Confirmed by the platform team</span></li>
+     <li class="{% if profile.ready_for_direct_payment %}is-done{% endif %}"><i><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg></i><span><b>Direct payments enabled</b><br>Customers pay you directly</span></li>
+    </ul>
+   </div>
+   <div class="mk-aside-card is-warn">
+    <h3><svg viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>Payments stay disabled until verified</h3>
+    <p>Saving credentials does not automatically enable live collection. Provider approval, secure callback/IPN validation and a successful end-to-end test are required first.</p>
+   </div>
+   <div class="mk-aside-card is-tint">
+    <h3><svg viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Keep your account safe</h3>
+    <p>Never enter card numbers, PINs or customer passwords here. Credentials are encrypted at rest and SmartPOS does not collect payment card details.</p>
+   </div>
+  </aside>
+ </div>
+ </form>
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+(function(){
+ var form=document.getElementById('mk-pay-form'); if(!form) return;
+ var panels=form.querySelectorAll('[data-provider-panel]');
+ function sync(){
+  var c=form.querySelector('input[name="provider"]:checked'), v=c?c.value:'';
+  panels.forEach(function(p){ p.hidden = !!v && p.getAttribute('data-provider-panel')!==v; });
+ }
+ form.querySelectorAll('input[name="provider"]').forEach(function(r){ r.addEventListener('change',sync); });
+ sync();
+ /* Browsers draw their own eye icon inside password inputs, which clashes with our Show/Hide button.
+    Where CSS masking is supported we use a masked text input instead (no native icon). */
+ var masked=window.CSS&&CSS.supports&&CSS.supports('-webkit-text-security','disc');
+ form.querySelectorAll('.mk-secret input').forEach(function(i){ if(masked){ i.type='text'; i.classList.add('mk-masked'); } });
+ form.addEventListener('click',function(e){
+  var b=e.target.closest('[data-reveal]'); if(!b) return;
+  var i=document.getElementById(b.getAttribute('data-reveal')); if(!i) return;
+  var hidden=masked?i.classList.contains('mk-masked'):i.type==='password';
+  if(masked) i.classList.toggle('mk-masked',!hidden); else i.type=hidden?'text':'password';
+  b.textContent=hidden?'Hide':'Show';
+ });
+})();
+</script>
+{% endblock %}

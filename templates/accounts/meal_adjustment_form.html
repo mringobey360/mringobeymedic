@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Meal Override{% endblock %}
+{% block content %}
+<div class="max-w-xl mx-auto">
+<div class="card">
+<h1 class="text-xl font-bold mb-1">Meal Override — {% firstof employee.get_full_name employee.username %}</h1>
+<p class="text-sm text-ink-500 mb-5">Choose exactly what this employee should be paid for on this date. Saving replaces the normal weekly policy only for this date.</p>
+<form method="post" class="space-y-4">{% csrf_token %}
+{% for field in form %}<div>{% if field.field.widget.input_type == 'checkbox' %}<label class="flex items-center gap-2">{{ field }}<span class="text-sm font-medium">{{ field.label }}</span></label>{% else %}<label class="block text-sm font-medium mb-1">{{ field.label }}</label>{{ field }}{% endif %}{% if field.errors %}<p class="text-xs text-red-600 mt-1">{{ field.errors.0 }}</p>{% endif %}</div>{% endfor %}
+<div class="rounded-lg bg-ink-50 p-3 text-xs text-ink-500">Examples: “Worked full Saturday shift”, “Sunday shift after church”, “Did not work”. For <strong>No meals</strong>, leave all three meal boxes unchecked.</div>
+<div class="flex gap-3"><button class="btn btn-primary" type="submit">Save Date Override</button><a class="btn btn-secondary" href="{% url 'accounts:employee_compensation' employee.pk %}">Cancel</a></div>
+</form></div></div>
+{% endblock %}

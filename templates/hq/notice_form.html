@@ -1,0 +1,241 @@
+{% extends "base.html" %}
+{% block title %}{% if notice %}Edit notice{% else %}New notice{% endif %} - HQ{% endblock %}
+{% block content %}
+{% include 'partials/_system_notice_styles.html' %}
+<style>
+  @media (min-width:1024px){ .spn-preview-sticky{position:sticky;top:1.5rem} }
+  .spn-preview-box{margin:0}
+</style>
+<div class="max-w-6xl mx-auto">
+
+    <div class="mb-6">
+        <a href="{% url 'hq:notice_list' %}" class="text-xs font-medium text-brand-700 hover:text-brand-800">&larr; System notices</a>
+        <h1 class="text-2xl font-bold text-ink-900 tracking-tight mt-1">{% if notice %}Edit notice{% else %}New notice{% endif %}</h1>
+        <p class="text-sm text-ink-500 mt-1">Write it here, then review the full preview and publish. Nothing reaches customers until you publish it.</p>
+    </div>
+
+    {% if notice and was_published %}
+    <div class="card !py-3.5 mb-6 border border-amber-200 bg-amber-50">
+        <p class="text-sm text-amber-800"><span class="font-semibold">This notice is live.</span> When you save changes it is taken off customer screens, so you can review the new wording. Publish it again from the review page.</p>
+    </div>
+    {% elif notice and not notice.is_published %}
+    <div class="card !py-3.5 mb-6">
+        <p class="text-sm text-ink-700"><span class="badge bg-ink-100 text-ink-600">Draft</span> <span class="ml-1">Customers cannot see this notice yet.</span></p>
+    </div>
+    {% endif %}
+
+    <form method="post" class="grid lg:grid-cols-3 gap-6" novalidate>
+        {% csrf_token %}
+
+        <div class="lg:col-span-2 space-y-6">
+
+            <section class="card space-y-3">
+                <h2 class="text-sm font-semibold text-ink-800">Quick start</h2>
+                <p class="text-xs text-ink-400">Pick a ready-made message in Swahili, then adjust it.</p>
+                <div class="flex flex-wrap gap-2" id="quick-start">
+                    <button type="button" class="btn btn-secondary !px-3 !py-1.5 !text-xs" data-preset="IMPROVEMENT">Maboresho mapya</button>
+                    <button type="button" class="btn btn-secondary !px-3 !py-1.5 !text-xs" data-preset="MAINTENANCE">Matengenezo</button>
+                    <button type="button" class="btn btn-secondary !px-3 !py-1.5 !text-xs" data-preset="INCIDENT">Changamoto</button>
+                    <button type="button" class="btn btn-secondary !px-3 !py-1.5 !text-xs" data-preset="RESOLVED">Imetatuliwa</button>
+                </div>
+            </section>
+
+            <section class="card space-y-4">
+                <h2 class="text-sm font-semibold text-ink-800">1. What do you want to tell customers?</h2>
+                {% if form.non_field_errors %}<p class="text-xs text-red-600">{{ form.non_field_errors.0 }}</p>{% endif %}
+                <div class="grid sm:grid-cols-2 gap-4">
+                    <div>
+                        <label for="id_kind" class="block text-sm font-medium text-ink-700 mb-1">Type</label>
+                        {{ form.kind }}
+                        {% if form.kind.errors %}<p class="text-xs text-red-600 mt-1">{{ form.kind.errors.0 }}</p>{% endif %}
+                    </div>
+                    <div>
+                        <label for="id_title" class="block text-sm font-medium text-ink-700 mb-1">Title</label>
+                        {{ form.title }}
+                        {% if form.title.errors %}<p class="text-xs text-red-600 mt-1">{{ form.title.errors.0 }}</p>{% endif %}
+                    </div>
+                </div>
+                <div>
+                    <label for="id_message" class="block text-sm font-medium text-ink-700 mb-1">Message <span class="text-xs text-ink-400 font-normal">(<span id="msg-count">0</span>/500)</span></label>
+                    {{ form.message }}
+                    <p class="text-xs text-ink-400 mt-1">{{ form.message.help_text }}</p>
+                    {% if form.message.errors %}<p class="text-xs text-red-600 mt-1">{{ form.message.errors.0 }}</p>{% endif %}
+                </div>
+                <div class="grid sm:grid-cols-2 gap-4">
+                    <div>
+                        <label for="id_link_url" class="block text-sm font-medium text-ink-700 mb-1">More details link (optional)</label>
+                        {{ form.link_url }}
+                        {% if form.link_url.errors %}<p class="text-xs text-red-600 mt-1">{{ form.link_url.errors.0 }}</p>{% endif %}
+                    </div>
+                    <div>
+                        <label for="id_link_label" class="block text-sm font-medium text-ink-700 mb-1">Button text (optional)</label>
+                        {{ form.link_label }}
+                    </div>
+                </div>
+            </section>
+
+            <section class="card space-y-4">
+                <h2 class="text-sm font-semibold text-ink-800">2. Who sees it, and when</h2>
+                <div class="grid sm:grid-cols-2 gap-4">
+                    <div>
+                        <label for="{{ form.audience.id_for_label }}" class="block text-sm font-medium text-ink-700 mb-1">Audience</label>
+                        {{ form.audience }}
+                    </div>
+                    <div></div>
+                    <div>
+                        <label for="{{ form.starts_at.id_for_label }}" class="block text-sm font-medium text-ink-700 mb-1">{{ form.starts_at.label }}</label>
+                        {{ form.starts_at }}
+                        <p class="text-xs text-ink-400 mt-1">{{ form.starts_at.help_text }}</p>
+                        {% if form.starts_at.errors %}<p class="text-xs text-red-600 mt-1">{{ form.starts_at.errors.0 }}</p>{% endif %}
+                    </div>
+                    <div>
+                        <label for="{{ form.ends_at.id_for_label }}" class="block text-sm font-medium text-ink-700 mb-1">{{ form.ends_at.label }}</label>
+                        {{ form.ends_at }}
+                        <p class="text-xs text-ink-400 mt-1">{{ form.ends_at.help_text }}</p>
+                        {% if form.ends_at.errors %}<p class="text-xs text-red-600 mt-1">{{ form.ends_at.errors.0 }}</p>{% endif %}
+                        <div class="flex flex-wrap gap-1.5 mt-2" id="end-presets">
+                            <button type="button" class="btn btn-secondary !px-2.5 !py-1 !text-xs" data-hours="1">+1 hour</button>
+                            <button type="button" class="btn btn-secondary !px-2.5 !py-1 !text-xs" data-hours="6">+6 hours</button>
+                            <button type="button" class="btn btn-secondary !px-2.5 !py-1 !text-xs" data-hours="24">+24 hours</button>
+                            <button type="button" class="btn btn-secondary !px-2.5 !py-1 !text-xs" data-hours="0">No end</button>
+                        </div>
+                    </div>
+                </div>
+
+                <label class="flex items-start gap-3 rounded-xl border border-ink-200 p-3.5 cursor-pointer hover:bg-ink-50 transition">
+                    <input type="checkbox" name="show_on_login" value="on" class="mt-1 accent-teal-700" {% if form.show_on_login.value %}checked{% endif %}>
+                    <span class="min-w-0">
+                        <span class="block text-sm font-medium text-ink-800">Also show on the login page</span>
+                        <span class="block text-xs text-ink-400 mt-0.5">{{ form.show_on_login.help_text }}</span>
+                    </span>
+                </label>
+                <label class="flex items-start gap-3 rounded-xl border border-ink-200 p-3.5 cursor-pointer hover:bg-ink-50 transition">
+                    <input type="checkbox" name="dismissible" id="id_dismissible" value="on" class="mt-1 accent-teal-700" {% if form.dismissible.value %}checked{% endif %}>
+                    <span class="min-w-0">
+                        <span class="block text-sm font-medium text-ink-800">Customers can close the banner</span>
+                        <span class="block text-xs text-ink-400 mt-0.5">{{ form.dismissible.help_text }} For an ongoing issue, turn this off so nobody misses it.</span>
+                    </span>
+                </label>
+                <label class="flex items-start gap-3 rounded-xl border border-ink-200 p-3.5 cursor-pointer hover:bg-ink-50 transition">
+                    <input type="checkbox" name="notify_in_app" value="on" class="mt-1 accent-teal-700" {% if form.notify_in_app.value %}checked{% endif %}>
+                    <span class="min-w-0">
+                        <span class="block text-sm font-medium text-ink-800">Also send to the notification bell</span>
+                        <span class="block text-xs text-ink-400 mt-0.5">{{ form.notify_in_app.help_text }}</span>
+                    </span>
+                </label>
+            </section>
+
+            <div class="flex items-center gap-3">
+                <button type="submit" name="action" value="review" class="btn btn-primary text-sm">Review &amp; publish &rarr;</button>
+                <button type="submit" name="action" value="draft" class="btn btn-secondary text-sm">Save as draft</button>
+                <a href="{% url 'hq:notice_list' %}" class="btn btn-secondary text-sm">Cancel</a>
+            </div>
+        </div>
+
+        <aside class="space-y-4">
+            <div class="spn-preview-sticky">
+                <section class="card space-y-3">
+                    <h2 class="text-sm font-semibold text-ink-800">Quick preview</h2>
+                    <div class="spn spn-info spn-preview-box" id="notice-preview">
+                        <span class="spn-ico" id="pv-icon" aria-hidden="true"></span>
+                        <div class="spn-body">
+                            <div class="spn-head">
+                                <span class="spn-badge" id="pv-badge">Taarifa</span><strong class="spn-title" id="pv-title"></strong>
+                                <button type="button" class="spn-x" id="pv-x" aria-label="Funga taarifa" tabindex="-1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+                            </div>
+                            <p class="spn-msg" id="pv-msg"></p>
+                            <div class="spn-foot"><span></span><a class="spn-link" id="pv-link" href="#" onclick="return false" hidden><span id="pv-link-ico"></span><span id="pv-link-text">Soma zaidi</span></a></div>
+                        </div>
+                    </div>
+                    <p class="text-xs text-ink-400">The next step shows the full preview (desktop, phone, dark mode) before anything is published. Tip: be calm and specific. Say what is affected, what customers should do (often nothing), and when you will update them.</p>
+                </section>
+            </div>
+        </aside>
+    </form>
+</div>
+
+<script>
+(function () {
+  var TONES = {IMPROVEMENT:'brand', MAINTENANCE:'warning', INCIDENT:'danger', RESOLVED:'success', INFO:'info'};
+  var BADGES = {IMPROVEMENT:'Maboresho', MAINTENANCE:'Matengenezo', INCIDENT:'Changamoto', RESOLVED:'Imetatuliwa', INFO:'Taarifa'};
+  var S = 'viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"';
+  var ICONS = {
+    danger:'<svg '+S+'><path d="M10.3 3.9 2.4 17.5A2 2 0 0 0 4.1 20.5h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9.5v4.2"/><path d="M12 17h.01"/></svg>',
+    warning:'<svg '+S+'><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+    success:'<svg '+S+'><circle cx="12" cy="12" r="9"/><path d="m8 12.5 2.8 2.8L16.2 9.5"/></svg>',
+    brand:'<svg '+S+'><path d="M12 3.5 14 9l5.5 2L14 13l-2 5.5L10 13l-5.5-2L10 9z"/></svg>',
+    info:'<svg '+S+'><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/></svg>'
+  };
+  var P = 'viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"';
+  var LINK_ICONS = {
+    rocket:'<svg '+P+'><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg>',
+    book:'<svg '+P+'><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>',
+    cart:'<svg '+P+'><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>',
+    phone:'<svg '+P+'><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>',
+    arrow:'<svg '+P+'><path d="M5 12h14M13 6l6 6-6 6"/></svg>'
+  };
+  var ICON_WORDS = [
+    ['rocket', ['anza','start','jaribu','try','fungua','open','sasa hivi']],
+    ['cart', ['nunua','buy','agiza','order','duka','shop','marketplace','lipa','pay']],
+    ['phone', ['piga','wasiliana','simu','call','contact','whatsapp']],
+    ['book', ['soma','zaidi','read','more','maelezo','details','jifunze','learn']]
+  ];
+  function linkIcon(text) {
+    text = (text || 'Soma zaidi').toLowerCase();
+    for (var i = 0; i < ICON_WORDS.length; i++) {
+      for (var j = 0; j < ICON_WORDS[i][1].length; j++) { if (text.indexOf(ICON_WORDS[i][1][j]) !== -1) return ICON_WORDS[i][0]; }
+    }
+    return 'arrow';
+  }
+  var PRESETS = {
+    IMPROVEMENT:{title:'Maboresho mapya yamefanyika', message:'Tumeboresha mfumo ili ikupe huduma ya haraka na bora zaidi. Ukiona chochote kisichoeleweka, wasiliana nasi - tuko tayari kukusaidia.', dismissible:true},
+    MAINTENANCE:{title:'Matengenezo yaliyopangwa', message:'Mfumo utafanyiwa matengenezo tarehe __ kuanzia saa __ hadi saa __. Huduma inaweza kusitishwa kwa muda mfupi. Samahani kwa usumbufu.', dismissible:true},
+    INCIDENT:{title:'Tunashughulikia changamoto ya muda', message:'Baadhi ya huduma zinaweza kuchelewa au kutopatikana kwa sasa. Timu yetu inalifanyia kazi na tutakujulisha mara litakapotatuliwa. Samahani kwa usumbufu.', dismissible:false},
+    RESOLVED:{title:'Tatizo limetatuliwa', message:'Huduma zimerejea kawaida. Asante kwa uvumilivu wako.', dismissible:true}
+  };
+  function $(id) { return document.getElementById(id); }
+  var kind = $('id_kind'), title = $('id_title'), msg = $('id_message'), url = $('id_link_url'), label = $('id_link_label'), dis = $('id_dismissible');
+  var pv = $('notice-preview');
+
+  function render() {
+    var k = kind.value || 'INFO', tone = TONES[k] || 'info';
+    pv.className = 'spn spn-' + tone + ' spn-preview-box';
+    $('pv-icon').innerHTML = ICONS[tone];
+    $('pv-badge').textContent = BADGES[k] || 'Taarifa';
+    $('pv-title').textContent = title.value || 'Title of your notice';
+    $('pv-msg').textContent = msg.value || 'Your message will appear here.';
+    var link = $('pv-link');
+    link.hidden = !url.value.trim();
+    $('pv-link-text').textContent = label.value.trim() || 'Soma zaidi';
+    $('pv-link-ico').innerHTML = LINK_ICONS[linkIcon(label.value)];
+    $('pv-x').hidden = !dis.checked;
+    $('msg-count').textContent = msg.value.length;
+  }
+  [kind, title, msg, url, label, dis].forEach(function (el) { el.addEventListener('input', render); el.addEventListener('change', render); });
+
+  document.getElementById('quick-start').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-preset]');
+    if (!b) return;
+    var p = PRESETS[b.dataset.preset];
+    kind.value = b.dataset.preset;
+    title.value = p.title;
+    msg.value = p.message;
+    dis.checked = p.dismissible;
+    render();
+  });
+
+  function pad(n) { return (n < 10 ? '0' : '') + n; }
+  document.getElementById('end-presets').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-hours]');
+    if (!b) return;
+    var end = document.getElementById('id_ends_at');
+    var h = parseInt(b.dataset.hours, 10);
+    if (!h) { end.value = ''; return; }
+    var d = new Date(Date.now() + h * 3600000);
+    end.value = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+  });
+
+  render();
+})();
+</script>
+{% endblock %}

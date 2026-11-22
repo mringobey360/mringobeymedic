@@ -1,0 +1,133 @@
+/* Free preview panel, PDF viewer dialog and card badge. Scoped with .pv- so nothing else changes. */
+.pv-panel{margin:16px 0;padding:16px;border:1px solid #e2e8f0;border-radius:16px;background:#fff;box-shadow:0 1px 2px rgba(15,23,42,.04)}
+.pv-head{display:flex;gap:12px;align-items:center;margin-bottom:14px}
+.pv-ico{flex:none;width:40px;height:40px;border-radius:12px;background:#f0fdfa;color:#0f766e;display:flex;align-items:center;justify-content:center}
+.pv-ico svg,.pv-note svg,.pv-inside li svg,.pv-go,.pv-x svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.pv-head h2{margin:0;font:800 16px/1.25 var(--sp-font,system-ui);color:#0f172a}
+.pv-head p{margin:2px 0 0;font:500 12.5px/1.4 var(--sp-font,system-ui);color:#64748b}
+
+.pv-panel .pv-open{display:flex;align-items:center;gap:14px;width:100%;margin:0 0 14px;padding:12px 14px;border:1.5px solid #99f6e4;border-radius:14px;background:linear-gradient(135deg,#f0fdfa,#fff);color:#0f172a;text-align:left;cursor:pointer;font:inherit;transition:border-color .15s,box-shadow .15s,transform .1s}
+.pv-panel .pv-open,.pv-panel .pv-open:hover,.pv-panel .pv-open:focus,.pv-panel .pv-open:active{color:#0f172a}
+.pv-panel .pv-open:hover,.pv-panel .pv-open:active{background:linear-gradient(135deg,#ecfdf5,#fff);border-color:#14b8a6;box-shadow:0 6px 18px rgba(15,118,110,.14)}
+.pv-panel .pv-open:active{transform:scale(.99)}
+.pv-panel .pv-open:focus-visible{outline:3px solid #5eead4;outline-offset:2px}
+.pv-sheet{flex:none;position:relative;width:46px;height:58px;border-radius:6px;background:#fff;border:1px solid #cbd5e1;box-shadow:3px 3px 0 #e2e8f0;padding:9px 7px;display:flex;flex-direction:column;gap:5px}
+.pv-sheet i{display:block;height:4px;border-radius:2px;background:#cbd5e1}
+.pv-sheet i.s{width:60%;background:#99f6e4}
+.pv-open-t{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.pv-open-t b{font:800 15px/1.25 var(--sp-font,system-ui)}
+.pv-open-t small{font:600 12px/1.3 var(--sp-font,system-ui);color:#0f766e}
+.pv-panel .pv-go{flex:none;color:#0f766e;width:20px;height:20px}
+
+.pv-media{margin:0 0 14px;display:grid;gap:8px}
+.pv-media-l{font:700 12px/1 var(--sp-font,system-ui);letter-spacing:.04em;text-transform:uppercase;color:#475569}
+.pv-media audio{width:100%}
+.pv-media video{width:100%;max-height:340px;border-radius:12px;background:#000}
+
+.pv-facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin:0 0 14px}
+.pv-facts div{background:#f8fafc;border:1px solid #eef2f7;border-radius:12px;padding:9px 11px;min-width:0}
+.pv-facts dt{font:700 10.5px/1 var(--sp-font,system-ui);letter-spacing:.06em;text-transform:uppercase;color:#64748b;margin:0 0 5px}
+.pv-facts dd{margin:0;font:700 13.5px/1.3 var(--sp-font,system-ui);color:#0f172a;overflow-wrap:anywhere}
+
+.pv-inside{margin:0 0 14px}
+.pv-inside h3{margin:0 0 8px;font:800 14px/1.2 var(--sp-font,system-ui);color:#0f172a}
+.pv-inside ul{list-style:none;margin:0;padding:0;display:grid;gap:7px}
+.pv-inside li{display:flex;gap:9px;align-items:flex-start;font:500 14px/1.45 var(--sp-font,system-ui);color:#334155}
+.pv-inside li svg{flex:none;width:18px;height:18px;margin-top:1px;padding:2px;border-radius:50%;background:#ccfbf1;color:#0f766e;stroke-width:3}
+
+.pv-note{display:flex;gap:9px;align-items:flex-start;margin:0;padding:10px 12px;border-radius:10px;background:#f0fdfa;color:#115e59;font:600 12.5px/1.45 var(--sp-font,system-ui)}
+.pv-note svg{flex:none;width:17px;height:17px;margin-top:1px}
+
+/* ---------- Free sample dialog ----------
+   Every rule is scoped under .pv-dialog / .pv-back so the global `button{padding...}` and
+   `button:hover{background...}` rules of marketplace.css cannot squash the icons or recolour the buttons. */
+.pv-back{position:fixed;inset:0;z-index:3000;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(2,6,23,.66);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .2s ease,visibility 0s linear .2s}
+.pv-back.on{opacity:1;visibility:visible;pointer-events:auto;transition:opacity .2s ease}
+.pv-lock{overflow:hidden}
+.pv-back .pv-dialog{display:flex;flex-direction:column;width:min(960px,100%);height:min(90vh,880px);height:min(90dvh,880px);background:#fff;border-radius:20px;overflow:hidden;box-shadow:0 30px 80px rgba(2,6,23,.45),0 0 0 1px rgba(255,255,255,.06);transform:translateY(14px) scale(.985);transition:transform .25s cubic-bezier(.2,.8,.2,1);outline:0}
+.pv-back.on .pv-dialog{transform:none}
+.pv-grab{display:none}
+
+/* header */
+.pv-dialog .pv-dialog-h{display:flex;align-items:center;gap:12px;padding:14px 16px;background:#fff;border-bottom:1px solid #e2e8f0}
+.pv-dialog .pv-dialog-ico{flex:none;width:42px;height:42px;border-radius:12px;background:#f0fdfa;color:#0f766e;display:flex;align-items:center;justify-content:center}
+.pv-dialog .pv-dialog-ico svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.pv-dialog .pv-dialog-title{flex:1;min-width:0}
+.pv-dialog .pv-dialog-title h2{margin:0;font:800 16px/1.25 var(--sp-font,system-ui);color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pv-dialog .pv-dialog-title p{display:flex;align-items:center;gap:8px;margin:4px 0 0;font:600 12px/1.2 var(--sp-font,system-ui);color:#64748b}
+.pv-dialog .pv-badge{display:inline-flex;align-items:center;padding:3px 8px;border-radius:99px;background:#ccfbf1;color:#115e59;font:800 10px/1 var(--sp-font,system-ui);letter-spacing:.06em;text-transform:uppercase}
+
+.pv-dialog .pv-newtab{flex:none;display:inline-flex;align-items:center;gap:7px;height:38px;padding:0 13px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;color:#0f172a;font:700 13px/1 var(--sp-font,system-ui);text-decoration:none;transition:background .15s,border-color .15s}
+.pv-dialog .pv-newtab:hover{background:#f8fafc;border-color:#94a3b8;color:#0f172a}
+.pv-dialog .pv-newtab svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+/* close: always visible, always a real hit area */
+.pv-dialog .pv-x{flex:none;display:inline-flex;align-items:center;justify-content:center;gap:7px;min-width:38px;height:38px;margin:0;padding:0 12px 0 10px;border:1px solid #cbd5e1;border-radius:10px;background:#f1f5f9;color:#0f172a;font:700 13px/1 var(--sp-font,system-ui);cursor:pointer;transition:background .15s,border-color .15s,color .15s}
+.pv-dialog .pv-x:hover,.pv-dialog .pv-x:active{background:#fee2e2;border-color:#fca5a5;color:#991b1b}
+.pv-dialog .pv-x:focus-visible,.pv-dialog .pv-btn:focus-visible,.pv-dialog .pv-newtab:focus-visible,.pv-dialog .pv-retry:focus-visible{outline:3px solid #5eead4;outline-offset:2px}
+.pv-dialog .pv-x svg{display:block;flex:none;width:18px;height:18px;min-width:18px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+
+/* body */
+.pv-dialog .pv-dialog-b{position:relative;flex:1;min-height:0;background:#e8edf3;display:flex;flex-direction:column}
+.pv-dialog .pv-dialog-b iframe{flex:1;width:100%;height:100%;border:0;background:#fff;opacity:0;transition:opacity .25s ease}
+.pv-dialog .pv-dialog-b iframe.ready{opacity:1}
+.pv-dialog .pv-state{position:absolute;inset:0;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:24px;text-align:center;background:#f8fafc;font-family:var(--sp-font,system-ui)}
+.pv-dialog .pv-state[hidden]{display:none}
+.pv-dialog .pv-state b{font:800 15px/1.3 var(--sp-font,system-ui);color:#0f172a}
+.pv-dialog .pv-state small{font:500 13px/1.45 var(--sp-font,system-ui);color:#64748b;max-width:340px}
+.pv-dialog .pv-spin{width:34px;height:34px;margin-bottom:8px;border-radius:50%;border:3px solid #ccfbf1;border-top-color:#0f766e;animation:pv-spin .8s linear infinite}
+@keyframes pv-spin{to{transform:rotate(360deg)}}
+.pv-dialog .pv-state-ico{width:48px;height:48px;margin-bottom:6px;border-radius:50%;background:#fef3c7;color:#b45309;display:flex;align-items:center;justify-content:center}
+.pv-dialog .pv-state-ico svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.pv-dialog .pv-retry{display:inline-flex;align-items:center;justify-content:center;height:42px;margin-top:10px;padding:0 18px;border-radius:10px;background:#0f766e;color:#fff;font:800 14px/1 var(--sp-font,system-ui);text-decoration:none}
+.pv-dialog .pv-retry:hover{background:#115e59;color:#fff}
+
+/* footer */
+.pv-dialog .pv-dialog-f{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 16px;background:#fff;border-top:1px solid #e2e8f0;box-shadow:0 -6px 18px rgba(15,23,42,.05)}
+.pv-dialog .pv-price{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 8px;min-width:0;font-family:var(--sp-font,system-ui)}
+.pv-dialog .pv-price-l{font:700 11px/1 var(--sp-font,system-ui);letter-spacing:.06em;text-transform:uppercase;color:#64748b}
+.pv-dialog .pv-price b{font:800 18px/1.1 var(--sp-font,system-ui);color:#0f172a}
+.pv-dialog .pv-price small{flex-basis:100%;display:flex;align-items:center;gap:5px;font:600 12px/1.3 var(--sp-font,system-ui);color:#0f766e}
+.pv-dialog .pv-price small svg{flex:none;width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.pv-dialog .pv-actions{flex:none;display:flex;align-items:center;gap:10px}
+.pv-dialog .pv-btn{display:inline-flex;align-items:center;justify-content:center;height:46px;margin:0;padding:0 22px;border-radius:12px;font:800 14px/1 var(--sp-font,system-ui);cursor:pointer;transition:background .15s,border-color .15s,transform .1s}
+.pv-dialog .pv-btn:active{transform:scale(.98)}
+.pv-dialog .pv-btn-ghost,.pv-dialog .pv-btn-ghost:hover,.pv-dialog .pv-btn-ghost:active{color:#0f172a;border:1px solid #cbd5e1}
+.pv-dialog .pv-btn-ghost{background:#fff}
+.pv-dialog .pv-btn-ghost:hover,.pv-dialog .pv-btn-ghost:active{background:#f1f5f9;border-color:#94a3b8}
+.pv-dialog .pv-btn-buy,.pv-dialog .pv-btn-buy:focus{background:#0f766e;color:#fff;border:1px solid #0f766e;min-width:140px}
+.pv-dialog .pv-btn-buy:hover,.pv-dialog .pv-btn-buy:active{background:#115e59;border-color:#115e59;color:#fff}
+
+/* phones: bottom sheet */
+@media (max-width:640px){
+  .pv-back{padding:0;align-items:flex-end}
+  .pv-back .pv-dialog{width:100%;height:94vh;height:94dvh;border-radius:20px 20px 0 0;transform:translateY(40px)}
+  .pv-grab{display:block;flex:none;width:42px;height:4px;margin:8px auto 0;border-radius:99px;background:#cbd5e1}
+  .pv-dialog .pv-dialog-h{padding:10px 12px 12px;gap:10px}
+  .pv-dialog .pv-dialog-ico,.pv-dialog .pv-newtab span{display:none}
+  .pv-dialog .pv-newtab{width:38px;padding:0;justify-content:center}
+  .pv-dialog .pv-dialog-title h2{font-size:15px}
+  .pv-dialog .pv-dialog-f{flex-direction:column;align-items:stretch;gap:10px;padding:10px 12px calc(10px + env(safe-area-inset-bottom,0px))}
+  .pv-dialog .pv-price{justify-content:space-between;align-items:center}
+  .pv-dialog .pv-price small{flex-basis:auto;order:3}
+  .pv-dialog .pv-actions{display:grid;grid-template-columns:1fr 1.6fr}
+  .pv-dialog .pv-btn{width:100%;padding:0 12px}
+  .pv-panel{padding:14px;border-radius:14px}
+}
+@media (max-width:360px){.pv-dialog .pv-x-t{display:none}.pv-dialog .pv-x{padding:0}}
+@media (prefers-reduced-motion:reduce){.pv-back,.pv-back .pv-dialog,.pv-dialog .pv-dialog-b iframe,.pv-panel .pv-open{transition:none}.pv-dialog .pv-spin{animation-duration:2s}}
+
+/* "Preview" badge on product cards */
+.pv-tag{position:absolute;left:8px;bottom:8px;z-index:2;display:inline-flex;align-items:center;gap:4px;padding:5px 8px;border-radius:99px;background:rgba(15,118,110,.92);color:#fff;font:700 10px/1 var(--sp-font,system-ui);letter-spacing:.05em;text-transform:uppercase}
+.pv-tag svg{width:11px;height:11px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+
+
+
+/* Video watermark: a small, quiet SmartPOS Marketplace mark above the player controls (samples and trailers only).
+   The paid video file itself is delivered untouched. */
+.pv-vwrap{position:relative;border-radius:12px;overflow:hidden;background:#000}
+.pv-vwrap video{display:block;border-radius:0}
+.pv-vwrap::after,.mv-stage::after{content:"SmartPOS Marketplace";position:absolute;right:12px;bottom:54px;z-index:2;pointer-events:none;user-select:none;
+  padding:4px 9px 4px 24px;border-radius:99px;background:rgba(2,6,23,.34) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23fff'%3E%3Ccircle cx='12' cy='12' r='2.6'/%3E%3Ccircle cx='12' cy='3.5' r='1.9'/%3E%3Ccircle cx='12' cy='20.5' r='1.9'/%3E%3Ccircle cx='3.5' cy='12' r='1.9'/%3E%3Ccircle cx='20.5' cy='12' r='1.9'/%3E%3Ccircle cx='6' cy='6' r='1.9'/%3E%3Ccircle cx='18' cy='6' r='1.9'/%3E%3Ccircle cx='6' cy='18' r='1.9'/%3E%3Ccircle cx='18' cy='18' r='1.9'/%3E%3C/svg%3E") no-repeat 7px center/13px 13px;
+  color:rgba(255,255,255,.78);font:700 10px/1.2 var(--sp-font,system-ui);letter-spacing:.05em;text-shadow:0 1px 2px rgba(0,0,0,.5);backdrop-filter:blur(2px)}
+.mv-stage{position:relative}

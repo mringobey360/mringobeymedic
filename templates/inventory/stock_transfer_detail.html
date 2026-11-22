@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}{{ transfer.reference }} · Stock Transfer{% endblock %}
+{% block content %}
+<div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+  <div><a href="{% url 'inventory:stock_transfer_list' %}" class="row-action">← Transfer history</a><p class="text-xs uppercase tracking-widest text-emerald-700 font-bold mt-4 mb-1">Transfer receipt</p><h1 class="text-2xl font-bold">{{ transfer.reference }}</h1><p class="text-sm text-ink-500 mt-1">Created {{ transfer.created_at|date:'d M Y, H:i:s' }}</p></div>
+  <div class="flex items-center gap-2"><span class="badge bg-emerald-50 text-emerald-700">{{ transfer.get_status_display }}</span><a href="{% url 'inventory:stock_transfer_pdf' transfer.pk %}" class="btn btn-primary" download>Download PDF</a></div>
+</div>
+<div class="card p-5 mb-5"><div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+  <div class="rounded-xl bg-ink-50 p-4"><p class="text-xs text-ink-500">Source branch</p><h2 class="font-bold text-lg mt-1">{{ transfer.source_pharmacy.name }}</h2></div>
+  <div class="text-center"><div class="text-3xl font-bold text-emerald-700">{{ transfer.quantity }}</div><div class="text-sm text-ink-500">total units · {{ transfer.item_count }} batch{{ transfer.item_count|pluralize:"es" }}</div><div class="my-2 text-emerald-700">⟶</div></div>
+  <div class="rounded-xl bg-emerald-50 p-4"><p class="text-xs text-emerald-700">Destination branch</p><h2 class="font-bold text-lg mt-1">{{ transfer.destination_pharmacy.name }}</h2></div>
+</div></div>
+<div class="card p-5 mb-5">
+  <h2 class="font-bold mb-4">Items transferred</h2>
+  <div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="text-left text-ink-500 border-b"><th class="py-2 pr-3">Product</th><th class="py-2 pr-3">Source batch</th><th class="py-2 pr-3">Destination batch</th><th class="py-2 pr-3 text-right">Qty</th><th class="py-2 pr-3 text-right">Left at source</th><th class="py-2 pr-3 text-right">Cost / unit</th><th class="py-2 pr-3 text-right">Price / unit</th><th class="py-2">Expiry</th></tr></thead><tbody>
+  {% for i in items %}<tr class="border-b border-ink-100"><td class="py-2 pr-3 font-semibold">{{ i.product_name }}</td><td class="py-2 pr-3">{{ i.source_batch_number }}</td><td class="py-2 pr-3">{{ i.destination_batch.batch_number }}</td><td class="py-2 pr-3 text-right font-bold">{{ i.quantity }} {{ i.unit_display }}</td><td class="py-2 pr-3 text-right">{{ i.source_quantity_after }}</td><td class="py-2 pr-3 text-right">TSh {{ i.purchase_price }}</td><td class="py-2 pr-3 text-right">TSh {{ i.selling_price }}</td><td class="py-2">{{ i.expiry_date|date:'d M Y'|default:'—' }}</td></tr>
+  {% empty %}<tr><td colspan="8" class="py-6 text-center text-ink-500">No item lines recorded.</td></tr>{% endfor %}
+  </tbody><tfoot><tr><td class="pt-3 font-bold" colspan="3">Total</td><td class="pt-3 text-right font-bold">{{ transfer.quantity }}</td><td colspan="2" class="pt-3 text-right text-ink-500">Stock value at cost</td><td class="pt-3 text-right font-bold">TSh {{ total_cost|floatformat:2 }}</td><td></td></tr></tfoot></table></div>
+</div>
+<div class="card p-5"><h2 class="font-bold mb-4">Audit details</h2><dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4 text-sm"><div><dt class="text-ink-500">Performed by</dt><dd class="font-semibold mt-1">{{ transfer.created_by|default:'System' }}</dd></div><div><dt class="text-ink-500">Reference</dt><dd class="font-semibold mt-1">{{ transfer.reference }}</dd></div><div class="sm:col-span-2"><dt class="text-ink-500">Reason / note</dt><dd class="mt-1">{{ transfer.note|default:'No note provided' }}</dd></div></dl><div class="flex flex-wrap gap-2 mt-6"><a href="{% url 'inventory:stock_transfer_pdf' transfer.pk %}" class="btn btn-primary" download>Download PDF receipt</a><a href="{% url 'inventory:stock_transfer_create' %}" class="btn btn-secondary">New transfer</a><a href="{% url 'inventory:stock_transfer_list' %}" class="btn btn-secondary">Back to history</a></div></div>
+<style>@media print{nav,aside,header,.sidebar,button,.btn{display:none!important}.card{box-shadow:none!important;border:1px solid #ddd!important}}</style>
+{% endblock %}

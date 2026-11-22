@@ -1,0 +1,33 @@
+{% comment %}
+  In-app status banners from the platform owner (improvements, maintenance, incidents, resolved).
+  Include with:  {% if system_notices %}{% include 'partials/system_notices.html' %}{% endif %}
+  Each notice in `system_notices` is a dict (see hq/system_notices.py). Text is auto-escaped.
+  A customer can close a dismissible banner; it stays closed on that device until the owner edits the notice.
+{% endcomment %}
+{% include 'partials/_system_notice_styles.html' %}
+<div class="spn-stack" id="sp-system-notices" role="region" aria-label="System notices">
+{% for n in system_notices %}{% include 'partials/_system_notice_card.html' with n=n %}{% endfor %}
+</div>
+<script>
+(function () {
+  var KEY = 'sp-notice-dismissed';
+  function read() { try { return JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) { return {}; } }
+  function write(o) { try { localStorage.setItem(KEY, JSON.stringify(o)); } catch (e) {} }
+  var dismissed = read();
+  document.querySelectorAll('#sp-system-notices .spn[data-notice-id]').forEach(function (el) {
+    if (el.dataset.dismissible === '1' && dismissed[el.dataset.noticeId] === el.dataset.noticeVersion) { el.hidden = true; }
+  });
+  if (window.__spNoticeBound) return;
+  window.__spNoticeBound = true;
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest ? e.target.closest('.spn-x') : null;
+    if (!btn) return;
+    var el = btn.closest('.spn');
+    if (!el) return;
+    var d = read();
+    d[el.dataset.noticeId] = el.dataset.noticeVersion;
+    write(d);
+    el.hidden = true;
+  });
+})();
+</script>

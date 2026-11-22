@@ -1,0 +1,82 @@
+{% extends "base.html" %}{% load humanize cart_tags %}
+{% block title %}Order {{ order.reference|stringformat:"s"|slice:":8" }} · {{ store.public_name }}{% endblock %}
+{% block extra_head %}{% include 'marketplace/_mk_styles.html' %}{% endblock %}
+{% block content %}
+<div class="mk-page">
+ <nav class="mk-crumbs" aria-label="Breadcrumb"><a href="{% url 'marketplace:seller_dashboard' %}">Seller Centre</a><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg><a href="{% url 'marketplace:seller_store_orders' store.id %}">Orders</a><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg><b>Order {{ order.reference|stringformat:"s"|slice:":8" }}</b></nav>
+ <header class="mk-hero">
+  <div class="mk-hero-main">
+   <span class="mk-hero-icon"><svg viewBox="0 0 24 24"><path d="M6 3h12v17l-2.5-1.4L13 20l-2.5-1.4L8 20l-2-1.4V3z"/><path d="M9 8h6M9 12h6"/></svg></span>
+   <div><h1>Order {{ order.reference|stringformat:"s"|slice:":8" }}</h1><p>{{ store.public_name }} · placed {{ order.created_at|date:'d M Y, H:i' }}</p></div>
+  </div>
+  <div class="mk-actions"><span class="mk-badge mk-b-{{ order.status }}">{{ order.get_status_display }}</span><span class="mk-badge mk-b-{{ order.payment_status }}">Payment: {{ order.get_payment_status_display }}</span></div>
+ </header>
+
+ <div class="mk-two">
+  <div style="display:grid;gap:1rem;min-width:0">
+   <section class="mk-card mk-pad">
+    <h2 style="font-size:1rem;font-weight:700;margin:0 0 .75rem">Customer & delivery</h2>
+    <div class="mk-kv">
+     <div><small>Customer</small><strong>{{ order.customer_name }}</strong></div>
+     <div><small>Phone</small><strong><a href="tel:+{{ order.phone|intl_phone }}">{{ order.phone }}</a></strong></div>
+     <div style="grid-column:1/-1"><small>Delivery location</small><strong>{{ order.location }}</strong></div>
+     {% if order.notes %}<div style="grid-column:1/-1"><small>Customer notes</small><strong style="font-weight:500;white-space:pre-line">{{ order.notes }}</strong></div>{% endif %}
+    </div>
+    <div class="mk-actions" style="margin-top:.8rem">
+     <a class="btn btn-secondary btn-sm" href="tel:+{{ order.phone|intl_phone }}">Call customer</a>
+     <a class="btn btn-secondary btn-sm" href="https://wa.me/{{ order.phone|intl_phone }}" target="_blank" rel="noopener">WhatsApp</a>
+    </div>
+   </section>
+
+   <section class="mk-card">
+    <div class="mk-sec-head"><h2>Items</h2></div>
+    <div class="mk-table-wrap"><table class="mk-table" style="min-width:480px">
+     <thead><tr><th>Product</th><th class="mk-num">Qty</th><th class="mk-num">Price</th><th class="mk-num">Subtotal</th></tr></thead>
+     <tbody>{% for item in order.items.all %}<tr><td class="mk-strong">{{ item.name }}{% if item.is_digital %} <span class="mk-badge mk-b-published">Digital</span>{% if item.download %} <span class="mk-muted">· downloaded {{ item.download.download_count }}/{{ item.download.max_downloads }}</span>{% endif %}{% endif %}</td><td class="mk-num">{{ item.quantity }}</td><td class="mk-num">TSh {{ item.unit_price|floatformat:0|intcomma }}</td><td class="mk-num">TSh {{ item.unit_price|mul:item.quantity|floatformat:0|intcomma }}</td></tr>{% endfor %}</tbody>
+    </table></div>
+    <div class="mk-total"><span>Total</span><span>TSh {{ order.total|floatformat:0|intcomma }}</span></div>
+   </section>
+  </div>
+
+  <aside style="display:grid;gap:1rem;min-width:0">
+   <section class="mk-card mk-pad">
+    <h2 style="font-size:1rem;font-weight:700;margin:0 0 .5rem">Next step</h2>
+    {% if next_steps %}
+    <form method="post">{% csrf_token %}
+     <label class="mk-label" for="note">Note <span class="mk-muted">(required when cancelling — the customer sees the reason)</span></label>
+     <input class="mk-input" id="note" name="note" maxlength="300" placeholder="e.g. Rider Juma, arrives 4pm / out of stock">
+     <div class="mk-act">
+      {% for value,label in next_steps %}
+       {% if value == 'cancelled' %}<button class="btn btn-secondary mk-btn-danger-soft" name="action" value="cancelled" type="submit" data-mk-confirm="Cancel this order?" data-mk-detail="The stock returns to your shelf. If the customer has already paid, you must refund them yourself." data-mk-accept="Yes, cancel order" data-mk-cancel="Keep order" data-mk-tone="danger">Cancel order</button>
+       {% elif value == 'fulfilled' %}<button class="btn btn-primary" name="action" value="fulfilled" type="submit" data-mk-confirm="Mark this order as delivered?" data-mk-detail="Confirm the customer has received the goods. This completes the order." data-mk-accept="Yes, mark delivered" data-mk-cancel="Not yet" data-mk-tone="success">Mark delivered</button>
+       {% elif value == 'out_for_delivery' %}<button class="btn btn-primary" name="action" value="out_for_delivery" type="submit">Send out for delivery</button>
+       {% elif value == 'confirmed' %}<button class="btn btn-primary" name="action" value="confirmed" type="submit">Confirm order</button>
+       {% else %}<button class="btn btn-secondary" name="action" value="{{ value }}" type="submit">Mark as {{ label|lower }}</button>{% endif %}
+      {% endfor %}
+     </div>
+    </form>
+    {% else %}
+    <p class="mk-muted" style="margin:0">This order is {{ order.get_status_display|lower }} — no further steps.{% if order.cancel_reason %} Reason: {{ order.cancel_reason }}{% endif %}</p>
+    {% endif %}
+   </section>
+
+   <section class="mk-card mk-pad">
+    <h2 style="font-size:1rem;font-weight:700;margin:0 0 .75rem">Progress</h2>
+    <ol class="mk-steps">
+     {% for e in order.events.all %}<li><strong class="mk-strong">{{ e.get_status_display }}</strong><small>{{ e.created_at|date:'d M Y, H:i' }}{% if e.actor %} · {{ e.actor.get_full_name|default:e.actor.username }}{% endif %}</small>{% if e.note %}<small>{{ e.note }}</small>{% endif %}</li>
+     {% empty %}<li><strong class="mk-strong">Placed</strong><small>{{ order.created_at|date:'d M Y, H:i' }}</small></li>{% endfor %}
+    </ol>
+   </section>
+
+   <section class="mk-card mk-pad">
+    <h2 style="font-size:1rem;font-weight:700;margin:0 0 .5rem">Internal note</h2>
+    <form method="post">{% csrf_token %}<input type="hidden" name="action" value="save_note">
+     <textarea class="mk-input" name="seller_note" rows="3" maxlength="2000" placeholder="Only your team sees this.">{{ order.seller_note }}</textarea>
+     <button class="btn btn-secondary btn-sm" type="submit" style="margin-top:.5rem">Save note</button>
+    </form>
+    <p class="mk-muted" style="margin:.75rem 0 0">Payment ref: {{ order.payment_reference|default:'—' }}{% if order.payment_method %} · {{ order.payment_method }}{% endif %}{% if order.paid_at %} · paid {{ order.paid_at|date:'d M H:i' }}{% endif %}</p>
+   </section>
+  </aside>
+ </div>
+</div>
+{% endblock %}

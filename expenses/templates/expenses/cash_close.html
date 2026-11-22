@@ -1,0 +1,190 @@
+{% extends 'base.html' %}
+{% load humanize %}
+{% block title %}Count & Close Day{% endblock %}
+{% block content %}
+<div class="max-w-xl mx-auto py-2 md:py-6">
+  <div class="text-center mb-6">
+    <p class="text-xs font-bold uppercase tracking-[0.14em] text-brand-700">Cash control · {{ day.date }}</p>
+    <h1 class="text-2xl md:text-3xl font-extrabold text-ink-900 mt-1">Count &amp; Close Day</h1>
+    <p class="text-sm text-ink-500 mt-2">Count the drawer once. The system calculates the variance and carries the verified balance forward.</p>
+  </div>
+
+  {% if form.non_field_errors %}
+    <div class="rounded-xl bg-red-50 border border-red-200 p-3 mb-4 text-sm text-red-700">{{ form.non_field_errors }}</div>
+  {% endif %}
+
+  {% if blocker %}
+  <section class="card p-5 md:p-6 border border-amber-200 bg-amber-50">
+    <p class="text-xs font-bold uppercase tracking-wider text-amber-700">Settle the earlier day first</p>
+    {% if blocker.reason == 'POST_CLOSE' %}
+      <h2 class="text-lg font-extrabold text-ink-900 mt-2">{{ blocker.day.date }} needs a recount</h2>
+      <p class="text-sm text-ink-700 mt-2">TZS {{ blocker.activity|floatformat:0|intcomma }} of net cash activity was recorded after {{ blocker.day.date }} was closed, so its closing count is out of date. Reopen it with a reason, recount the drawer and close it again. {{ day.date }} can be closed straight after.</p>
+      <a href="{% url 'expenses:cash_reopen' blocker.day.pk %}" class="btn btn-primary w-full mt-4 py-3">Reopen &amp; recount {{ blocker.day.date }}</a>
+    {% elif blocker.reason == 'UNVERIFIED' %}
+      <h2 class="text-lg font-extrabold text-ink-900 mt-2">{{ blocker.day.date }} still needs its physical count</h2>
+      <p class="text-sm text-ink-700 mt-2">Cash days are closed in order. Count the drawer for {{ blocker.day.date }} first; {{ day.date }} can be closed straight after.</p>
+      {% if handover %}
+      <div class="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-left">
+        <p class="text-xs font-bold uppercase tracking-wider text-emerald-700">Safe handover shortcut</p>
+        <p class="text-sm text-ink-700 mt-1">{{ handover.current.date }} was opened provisionally at <strong>TZS {{ handover.current.opening_cash|floatformat:0|intcomma }}</strong>. Its latest physical count is <strong>TZS {{ handover.count.physical_cash|floatformat:0|intcomma }}</strong>, no current-day cash movement has occurred, and the amounts match. This count can verify {{ blocker.day.date }} without asking you to count the same drawer twice.</p>
+        <form method="post" action="{% url 'expenses:cash_verify_previous_from_opening' handover.current.pk %}" class="mt-3">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-primary w-full py-3">Verify {{ blocker.day.date }} from {{ handover.current.date }} Opening Count</button>
+        </form>
+      </div>
+      {% else %}
+      <a href="{% url 'expenses:cash_close' blocker.day.pk %}" class="btn btn-primary w-full mt-4 py-3">Count &amp; Close {{ blocker.day.date }}</a>
+      {% endif %}
+    {% else %}
+      <h2 class="text-lg font-extrabold text-ink-900 mt-2">{{ blocker.day.date }} needs opening reconciliation</h2>
+      <p class="text-sm text-ink-700 mt-2">{{ blocker.day.date }} was already closed, but its opening balance is still marked provisional. Review it and reconcile it with a reason; the change is kept permanently in the audit trail. Then come back to close {{ day.date }}.</p>
+      <a href="{% url 'expenses:cash_reopen' blocker.day.pk %}" class="btn btn-primary w-full mt-4 py-3">Review &amp; reconcile {{ blocker.day.date }}</a>
+    {% endif %}
+    <a href="{% url 'expenses:cash' %}" class="block text-center text-sm font-semibold text-ink-500 hover:text-ink-900 mt-3">Back to Cash Control</a>
+  </section>
+  {% else %}
+
+  {% if day.date >= today %}
+  <section class="card p-5 md:p-6 border border-amber-200 bg-amber-50">
+    <p class="text-xs font-bold uppercase tracking-wider text-amber-700">Trading day still open</p>
+    <h2 class="text-lg font-extrabold text-ink-900 mt-2">Final Close is not available yet</h2>
+    <p class="text-sm text-ink-700 mt-2">You can perform a Spot Check during the day, but the final closing count is locked until this business date has ended. This prevents new sales from being posted after a false early close.</p>
+    <a href="{% url 'expenses:cash' %}" class="block text-center text-sm font-semibold text-ink-500 hover:text-ink-900 mt-3">Back to Cash Control</a>
+  </section>
+  {% else %}
+
+  <section class="card p-5 md:p-6 border border-brand-100 bg-brand-50/60 mb-4">
+    <p class="text-xs font-bold uppercase tracking-wider text-brand-700">System expected</p>
+    <p class="text-2xl md:text-3xl font-extrabold text-brand-800 mt-1">TZS {{ day.expected_closing_cash|floatformat:0|intcomma }}</p>
+    {% include 'expenses/_expected_breakdown.html' %}
+    <div class="mt-3 rounded-lg bg-blue-50 border border-blue-200 p-3 text-xs text-blue-950"><strong>Before you count:</strong> make sure every meal or expense paid from the drawer today has been recorded. <a href="{% url 'expenses:create' %}" class="underline font-semibold">Record an expense / meal</a></div>
+  </section>
+
+  {% if frozen_expected_at %}
+  <p class="text-xs text-ink-500 mb-3">Expected cash for {{ day.date }} is frozen at the end of that business day ({{ frozen_expected_at|date:"d M Y, H:i" }}). Cash received after that time belongs to later days and is not part of this count.</p>
+  {% endif %}
+
+  {% if reconstruction %}
+  <section class="card p-5 md:p-6 border border-sky-200 bg-sky-50/70 mb-4">
+    <p class="text-xs font-bold uppercase tracking-wider text-sky-700">Late count &middot; suggested closing balance</p>
+    <p class="text-sm text-ink-700 mt-2">The drawer cannot be re-counted as it was at the end of {{ day.date }}. A later physical count exists: <strong>TZS {{ reconstruction.count.physical_cash|floatformat:0|intcomma }}</strong> on {{ reconstruction.count.counted_at|date:"d M Y, H:i" }}. Removing the cash movement recorded after {{ day.date }} gives <strong>TZS {{ reconstruction.amount|floatformat:0|intcomma }}</strong>.</p>
+    <ul class="mt-2 text-xs text-ink-600 space-y-0.5">
+      {% for step in reconstruction.steps %}<li>{{ step.date }}: net cash movement TZS {{ step.net|floatformat:0|intcomma }}</li>{% endfor %}
+    </ul>
+    <p class="text-xs text-ink-500 mt-2">Use this only if you are sure no other cash entered or left the drawer. You must still confirm the amount below; the reasoning is saved in the audit trail.</p>
+    <a href="?use_reconstruction=1" class="btn btn-primary w-full mt-3 py-3">Use suggested amount (TZS {{ reconstruction.amount|floatformat:0|intcomma }})</a>
+  </section>
+  {% endif %}
+
+  {% if can_use_latest %}
+  <section class="card p-5 md:p-6 border border-emerald-200 bg-emerald-50/60 mb-2">
+    <p class="text-xs font-bold uppercase tracking-wider text-emerald-700">Quick close</p>
+    <p class="text-sm text-ink-700 mt-2">You counted <strong>TZS {{ latest_count.physical_cash|floatformat:0|intcomma }}</strong> at {{ latest_count.counted_at|date:"H:i" }} and no cash activity has happened since. Close the day with that count; there is no need to count again.</p>
+    <form method="post" class="mt-4 space-y-3">{% csrf_token %}
+      <input type="hidden" name="use_latest_count" value="1">
+      {% if latest_count.variance_clean != 0 %}
+      <div>
+        <label for="quick_note" class="block text-xs font-semibold text-amber-900 mb-1">Reason for the {% if latest_count.variance_clean < 0 %}shortage{% else %}overage{% endif %} of TZS {{ latest_count.variance_clean|floatformat:0|intcomma }}</label>
+        <textarea id="quick_note" name="closing_note" rows="2" required class="form-input w-full" placeholder="Short explanation"></textarea>
+        {% if form.closing_note.errors %}<p class="text-xs text-red-600 mt-1">{{ form.closing_note.errors|striptags }}</p>{% endif %}
+      </div>
+      {% endif %}
+      <button class="btn btn-primary w-full py-3" type="submit">Close Day with this Count</button>
+    </form>
+  </section>
+  <p class="text-center text-xs text-ink-400 my-3">or count again below</p>
+  {% endif %}
+
+  <section class="rounded-2xl border {% if day.actual_mobile_balance is None %}border-amber-200 bg-amber-50{% else %}border-emerald-200 bg-emerald-50{% endif %} p-4 mb-4 text-sm">
+    <p class="font-bold">Mobile money for {{ day.date }}</p>
+    <p class="mt-1">Expected mobile balance: <strong>TZS {{ day.expected_mobile_balance|floatformat:0|intcomma }}</strong>
+      {% if day.actual_mobile_balance is not None %} · Statement balance: <strong>TZS {{ day.actual_mobile_balance|floatformat:0|intcomma }}</strong> · {% with d=day.mobile_money_difference %}{% if d == 0 %}Matched{% elif d < 0 %}Shortage TZS {{ d|floatformat:0|intcomma }}{% else %}Overage TZS +{{ d|floatformat:0|intcomma }}{% endif %}{% endwith %}
+      {% else %} · <span class="font-semibold text-amber-800">Statement balance not entered.</span> Enter it on <a href="{% url 'expenses:cash' %}#mobile-money-check" class="underline font-semibold">Cash Control</a> so the total money for the day is complete. You can still close the drawer without it.{% endif %}</p>
+  </section>
+
+  <form method="post" id="cash-reconcile-form" novalidate>
+    {% csrf_token %}
+    <section class="card p-5 md:p-6">
+      <label for="id_actual_closing_cash" class="block text-sm font-bold text-ink-900 mb-2">Physical cash counted</label>
+      <div class="relative">
+        <span class="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-ink-400 pointer-events-none">TZS</span>
+        {{ form.actual_closing_cash }}
+      </div>
+      {% if form.actual_closing_cash.errors %}<p class="text-xs text-red-600 mt-2">{{ form.actual_closing_cash.errors|striptags }}</p>{% endif %}
+
+      <div id="cash-variance-card" class="hidden rounded-xl border p-4 mt-4" aria-live="polite">
+        <div class="flex items-center justify-between gap-3 flex-wrap">
+          <span id="cash-variance-label" class="text-sm font-semibold"></span>
+          <strong id="cash-variance-preview" class="text-lg"></strong>
+        </div>
+        <p id="cash-variance-help" class="text-xs mt-1"></p>
+      </div>
+
+      <div id="variance-note-panel" class="hidden rounded-xl border border-amber-200 bg-amber-50 p-4 mt-4" data-error="{% if form.closing_note.errors %}1{% else %}0{% endif %}">
+        <p class="text-sm font-bold text-amber-900">Variance explanation required</p>
+        <label for="id_closing_note" class="block text-xs font-semibold text-amber-900 mt-3 mb-1">Reason</label>
+        {{ form.closing_note }}
+        {% if form.closing_note.errors %}<p class="text-xs text-red-600 mt-1">{{ form.closing_note.errors|striptags }}</p>{% endif %}
+      </div>
+
+      <label class="flex items-start gap-3 rounded-xl border border-ink-200 p-4 mt-4 cursor-pointer hover:bg-ink-50">
+        {{ form.physical_count_confirmed }}
+        <span>
+          <span class="block text-sm font-bold text-ink-900">I physically counted and verified this amount.</span>
+          <span class="block text-xs text-ink-500 mt-1">Saved in the cash audit record.</span>
+        </span>
+      </label>
+      {% if form.physical_count_confirmed.errors %}<p class="text-xs text-red-600 mt-2">{{ form.physical_count_confirmed.errors|striptags }}</p>{% endif %}
+
+      <button id="close-cash-btn" class="btn btn-primary w-full mt-4 py-3" type="submit">Verify Cash &amp; Close Day</button>
+      <a href="{% url 'expenses:cash' %}" class="block text-center text-sm font-semibold text-ink-500 hover:text-ink-900 mt-3">Cancel</a>
+    </section>
+  </form>
+  {% endif %}
+  {% endif %}
+</div>
+
+{% if not blocker and day.date < today %}
+<script>
+(function(){
+  const input = document.getElementById('id_actual_closing_cash');
+  const card = document.getElementById('cash-variance-card');
+  const label = document.getElementById('cash-variance-label');
+  const out = document.getElementById('cash-variance-preview');
+  const help = document.getElementById('cash-variance-help');
+  const notePanel = document.getElementById('variance-note-panel');
+  const form = document.getElementById('cash-reconcile-form');
+  const expected = Number('{{ day.expected_closing_cash|default:"0" }}');
+  const keepNote = notePanel && notePanel.dataset.error === '1';
+  if (!input) return;
+  input.classList.add('pl-14','text-xl','md:text-2xl','font-extrabold','py-4','w-full');
+  const money = v => 'TZS ' + new Intl.NumberFormat('en-TZ',{maximumFractionDigits:0}).format(Math.abs(v));
+  function showNote(on){ if (on || keepNote) notePanel.classList.remove('hidden'); else notePanel.classList.add('hidden'); }
+  function paint(kind, title, amount, text){
+    const c = {ok:['emerald'], short:['red'], over:['amber']}[kind][0];
+    card.className = 'rounded-xl border border-'+c+'-200 bg-'+c+'-50 p-4 mt-4';
+    label.className = 'text-sm font-semibold text-'+c+'-800';
+    out.className = 'text-lg text-'+c+'-800';
+    help.className = 'text-xs text-'+c+'-700 mt-1';
+    label.textContent = title; out.textContent = amount; help.textContent = text;
+  }
+  function update(){
+    const raw = input.value.trim();
+    const physical = Number(raw);
+    if (!raw || !Number.isFinite(physical) || physical < 0){ card.classList.add('hidden'); showNote(false); return; }
+    const variance = physical - expected;
+    card.classList.remove('hidden');
+    if (variance === 0){ paint('ok','Reconciled','TZS 0 variance','Physical cash matches the system expected cash.'); showNote(false); }
+    else if (variance < 0){ paint('short','Shortage',money(variance),'Explain the difference before closing.'); showNote(true); }
+    else { paint('over','Overage',money(variance),'Explain the difference before closing.'); showNote(true); }
+  }
+  input.addEventListener('input', update);
+  update();
+  form.addEventListener('submit', function(){
+    const button = document.getElementById('close-cash-btn');
+    if (button && form.checkValidity()) { button.disabled = true; button.textContent = 'Verifying & Closing…'; }
+  });
+})();
+</script>
+{% endif %}
+{% endblock %}

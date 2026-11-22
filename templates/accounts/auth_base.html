@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% load static %}
+
+{# Shared shell for every signed-out screen: login, forgot password, OTP, reset password. #}
+
+{% block extra_head %}
+<style>
+    /* Auth screens provide their own full-bleed header/footer. Hide the global
+       application footer explicitly (it sits outside .sp-main-col, not beside #app-content). */
+    #app-content { max-width: none !important; padding: 0 !important; }
+    body.sp-body > footer.spx-footer { display: none !important; }
+
+    html[data-theme="dark"] .auth-page{background:linear-gradient(180deg,#07111b 0%,#0d1b28 60%,#123d3b 140%);color:#edf5fb}
+    html[data-theme="dark"] .auth-page header{position:sticky;top:0;z-index:80;background:rgba(13,27,40,.94);border-color:#294052;color:#edf5fb}
+    html[data-theme="dark"] .auth-card{background:#0d1b28;border-color:#294052;color:#edf5fb}
+    html[data-theme="dark"] .auth-card h1,html[data-theme="dark"] .auth-card label{color:#edf5fb}
+    html[data-theme="dark"] .auth-card .form-input,html[data-theme="dark"] .auth-field{background:#102333;color:#edf5fb;border-color:#395366}
+    html[data-theme="dark"] .auth-back{background:#102333;color:#edf5fb;border-color:#395366}
+    html[data-theme="dark"] .auth-back:hover{background:#123d3b;color:#5eead4}
+    html[data-theme="dark"] .auth-page footer{color:#a7b8c9}
+    .auth-page { min-height: 100vh; min-height: 100dvh; box-sizing: border-box; overflow-x: hidden; display: flex; flex-direction: column; background: linear-gradient(180deg, #ffffff 0%, #f0fdfa 60%, #ccfbf1 140%); }
+    .auth-container { width: 100%; max-width: 72rem; margin: 0 auto; padding-left: 1rem; padding-right: 1rem; }
+    @media (min-width: 640px) { .auth-container { padding-left: 1.5rem; padding-right: 1.5rem; } }
+
+    /* Card used by forgot password, OTP and reset password (same look as the login dialog) */
+    .auth-card { width: 100%; max-width: 26rem; border-radius: 1rem; background: #fff; border: 1px solid #e2e8f0; padding: 1.25rem; box-shadow: 0 20px 50px rgba(15,23,42,.10); }
+    @media (min-width: 640px) { .auth-card { padding: 1.5rem; } }
+    .auth-icon { margin: 0 auto 1rem; display: flex; height: 3.25rem; width: 3.25rem; align-items: center; justify-content: center; border-radius: 9999px; background: #f0fdfa; color: #0f766e; box-shadow: inset 0 0 0 1px #ccfbf1; }
+    .auth-icon svg { height: 1.5rem; width: 1.5rem; }
+    .auth-card .form-input, .auth-field { width: 100%; border: 1px solid #cbd5e1; border-radius: .625rem; background: #f8fafc; padding: .8rem 1rem; font-size: .9375rem; color: #0f172a; outline: none; transition: border-color .15s ease, box-shadow .15s ease, background .15s ease; }
+    .auth-card .form-input:focus, .auth-field:focus { background: #fff; border-color: #0d9488; box-shadow: 0 0 0 3px rgba(20,184,166,.18); }
+    .auth-card .pw-field .form-input { padding-right: 3rem; }
+    .otp-input { text-align: center; font-size: 1.75rem; font-weight: 600; letter-spacing: .5em; padding-left: calc(1rem + .5em); font-variant-numeric: tabular-nums; }
+    .otp-input::placeholder { letter-spacing: .5em; color: #cbd5e1; }
+    .auth-btn { display: inline-flex; width: 100%; min-height: 2.5rem; align-items: center; justify-content: center; gap: .5rem; border-radius: .625rem; background: linear-gradient(180deg,#0d9488,#0f766e); border: 1px solid #115e59; padding: .55rem 1rem; cursor: pointer; font-size: .875rem; font-weight: 600; color: #fff; box-shadow: 0 1px 2px rgba(15,23,42,.08); transition: background .15s ease; }
+    .auth-btn { border-radius: 9999px; }
+    .auth-switch .btn, .auth-page .btn-secondary.btn-sm { border-radius: 9999px; }
+    .auth-btn:hover { background: linear-gradient(180deg,#0f766e,#115e59); }
+    .auth-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(20,184,166,.35); }
+    .auth-btn:disabled { opacity: .6; cursor: not-allowed; }
+    .auth-link { font-size: .875rem; font-weight: 600; color: #0f766e; transition: color .15s ease; }
+    .auth-link:hover { color: #115e59; }
+
+    /* Back-to-home navigation (shown to signed-out visitors only) */
+    .auth-back { display: inline-flex; align-items: center; gap: .4rem; min-height: 2.25rem; padding: 0 .85rem; border-radius: 9999px; border: 1px solid #e2e8f0; background: #fff; color: #334155; font-size: .8125rem; font-weight: 600; transition: border-color .15s ease, color .15s ease, background .15s ease; white-space: nowrap; }
+    .auth-back:hover { border-color: #5eead4; color: #0f766e; background: #f0fdfa; }
+    .auth-back svg { width: .95rem; height: .95rem; transition: transform .15s ease; }
+    .auth-back:hover svg { transform: translateX(-2px); }
+    .auth-head-actions { display: flex; align-items: center; gap: .5rem; }
+    .auth-cross { display: none; font-size: .8125rem; font-weight: 600; color: #0f766e; }
+    .auth-cross:hover { color: #115e59; }
+    @media (min-width: 640px) { .auth-cross { display: inline; } }
+    .auth-foot-links { display: flex; flex-wrap: wrap; justify-content: center; gap: .25rem 1.1rem; margin-bottom: .35rem; font-size: .8125rem; }
+    .auth-foot-links a { color: #64748b; font-weight: 500; }
+    .auth-foot-links a:hover { color: #0f766e; }
+</style>
+{% block auth_head %}{% endblock %}
+{% endblock %}
+
+{% block content %}
+<div class="auth-page">
+
+    <header class="shrink-0 border-b border-ink-200/80 bg-white/80 backdrop-blur">
+        <div class="auth-container flex h-16 sm:h-20 items-center justify-between gap-3">
+            <div class="flex min-w-0 items-center gap-3 sm:gap-5">
+                <a href="{% if user.is_authenticated %}{% url 'accounts:login' %}{% else %}{% url 'landing' %}{% endif %}" class="inline-flex shrink-0 items-center gap-2.5" aria-label="{% if user.is_authenticated %}SmartPOS - sign in{% else %}SmartPOS - home{% endif %}">
+                    <img src="{% static 'img/smartpos-icon.svg' %}" alt="" class="h-8 w-8 sm:h-9 sm:w-9 object-contain">
+                    <span class="text-xl sm:text-2xl font-semibold tracking-tight text-ink-900">SmartPOS</span>
+                </a>
+                <span class="hidden md:inline text-sm text-ink-500">A product by <span class="font-semibold text-ink-800">Mutech Apex Innovations</span></span>
+            </div>
+
+            <div class="auth-head-actions">
+                <button type="button" data-pwa-install class="sp-install-btn" title="Install SmartPOS on this device" aria-label="Install SmartPOS app">
+                    <span class="sp-install-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 11 5 5 5-5"/><path d="M5 21h14"/></svg></span>
+                    <span class="sp-install-label">Install App</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 flex items-center justify-center px-4 py-3 sm:py-6 min-h-0">
+        {% block auth_content %}{% endblock %}
+    </main>
+
+    <footer class="shrink-0 pb-3 pt-1 text-center">
+        {% if not user.is_authenticated %}
+        <nav class="auth-foot-links" aria-label="SmartPOS">
+            <a href="{% url 'landing' %}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-home"/></svg>Home</a>
+            <a href="{% url 'landing' %}#pricing"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-tag"/></svg>Pricing</a>
+        </nav>
+        {% endif %}
+        <p class="text-sm text-ink-400">&copy; {% now "Y" %} SmartPOS. All rights reserved.</p>
+    </footer>
+</div>
+{% block auth_overlays %}{% endblock %}
+{% endblock %}

@@ -1,0 +1,11 @@
+{% extends 'marketplace/base.html' %}{% block title %}Shop not available{% endblock %}
+{% block body %}
+<div class="sp-page">
+  <div class="sp-box sp-cart-empty">
+    <div class="ico"><svg class="i"><use href="#i-bag"/></svg></div>
+    <h2>{% if store %}{{ store.public_name }} is not open right now{% else %}We could not find this shop{% endif %}</h2>
+    <p>{% if store %}This online shop is temporarily closed. Please check back soon or contact the seller directly.{% else %}The link may be incomplete or the shop may have been removed. Check the link you were sent.{% endif %}</p>
+    <a class="sp-btn primary" href="{% url 'marketplace:catalog' %}">Browse the marketplace</a>
+  </div>
+</div>
+{% endblock %}

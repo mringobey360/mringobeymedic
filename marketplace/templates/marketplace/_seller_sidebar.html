@@ -1,0 +1,57 @@
+{# Sidebar for online sellers: same grouped, collapsible structure as the POS sidebar. Needs context from marketplace.context.seller_workspace #}
+{% with un=request.resolver_match.url_name store=seller_nav_store %}
+<p class="nav-section-label">Online selling</p>
+<a href="{% url 'marketplace:seller_dashboard' %}" class="nav-link {% if un == 'seller_dashboard' %}active{% endif %}"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="3" width="7" height="7.5" rx="1.5"/><rect x="3" y="13" width="7.5" height="8" rx="1.5"/><rect x="13.5" y="13" width="7" height="7.5" rx="1.5"/></svg><span class="sidebar-text">Dashboard</span></a>
+{% if store %}
+<div class="nav-group" data-nav-group="seller-sell">
+ <button type="button" class="nav-group-toggle {% if un == 'seller_new_listing' or un == 'seller_products' or un == 'seller_store_products' or un == 'seller_product_add' or un == 'seller_product_edit' or un == 'seller_listings' or un == 'seller_store_listings' or un == 'seller_listing_add' or un == 'seller_listing_edit' or un == 'seller_categories' or un == 'seller_store_categories' %}is-active{% endif %}" aria-expanded="false" aria-controls="nav-seller-sell-children">
+  <span class="nav-group-main"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5l9-4 9 4-9 4-9-4z"/><path d="M3 7.5v9l9 4 9-4v-9"/></svg><span class="sidebar-text">Sell</span></span>
+  <svg class="nav-group-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 6 6 6-6 6"/></svg>
+ </button>
+ <div id="nav-seller-sell-children" class="nav-group-children">
+  <a href="{% url 'marketplace:seller_new_listing' store.id %}" class="nav-sublink {% if un == 'seller_new_listing' %}active{% endif %}">New listing</a>
+  <a href="{% url 'marketplace:seller_store_products' store.id %}" class="nav-sublink {% if un == 'seller_products' or un == 'seller_store_products' or un == 'seller_product_add' or un == 'seller_product_edit' %}active{% endif %}">Products &amp; downloads</a>
+  <a href="{% url 'marketplace:seller_store_listings' store.id %}" class="nav-sublink {% if un == 'seller_listings' or un == 'seller_store_listings' or un == 'seller_listing_add' or un == 'seller_listing_edit' %}active{% endif %}">Rooms &amp; property</a>
+  <a href="{% url 'marketplace:seller_store_categories' store.id %}" class="nav-sublink {% if un == 'seller_categories' or un == 'seller_store_categories' %}active{% endif %}">Categories</a>
+ </div>
+</div>
+<div class="nav-group" data-nav-group="seller-orders">
+ <button type="button" class="nav-group-toggle {% if un == 'seller_orders' or un == 'seller_store_orders' or un == 'seller_order_detail' or un == 'seller_inquiries' or un == 'seller_store_inquiries' %}is-active{% endif %}" aria-expanded="false" aria-controls="nav-seller-orders-children">
+  <span class="nav-group-main"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M6 3h12v17l-2.5-1.4L13 20l-2.5-1.4L8 20l-2-1.4V3z"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="9" y1="12" x2="15" y2="12"/></svg><span class="sidebar-text">Orders &amp; customers</span></span>
+  <svg class="nav-group-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 6 6 6-6 6"/></svg>
+ </button>
+ <div id="nav-seller-orders-children" class="nav-group-children">
+  <a href="{% url 'marketplace:seller_store_orders' store.id %}" class="nav-sublink {% if un == 'seller_orders' or un == 'seller_store_orders' or un == 'seller_order_detail' %}active{% endif %}"><span class="flex-1">Orders</span>{% if seller_new_orders %}<span class="nav-count bg-amber-500">{{ seller_new_orders }}</span>{% endif %}</a>
+  <a href="{% url 'marketplace:seller_store_inquiries' store.id %}" class="nav-sublink {% if un == 'seller_inquiries' or un == 'seller_store_inquiries' %}active{% endif %}">Customer enquiries</a>
+ </div>
+</div>
+<div class="nav-group" data-nav-group="seller-money">
+ <button type="button" class="nav-group-toggle {% if un == 'seller_payment_settings' or un == 'seller_service_requests' %}is-active{% endif %}" aria-expanded="false" aria-controls="nav-seller-money-children">
+  <span class="nav-group-main"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/></svg><span class="sidebar-text">Payments &amp; billing</span></span>
+  <svg class="nav-group-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 6 6 6-6 6"/></svg>
+ </button>
+ <div id="nav-seller-money-children" class="nav-group-children">
+  <a href="{% url 'marketplace:seller_payment_settings' store.id %}" class="nav-sublink {% if un == 'seller_payment_settings' %}active{% endif %}">Payment connection</a>
+  <a href="{% url 'marketplace:seller_service_requests' %}" class="nav-sublink {% if un == 'seller_service_requests' %}active{% endif %}">Plans &amp; billing</a>
+ </div>
+</div>
+<div class="nav-group" data-nav-group="seller-store">
+ <button type="button" class="nav-group-toggle {% if un == 'seller_store_setup' %}is-active{% endif %}" aria-expanded="false" aria-controls="nav-seller-store-children">
+  <span class="nav-group-main"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M3 9l1.5-5h15L21 9"/><path d="M4 9v11h16V9"/><path d="M3 9a3 3 0 006 0 3 3 0 006 0 3 3 0 006 0"/></svg><span class="sidebar-text">My store</span></span>
+  <svg class="nav-group-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 6 6 6-6 6"/></svg>
+ </button>
+ <div id="nav-seller-store-children" class="nav-group-children">
+  <a href="{% url 'marketplace:seller_store_setup' %}" class="nav-sublink {% if un == 'seller_store_setup' %}active{% endif %}">Shop profile &amp; logo</a>
+  <a href="{% url 'marketplace:seller_store_public' store.slug %}" class="nav-sublink {% if False %}active{% endif %}" target="_blank" rel="noopener">View public store ↗</a>
+ </div>
+</div>
+{% else %}
+<a href="{% url 'marketplace:seller_store_setup' %}" class="nav-link {% if un == 'seller_store_setup' %}active{% endif %}"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M3 9l1.5-5h15L21 9"/><path d="M4 9v11h16V9"/><path d="M3 9a3 3 0 006 0 3 3 0 006 0 3 3 0 006 0"/></svg><span class="sidebar-text">Set up my shop</span></a>
+<a href="{% url 'marketplace:seller_service_requests' %}" class="nav-link {% if un == 'seller_service_requests' %}active{% endif %}"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M8 3v4M16 3v4M3.5 10h17"/></svg><span class="sidebar-text">Plans &amp; billing</span></a>
+{% endif %}
+<a href="{% url 'marketplace:catalog' %}" target="_blank" rel="noopener" class="nav-link"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 010 18M12 3a14 14 0 000 18"/></svg><span class="sidebar-text">Browse the Marketplace</span></a>
+{% if seller_has_pos %}
+<p class="nav-section-label">Shop</p>
+<a href="{% url 'dashboard:home' %}" class="nav-link"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg><span class="sidebar-text">Back to shop workspace (POS)</span></a>
+{% endif %}
+{% endwith %}

@@ -1,0 +1,4 @@
+{% comment %}Download buttons for the paid digital items of `order`. Needs `order` in context.{% endcomment %}
+{% if order.payment_status == 'paid' %}{% for item in order.items.all %}{% if item.is_digital and item.download %}
+<div class="summary-line" style="align-items:center;gap:12px;flex-wrap:wrap"><span><b>{{ item.name }}</b><br><small style="color:#64748b">Digital download{% if item.download.revoked %} · access withdrawn{% else %} · {{ item.download.remaining }} download{{ item.download.remaining|pluralize }} left{% endif %}</small></span>{% if item.download.usable %}<a class="btn checkout-btn" style="white-space:nowrap" href="{% url 'marketplace:download' item.download.token %}">Download</a>{% endif %}</div>
+{% endif %}{% endfor %}{% endif %}

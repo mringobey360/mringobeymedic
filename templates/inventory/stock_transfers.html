@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Branch Stock Transfers · SmartPOS{% endblock %}
+{% block content %}
+<div class="pro">
+  <div class="pro-head">
+    <div class="pro-head-main">
+      <p class="pro-eyebrow">Inventory control</p>
+      <h1 class="pro-title">Branch Stock Transfers</h1>
+      <p class="pro-sub">Track stock moving between the branches you manage, with batch-level traceability.</p>
+    </div>
+    <div class="pro-tools">
+      <a class="btn btn-primary" href="{% url 'inventory:stock_transfer_create' %}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>New transfer</a>
+    </div>
+  </div>
+
+  <div class="pro-kpis k3">
+    <div class="pro-kpi acc"><span class="pro-kpi-l">Accessible branches</span><span class="pro-kpi-v">{{ branches|length }}</span></div>
+    <div class="pro-kpi info"><span class="pro-kpi-l">Transfer records</span><span class="pro-kpi-v">{{ page_obj.paginator.count }}</span></div>
+    <div class="pro-kpi"><span class="pro-kpi-l">Audit trail</span><span class="pro-kpi-v sm">Batch · Quantity · User · Time</span></div>
+  </div>
+
+  <form method="get" class="pro-toolbar">
+    <label class="pro-search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input class="form-input" type="search" name="q" value="{{ query }}" placeholder="Search reference, product, batch or branch…" aria-label="Search transfers">
+    </label>
+    <select class="form-input" name="status" aria-label="Filter by status">
+      <option value="">All statuses</option>
+      <option value="COMPLETED" {% if status_filter == 'COMPLETED' %}selected{% endif %}>Completed</option>
+      <option value="CANCELLED" {% if status_filter == 'CANCELLED' %}selected{% endif %}>Cancelled</option>
+    </select>
+    <button class="btn btn-secondary" type="submit">Filter</button>
+    {% if query or status_filter %}<a class="btn btn-ghost" href="{% url 'inventory:stock_transfer_list' %}">Reset</a>{% endif %}
+  </form>
+
+  <section class="pro-panel" aria-label="Stock transfers">
+    <div class="pro-tw">
+      <table class="pro-table stack">
+        <thead><tr><th>Transfer</th><th>Products</th><th>From</th><th>To</th><th>Qty</th><th>Status</th><th>When / By</th><th class="r">Actions</th></tr></thead>
+        <tbody>
+        {% for item in page_obj %}
+          <tr>
+            <td class="first"><a class="pro-ref" href="{% url 'inventory:stock_transfer_detail' item.pk %}">{{ item.reference }}</a></td>
+            <td data-label="Products">{% with first=item.items.all.0 %}<div><div class="pro-cell-main">{{ first.product_name|default:"—" }}{% if item.item_count > 1 %} <span class="pro-cell-sub">+ {{ item.item_count|add:"-1" }} more</span>{% endif %}</div><div class="pro-cell-sub">{{ item.item_count }} batch{{ item.item_count|pluralize:"es" }}</div></div>{% endwith %}</td>
+            <td data-label="From">{{ item.source_pharmacy.name }}</td>
+            <td data-label="To">{{ item.destination_pharmacy.name }}</td>
+            <td data-label="Qty" class="num"><b>{{ item.quantity }}</b> <span class="pro-cell-sub" style="display:inline">units</span></td>
+            <td data-label="Status"><span class="pro-b {% if item.status == 'COMPLETED' %}ok{% else %}plain{% endif %}">{{ item.get_status_display }}</span></td>
+            <td data-label="When / By"><div><div class="num">{{ item.created_at|date:'d M Y, H:i' }}</div><div class="pro-cell-sub">{{ item.created_by|default:'System' }}</div></div></td>
+            <td class="acts r"><div class="pro-actions">
+              <a class="pro-link bd" href="{% url 'inventory:stock_transfer_detail' item.pk %}">View →</a>
+              <a class="pro-link bd" href="{% url 'inventory:stock_transfer_pdf' item.pk %}" download>PDF</a>
+            </div></td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="8"><div class="pro-empty"><strong>No stock transfers found</strong>Move stock between your branches to see it here.<div style="margin-top:.9rem"><a class="btn btn-primary" href="{% url 'inventory:stock_transfer_create' %}">Create first transfer</a></div></div></td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {% include "partials/pagination.html" with page_obj=page_obj %}
+</div>
+{% endblock %}

@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Meal Timing Settings{% endblock %}
+{% block content %}
+<div class="max-w-3xl mx-auto space-y-6">
+  <div><h1 class="text-2xl font-bold">Meal Timing & Funding Rules</h1><p class="text-sm text-ink-500 mt-1">Configure professional meal windows and background reminders. Salary stays completely separate and is reference only.</p></div>
+  <form method="post" class="card space-y-5">{% csrf_token %}
+    <div class="grid md:grid-cols-3 gap-4">
+      {% for field in form %}<div><label class="block text-sm font-medium mb-1">{{ field.label }}</label>{{ field }}{% if field.errors %}<p class="text-xs text-red-600">{{ field.errors.0 }}</p>{% endif %}</div>{% endfor %}
+    </div>
+    <div class="rounded-xl bg-ink-50 p-4 text-sm text-ink-600 space-y-2">
+      <p><strong>How it works:</strong> the employee scans the dynamic branch QR at check-in, during an eligible meal window, and at the end of the shift. The system prevents duplicate or out-of-window scans.</p>
+      <p><strong>Reminders:</strong> when browser notifications are allowed, the server can send a background push even when the app tab is closed or the employee is logged out. The browser/OS controls final sound behavior.</p>
+      <p><strong>Accounting:</strong> earned meals are business operating cost against the branch's sales/profit calculation. They never reduce monthly salary.</p>
+    </div>
+    <button class="btn btn-primary" type="submit">Save Meal Timing</button>
+  </form>
+</div>
+{% endblock %}

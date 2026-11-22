@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Notifications{% endblock %}
+{% block content %}
+<div class="max-w-3xl mx-auto">
+    <div class="flex items-center justify-between mb-4">
+        <div>
+            <h1 class="text-2xl font-bold text-ink-900 tracking-tight">My Notifications</h1>
+            {% if active_pharmacy %}<p class="text-xs text-ink-500 mt-1">Showing notifications for <strong>{{ active_pharmacy.name }}</strong> and system-wide notices.</p>{% else %}<p class="text-xs text-ink-500 mt-1">Showing system-wide notices.</p>{% endif %}
+        </div>
+        {% if unread_count > 0 %}
+        <button type="button" id="mark-all-read-btn" class="btn btn-secondary text-sm">Mark all as read ({{ unread_count }})</button>
+        {% endif %}
+    </div>
+
+    <form method="get" class="flex flex-wrap gap-2 mb-4">
+        <select name="category" class="form-input max-w-[220px]" onchange="this.form.submit()">
+            <option value="">All categories</option>
+            {% for value, label in category_choices %}
+            <option value="{{ value }}" {% if current_category == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+        <select name="status" class="form-input max-w-[180px]" onchange="this.form.submit()">
+            <option value="">Zote</option>
+            <option value="unread" {% if current_status == 'unread' %}selected{% endif %}>Unread</option>
+            <option value="read" {% if current_status == 'read' %}selected{% endif %}>Read</option>
+        </select>
+    </form>
+
+    <div class="space-y-2">
+        {% for n in page_obj %}
+        <div class="card flex items-start gap-3 {% if not n.is_read %}bg-brand-50/40 border-brand-200{% endif %}" data-notification-id="{{ n.id }}">
+            <span class="mt-1 w-2 h-2 rounded-full flex-shrink-0
+                {% if n.level == 'DANGER' %}bg-red-500
+                {% elif n.level == 'WARNING' %}bg-amber-500
+                {% elif n.level == 'SUCCESS' %}bg-emerald-500
+                {% else %}bg-brand-500{% endif %}"></span>
+            <div class="flex-1 min-w-0">
+                <div class="flex items-center justify-between gap-2">
+                    {% if n.safe_link_url %}<a href="{{ n.safe_link_url }}" class="text-sm font-semibold text-ink-900 hover:text-brand-700">{{ n.title }}</a>{% else %}<p class="text-sm font-semibold text-ink-900">{{ n.title }}</p>{% endif %}
+                    <div class="flex items-center gap-1.5">
+                        {% if n.pharmacy %}<span class="badge bg-brand-50 text-brand-700 text-[11px]">{{ n.pharmacy.name }}</span>{% endif %}
+                        <span class="badge bg-ink-100 text-ink-500 text-[11px]">{{ n.get_category_display }}</span>
+                    </div>
+                </div>
+                {% if n.safe_link_url %}<a href="{{ n.safe_link_url }}" class="block">{% endif %}
+                {% if n.message %}<p class="text-sm text-ink-600 mt-1">{{ n.message }}</p>{% endif %}
+                {% if n.safe_link_url %}</a>{% endif %}
+                {% if n.safe_action.action_url %}<a href="{{ n.safe_action.action_url }}"{% if n.safe_action.action_external %} target="_blank" rel="noopener noreferrer"{% endif %} class="inline-flex items-center gap-1.5 mt-2 rounded-lg bg-brand-50 px-3 py-1.5 text-xs font-bold text-brand-700 hover:bg-brand-100">{{ n.safe_action.action_label }}<svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M8 7h9v9"/></svg></a>{% endif %}
+                <p class="text-xs text-ink-400 mt-1">{{ n.created_at|timesince }} ago</p>
+            </div>
+            {% if not n.is_read %}
+            <button type="button" class="mark-read-btn row-action flex-shrink-0" data-id="{{ n.id }}">Mark as read</button>
+            {% endif %}
+        </div>
+        {% empty %}
+        <div class="card text-center text-ink-400 py-8">No notifications to display.</div>
+        {% endfor %}
+    </div>
+
+    {% include "partials/pagination.html" with page_obj=page_obj %}
+</div>
+
+{% block extra_scripts %}
+<script>
+onPharmacyContentReady(function () {
+    document.querySelectorAll('.mark-read-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            const id = btn.dataset.id;
+            fetch(`/notifications/api/${id}/read/`, {
+                method: 'POST',
+                headers: { 'X-CSRFToken': getCookie('csrftoken') },
+            }).then(() => window.location.reload());
+        });
+    });
+
+    const markAllBtn = document.getElementById('mark-all-read-btn');
+    if (markAllBtn) {
+        markAllBtn.addEventListener('click', function () {
+            fetch('/notifications/api/read-all/', {
+                method: 'POST',
+                headers: { 'X-CSRFToken': getCookie('csrftoken') },
+            }).then(() => window.location.reload());
+        });
+    }
+});
+</script>
+{% endblock %}
+{% endblock %}

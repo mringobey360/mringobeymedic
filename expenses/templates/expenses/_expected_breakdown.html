@@ -1,0 +1,23 @@
+{% load humanize %}
+{% with b=day.expected_breakdown %}
+<div class="rounded-xl border border-ink-100 bg-white p-4 mt-3 text-sm">
+  <p class="text-[11px] font-bold uppercase tracking-wider text-ink-500 mb-2">How this is calculated</p>
+  <dl class="space-y-1">
+    <div class="flex justify-between"><dt>Opening cash</dt><dd class="font-semibold">TZS {{ b.opening|floatformat:0|intcomma }}</dd></div>
+    <div class="flex justify-between"><dt>+ Cash sales <span class="text-ink-400 font-normal">(original amount)</span></dt><dd class="font-semibold">TZS {{ b.cash_sales|floatformat:0|intcomma }}</dd></div>
+    <div class="flex justify-between"><dt>+ Credit &amp; layaway payments received in cash</dt><dd class="font-semibold">TZS {{ b.debt_collected|floatformat:0|intcomma }}</dd></div>
+    {% if b.layaway_collected %}<div class="flex justify-between text-[12px] text-ink-500 pl-4"><dt>of which layaway payments (not sales yet)</dt><dd>TZS {{ b.layaway_collected|floatformat:0|intcomma }}</dd></div>{% endif %}
+    <div class="flex justify-between"><dt>− Cash refunds</dt><dd class="font-semibold">TZS {{ b.cash_refunds|floatformat:0|intcomma }}</dd></div>
+    {% if b.layaway_refunded %}<div class="flex justify-between text-[12px] text-ink-500 pl-4"><dt>of which cancelled layaway refunds</dt><dd>TZS {{ b.layaway_refunded|floatformat:0|intcomma }}</dd></div>{% endif %}
+    <div class="flex justify-between"><dt>− Staff meals paid from drawer{% if b.staff_meals_count %} <span class="text-ink-400">({{ b.staff_meals_count }})</span>{% endif %}</dt><dd class="font-semibold">TZS {{ b.staff_meals|floatformat:0|intcomma }}</dd></div>
+    <div class="flex justify-between"><dt>− Other cash expenses</dt><dd class="font-semibold">TZS {{ b.other_expenses|floatformat:0|intcomma }}</dd></div>
+    <div class="flex justify-between border-t border-ink-100 pt-2 mt-2 font-extrabold text-brand-800"><dt>= Expected cash in drawer</dt><dd>TZS {{ b.expected|floatformat:0|intcomma }}</dd></div>
+  </dl>
+  {% if b.staff_meals_auto and b.staff_meals_expense %}<p class="text-[11px] text-amber-800 mt-2">Meals include TZS {{ b.staff_meals_expense|floatformat:0|intcomma }} recorded manually as Staff Meals expenses plus TZS {{ b.staff_meals_auto|floatformat:0|intcomma }} automatic. Check you have not recorded the same meal twice.</p>{% endif %}
+  {% if b.cash_refunds %}<p class="text-[11px] text-ink-500 mt-2">Cash sales show the original amount of each sale, including sales later returned or voided. The money handed back is deducted separately as cash refunds, so the drawer total is exact.</p>{% endif %}
+  <p class="text-[11px] text-ink-500 mt-2">Only approved expenses paid from the drawer are deducted. Mobile money, bank and other sources do not reduce drawer cash.</p>
+  {% if b.pending_count %}
+  <div class="mt-3 rounded-lg bg-amber-50 border border-amber-200 p-3 text-amber-900 text-xs"><strong>{{ b.pending_count }} cash expense{{ b.pending_count|pluralize }} (TZS {{ b.pending_expenses|floatformat:0|intcomma }}) awaiting approval</strong> — not deducted yet. If this cash already left the drawer, the count may show a shortage until they are approved.</div>
+  {% endif %}
+</div>
+{% endwith %}

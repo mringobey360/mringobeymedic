@@ -1,0 +1,25 @@
+{% extends 'marketplace/base.html' %}{% load humanize %}{% block title %}Track order{% endblock %}
+{% block body %}
+<div class="sp-page">
+  <nav class="sp-crumbs" aria-label="Breadcrumb"><a class="sp-back" href="{% url 'marketplace:catalog' %}" aria-label="Back to marketplace"><svg class="i"><use href="#i-back"/></svg></a><a href="{% url 'marketplace:catalog' %}">Marketplace</a><span class="sep">/</span><b>Track order</b></nav>
+  <div class="sp-box sp-track">
+    <h1>Track your order</h1>
+    <p>Enter the Ticket ID from your confirmation and the phone number used at checkout.</p>
+    <form method="get" class="sp-form" id="track-order-form"><label for="t-ref">Order / Ticket ID</label><input id="t-ref" name="reference" placeholder="e.g. SP-7CA55820 or LCPCAJJZTJ8V7B" value="{{ reference }}" autocomplete="off" required><label for="t-phone">Phone number used at checkout</label><input id="t-phone" name="phone" type="tel" inputmode="tel" placeholder="e.g. 0610117824 or +255610117824" value="{{ request.GET.phone }}" autocomplete="tel" required><button class="sp-pay-btn" type="submit" id="track-order-submit">Find order</button><p id="track-order-feedback" aria-live="polite" style="margin:4px 0 0;color:var(--muted);font-size:13px">Use the Ticket ID from your payment confirmation SMS and the same phone number used at checkout.</p></form>
+    {% include 'marketplace/_track_result.html' %}
+  </div>
+</div>
+<script>
+(function(){
+  var form=document.getElementById('track-order-form');
+  if(!form || form.dataset.trackBound==='1') return;
+  form.dataset.trackBound='1';
+  form.addEventListener('submit',function(){
+    var btn=document.getElementById('track-order-submit');
+    var feedback=document.getElementById('track-order-feedback');
+    if(btn){btn.disabled=true;btn.textContent='Checking order…';}
+    if(feedback) feedback.textContent='Checking your Ticket ID and checkout phone. Please wait…';
+  });
+})();
+</script>
+{% endblock %}

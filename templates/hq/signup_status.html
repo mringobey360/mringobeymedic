@@ -1,0 +1,63 @@
+{% extends "accounts/auth_base.html" %}
+{% load static %}
+{% block title %}Registration Status - SmartPOS{% endblock %}
+{% block auth_content %}
+<div class="w-full">
+    <div class="w-full max-w-md mx-auto">
+        <div class="text-center mb-6">
+            <h1 class="text-2xl font-light tracking-tight text-ink-900">Registration status</h1>
+            <p class="text-sm text-ink-500">{{ signup.business_name }} — {{ signup.owner_full_name }}</p>
+        </div>
+        <div class="auth-card !max-w-none space-y-4">
+            <div class="flex items-center justify-between border-b border-ink-100 pb-3">
+                <span class="text-sm text-ink-500">Plan</span>
+                <span class="text-sm font-semibold">{% if signup.is_trial %}30-day free trial{% else %}{{ signup.get_plan_display }}{% endif %}</span>
+            </div>
+            <div class="flex items-center justify-between border-b border-ink-100 pb-3">
+                <span class="text-sm text-ink-500">Status</span>
+                <span class="badge {% if signup.status == 'REJECTED' %}bg-red-100 text-red-700{% elif signup.status == 'ACTIVE' or signup.status == 'DELIVERED' %}bg-emerald-100 text-emerald-700{% else %}bg-amber-100 text-amber-700{% endif %}">
+                    {{ signup.get_status_display }}
+                </span>
+            </div>
+
+            {% if signup.status == 'PENDING_PAYMENT' %}
+                <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
+                    Your registration has been received. Complete your payment to activate your account.
+                </div>
+                <a href="{% url 'hq:payment_instructions' signup.public_id %}" class="auth-btn">Complete payment</a>
+            {% elif signup.status == 'ACTIVE' and signup.is_trial %}
+                <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-sm text-emerald-800">
+                    Your 30-day free trial is active{% if trial_subscription %} until {{ trial_subscription.end_date|date:"d M Y" }}{% endif %}. Login details have been sent by SMS to your phone.
+                </div>
+                <div class="bg-ink-50 border border-ink-100 rounded-lg p-3 text-sm text-ink-600">
+                    <strong class="text-ink-800">Your free month includes:</strong> all Starter features, 10 sample products to practise with, and 20 free SMS in each SMS package (Debt, Receipt, Marketing). Pay any time from <strong>Subscription &amp; Packages</strong>.
+                </div>
+                <a href="{% url 'accounts:login' %}" class="auth-btn">Sign in</a>
+            {% elif signup.status == 'ACTIVE' %}
+                <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-sm text-emerald-800">
+                    Your payment has been verified and your account is active. Login details have been sent by SMS.
+                </div>
+                <div class="bg-ink-50 border border-ink-100 rounded-lg p-3 text-sm text-ink-600">
+                    <strong class="text-ink-800">Next:</strong> sign in, then open <strong>Subscription &amp; Packages</strong> to add Debt SMS, Receipt SMS, Marketing SMS or Intelligent Reports whenever you need them.
+                </div>
+                <a href="{% url 'accounts:login' %}" class="auth-btn">Sign in</a>
+            {% elif signup.status == 'REJECTED' %}
+                <div class="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-800">
+                    Your registration was not approved. Please contact support for more information.
+                </div>
+            {% endif %}
+
+            <p class="text-sm text-ink-500 text-center">Support: <strong>{{ payment_settings.support_phone }}</strong></p>
+        </div>
+
+        <div class="mt-4">
+            <a href="{% url 'accounts:login' %}" class="btn btn-secondary w-full">
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4"/><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/></svg>
+                Already have login details? Sign in
+            </a>
+        </div>
+
+        <p class="text-center text-xs text-ink-400 mt-4">Keep this private status link. It is unique to your registration.</p>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,215 @@
+{% extends 'base.html' %}
+{% load humanize layaway_extras %}
+{% block title %}{{ plan.reference }} | Layaway | SmartPOS{% endblock %}
+{% block content %}
+{% include 'layaway/_styles.html' %}
+<div class="sp-container ly">
+  <header class="ly-head">
+    <div>
+      <nav class="ly-crumbs" aria-label="Breadcrumb"><a href="{% url 'layaway:list' %}">Layaway</a>{% ly_icon 'chevron-right' 14 %}<span>{{ plan.reference }}</span></nav>
+      <h1 class="ly-title">{{ plan.reference }} {% include 'layaway/_status.html' with plan=plan %}</h1>
+      <p class="ly-sub">Opened {{ plan.created_at|date:'d M Y, H:i' }}</p>
+    </div>
+    <div class="ly-actions">
+      {% if plan.status == 'ACTIVE' or plan.status == 'PAID_PENDING_HANDOVER' or plan.status == 'PARTIALLY_HANDED_OVER' or plan.status == 'NEEDS_RESOLUTION' %}<button type="button" class="btn btn-secondary" data-spx-open="layaway-resolve">{% ly_icon 'sliders' 16 %}{% if is_manager %}Flag or cancel{% else %}Flag for review{% endif %}</button>{% endif %}
+      {% if plan.sale_id %}<a class="btn btn-secondary" href="{% url 'sales:receipt_pdf' plan.sale_id %}" target="_blank" rel="noopener">{% ly_icon 'banknote' 16 %}Print receipt</a>{% endif %}
+      {% if stock and plan.quantity_remaining > 0 and plan.status != 'COMPLETED' and plan.status != 'CANCELLED' and plan.status != 'NEEDS_RESOLUTION' %}
+        {% if stock.handover_max > 0 %}<button type="button" class="btn btn-primary" data-spx-open="layaway-handover">{% ly_icon 'package' 16 %}Record handover ({{ stock.handover_max }} available)</button>
+        {% else %}<button type="button" class="btn btn-secondary" disabled title="Restock or resolve payment eligibility before handover">{% ly_icon 'package' 16 %}Handover unavailable</button>{% endif %}
+      {% endif %}
+      {% if plan.balance > 0 and plan.status == 'ACTIVE' or plan.balance > 0 and plan.status == 'PARTIALLY_HANDED_OVER' %}<button type="button" class="btn btn-primary" data-spx-open="layaway-pay">{% ly_icon 'plus' 16 %}Record payment</button>{% endif %}
+    </div>
+  </header>
+
+  <section class="ly-card">
+    <div class="ly-hero">
+      <div class="l">
+        <div class="ly-person">
+          <span class="ly-av lg">{{ plan.customer_name|initials }}</span>
+          <div><div class="ly-strong" style="font-size:1.0625rem">{{ plan.customer_name }}</div><a class="ly-muted" style="display:inline-flex;gap:.35rem;align-items:center" href="tel:{{ plan.customer_phone }}">{% ly_icon 'phone' 13 %}{{ plan.customer_phone }}</a></div>
+        </div>
+        <dl class="ly-dl">
+          <dt>Product</dt><dd>{{ plan.product.name }}</dd>
+          <dt>Plan quantity</dt><dd>{{ plan.quantity }} &times; TZS {{ plan.unit_price|floatformat:0|intcomma }}</dd>
+          <dt>Handed over</dt><dd>{{ plan.quantity_handed_over }} unit(s)</dd>
+          <dt>Still to hand over</dt><dd>{{ plan.quantity_remaining }} unit(s)</dd>
+          <dt>Plan total</dt><dd class="ly-num">TZS {{ plan.total_amount|floatformat:0|intcomma }}</dd>
+          <dt>Final payment date</dt><dd>{% if plan.due_date %}{{ plan.due_date|date:'d M Y' }}{% if days_left is not None %} <span class="ly-chip {% if days_left < 0 %}bad{% elif days_left <= 3 %}warn{% else %}info{% endif %}">{% if days_left < 0 %}{{ days_left|cut:'-' }} day{{ days_left|cut:'-'|pluralize }} overdue{% elif days_left == 0 %}Due today{% else %}{{ days_left }} day{{ days_left|pluralize }} left{% endif %}</span>{% endif %}{% else %}Not set{% endif %}</dd>
+          {% if plan.notes %}<dt>Notes</dt><dd>{{ plan.notes }}</dd>{% endif %}
+        </dl>
+      </div>
+      <div class="deep">
+        <div class="ly-deep" style="background:transparent;border:0;padding:0">
+          <div class="l">Remaining balance</div>
+          <div class="big">TZS {{ plan.balance|floatformat:0|intcomma }}</div>
+          <div class="trk"><i style="width:{{ pct }}%"></i></div>
+          <div class="row" style="border-top:0;padding-top:0"><span>{{ pct }}% paid</span><b>TZS {{ plan.amount_paid|floatformat:0|intcomma }}</b></div>
+          {% if plan.status == 'COMPLETED' %}<div class="row"><span>Status</span><b>All units handed over</b></div>{% elif plan.quantity_handed_over %}<div class="row"><span>Next step</span><b>{{ plan.quantity_remaining }} unit(s) pending</b></div>{% elif plan.balance == 0 and plan.status != 'CANCELLED' %}<div class="row"><span>Next step</span><b>Hand over product</b></div>{% endif %}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {% if stock %}
+    <div class="ly-note {% if stock.short or stock.handover_max == 0 and plan.quantity_remaining > 0 %}warn{% else %}info{% endif %}">{% ly_icon 'alert' 18 %}<div><strong>Stock reservation status.</strong> {{ stock.sellable }} sellable in stock, {{ stock.reserved }} reserved across {{ stock.plans }} active reservation(s). Up to {{ stock.available_for_plan }} unit(s) are currently available for this plan after protecting other customers' reservations.
+      {% if stock.short %}<br><strong>Stock shortage:</strong> reservations exceed sellable stock by {{ stock.short }} unit(s).{% endif %}
+      {% if stock.handover_max == 0 and plan.quantity_remaining > 0 %}<br><strong>Handover is temporarily unavailable.</strong>
+      {% if plan.balance > 0 and stock.available_for_plan > 0 and stock.eligible == 0 %}The stock is available, but the payments recorded so far do not yet cover the next whole unit. Record at least TZS {{ stock.next_unit_payment|floatformat:0|intcomma }} more to make one additional unit eligible for handover.{% elif stock.available_for_plan < 1 %}There is no unreserved stock available for this plan. Restock or correct the inventory record before handing over more units.{% else %}Only units covered by payments can be handed over. Verify the payment and stock details before proceeding.{% endif %}
+      {% if plan.balance == 0 %}This plan is fully paid; do not collect another payment.{% endif %} No handover or sale has been recorded for the remaining units.
+      {% if stock.available_for_plan < 1 %}<br><a href="{% url 'inventory:product_batches' plan.product_id %}" style="font-weight:700">Review product batches / stock</a>{% if is_manager %} · <a href="{% url 'inventory:batch_add' plan.product_id %}" style="font-weight:700">Receive a new batch</a>{% endif %}{% endif %}{% endif %}
+      <br>POS protects reserved units by default. A manager may release stock only from an unpaid plan with a recorded reason; fully-paid plans are protected.</div></div>
+  {% endif %}
+  {% if plan.status == 'COMPLETED' %}<div class="ly-note ok">{% ly_icon 'check-circle' 18 %}<div><strong>Handover complete{% if plan.handed_over_at %} on {{ plan.handed_over_at|date:'d M Y, H:i' }}{% endif %}.</strong> All {{ plan.quantity }} unit(s) were handed over. Latest official sale #{{ plan.sale.sale_number|default:plan.sale_id }} was recorded.</div></div>
+  {% elif plan.quantity_handed_over %}<div class="ly-note info">{% ly_icon 'package' 18 %}<div><strong>Partial handover recorded.</strong> {{ plan.quantity_handed_over }} of {{ plan.quantity }} unit(s) handed over; {{ plan.quantity_remaining }} remain. The remaining units stay on this plan and will not be charged again.</div></div>
+  {% elif plan.balance == 0 and plan.status != 'CANCELLED' %}<div class="ly-note ok">{% ly_icon 'check-circle' 18 %}<div><strong>Fully paid.</strong> Hand over all available units or use a partial handover if stock is short. No additional payment is taken during handover.</div></div>{% endif %}
+
+  {% if handovers %}
+  <section class="ly-card" style="margin-top:1rem">
+    <div class="ly-card-h"><span class="ly-ico ok">{% ly_icon 'package' %}</span><div class="grow"><h2 class="ly-h2">Handover history</h2><p class="ly-hint">Physical quantities issued to the customer; no duplicate payment collection</p></div></div>
+    <div class="ly-tw"><table class="ly-table stack"><thead><tr><th>Date</th><th>Handled by</th><th>Quantity</th><th>Sale / receipt</th></tr></thead><tbody>
+    {% for h in handovers %}<tr><td data-label="Date">{{ h.handed_over_at|date:'d M Y, H:i' }}</td><td data-label="Handled by">{{ h.handed_over_by|default:'-' }}</td><td data-label="Quantity">{{ h.quantity }} × TZS {{ plan.unit_price|floatformat:0|intcomma }}</td><td data-label="Sale / receipt"><a href="{% url 'sales:receipt_pdf' h.sale_id %}" target="_blank" rel="noopener">Sale #{{ h.sale.sale_number|default:h.sale_id }} · Print receipt</a></td></tr>{% endfor %}
+    </tbody></table></div>
+  </section>
+  {% endif %}
+
+  <div class="ly-split">
+    <section class="ly-card">
+      <div class="ly-card-h"><span class="ly-ico ok">{% ly_icon 'banknote' %}</span><div class="grow"><h2 class="ly-h2">Payment history</h2><p class="ly-hint">{{ payments|length }} payment{{ payments|length|pluralize }} recorded</p></div></div>
+      {% if payments %}
+      <div class="ly-tw"><table class="ly-table stack">
+        <thead><tr><th>Date</th><th>Method</th><th>Received by</th><th class="r">Amount</th></tr></thead>
+        <tbody>{% for pay in payments %}
+          <tr><td data-label="Date" class="ly-nowrap">{{ pay.received_at|date:'d M Y, H:i' }}{% if pay.transaction_reference %}<div class="ly-muted">Ref {{ pay.transaction_reference }}</div>{% endif %}</td><td data-label="Method">{{ pay.get_method_display }}{% if pay.method == 'CASH' %}<div class="ly-muted">Counted in cash drawer</div>{% endif %}</td><td data-label="Received by">{{ pay.received_by|default:'-' }}</td><td data-label="Amount" class="r ly-nowrap ly-num ly-strong">TZS {{ pay.amount|floatformat:0|intcomma }}</td></tr>
+        {% endfor %}</tbody>
+      </table></div>
+      {% else %}<div class="ly-empty" style="padding:2.5rem 1rem"><div class="ly-muted" style="font-size:.875rem">No payments recorded yet.</div></div>{% endif %}
+    </section>
+
+    <section class="ly-card">
+      <div class="ly-card-h"><span class="ly-ico info">{% ly_icon 'clock' %}</span><div class="grow"><h2 class="ly-h2">Activity</h2><p class="ly-hint">Audit trail for this plan</p></div></div>
+      <div class="ly-card-b">
+        <ul class="ly-tl">
+        {% for event in audit %}
+          <li class="{% if event.action == 'PAYMENT_RECEIVED' or event.action == 'FULLY_PAID' or event.action == 'HANDED_OVER' %}ok{% elif event.action == 'CREATED' %}brand{% elif event.action == 'CANCELLED' %}bad{% elif event.action == 'NEEDS_RESOLUTION' %}warn{% endif %}">
+            <div class="top"><span class="t">{{ event.action|audit_label }}</span><span class="ly-muted">{{ event.created_at|date:'d M, H:i' }}</span></div>
+            {% if event.detail %}<div class="d">{{ event.detail }}</div>{% endif %}
+            <div class="ly-muted">By {{ event.actor|default:'System' }}</div>
+          </li>
+        {% empty %}<li><div class="d">No activity recorded.</div></li>{% endfor %}
+        </ul>
+      </div>
+    </section>
+  </div>
+</div>
+
+{% if plan.status == 'ACTIVE' or plan.status == 'PARTIALLY_HANDED_OVER' %}
+{% if plan.balance > 0 %}
+<div class="spx-modal" id="spx-modal-layaway-pay" role="dialog" aria-modal="true" aria-labelledby="ly-pay-title" hidden>
+  <div class="spx-modal-card ly-modal sm">
+    <form method="post" class="ly-mform" novalidate id="ly-pay-form">
+      {% csrf_token %}
+      <div class="spx-modal-head">
+        <span class="spx-modal-ico spx-modal-ico--brand">{% ly_icon 'banknote' 20 %}</span>
+        <div><h2 id="ly-pay-title">Record payment</h2><p>The customer receives an SMS receipt for every payment.</p></div>
+        <button type="button" class="spx-modal-x" data-spx-close aria-label="Close">{% ly_icon 'x' 16 %}</button>
+      </div>
+      <div class="spx-modal-body">
+        <input type="hidden" name="idem" value="{{ pay_key }}">
+        <div class="ly-mgrid">
+          <div class="ly-f span2"><label class="spx-label" for="id_amount">Amount received (TZS)</label>{{ payment_form.amount }}<div class="help"><a href="#" id="pay-full">Pay full balance (TZS {{ plan.balance|floatformat:0|intcomma }})</a></div>{% if payment_form.amount.errors %}<p class="spx-err">{{ payment_form.amount.errors|join:', ' }}</p>{% endif %}</div>
+          <div class="ly-f"><label class="spx-label" for="{{ payment_form.method.id_for_label }}">Method</label>{{ payment_form.method }}{% if payment_form.method.errors %}<p class="spx-err">{{ payment_form.method.errors|join:', ' }}</p>{% endif %}</div>
+          <div class="ly-f"><label class="spx-label" for="{{ payment_form.transaction_reference.id_for_label }}">Reference <span style="font-weight:500;color:#94a3b8">(optional)</span></label>{{ payment_form.transaction_reference }}</div>
+          <div class="ly-f span2"><label class="spx-label" for="{{ payment_form.note.id_for_label }}">Note <span style="font-weight:500;color:#94a3b8">(optional)</span></label>{{ payment_form.note }}</div>
+        </div>
+      </div>
+      <div class="spx-modal-foot">
+        <button type="button" class="spx-btn spx-btn--ghost" data-spx-close>Cancel</button>
+        <button type="submit" class="spx-btn spx-btn--primary" name="record_payment" value="1" id="ly-pay-submit">Save payment</button>
+      </div>
+    </form>
+  </div>
+</div>
+<script>
+(function(){
+  var full=document.getElementById('pay-full'), amt=document.getElementById('id_amount'); if(!full||!amt) return;
+  full.addEventListener('click',function(e){e.preventDefault();amt.value='{{ plan.balance|floatformat:2 }}'.replace(',','');amt.focus();});
+  document.getElementById('ly-pay-form').addEventListener('submit',function(){var b=document.getElementById('ly-pay-submit');setTimeout(function(){b.disabled=true;b.innerHTML='<span class="spx-spin"></span> Saving\u2026';},0);});
+  {% if open_modal == 'pay' %}window.addEventListener('load',function(){var b=document.querySelector('[data-spx-open="layaway-pay"]');if(b)b.click();});{% endif %}
+})();
+</script>
+{% endif %}
+{% endif %}
+
+
+{% if stock and stock.handover_max > 0 and plan.status != 'COMPLETED' and plan.status != 'CANCELLED' %}
+<div class="spx-modal" id="spx-modal-layaway-handover" role="dialog" aria-modal="true" aria-labelledby="ly-ho-title" hidden>
+  <div class="spx-modal-card ly-modal sm">
+    <form method="post" action="{% url 'layaway:handover' plan.pk %}" class="ly-mform" id="ly-ho-form">
+      {% csrf_token %}
+      <div class="spx-modal-head">
+        <span class="spx-modal-ico spx-modal-ico--brand">{% ly_icon 'package' 20 %}</span>
+        <div><h2 id="ly-ho-title">Hand over to {{ plan.customer_name }}</h2><p>Record only the units physically given to the customer. This will not collect payment again.</p></div>
+        <button type="button" class="spx-modal-x" data-spx-close aria-label="Close">{% ly_icon 'x' 16 %}</button>
+      </div>
+      <div class="spx-modal-body">
+        <dl class="ly-dl">
+          <dt>Product</dt><dd>{{ plan.product.name }}</dd>
+          <dt>Remaining units</dt><dd>{{ stock.remaining }}</dd>
+          <dt>Maximum now</dt><dd>{{ stock.handover_max }} unit(s), based on payments retained and sellable stock</dd>
+          <dt>Unit price</dt><dd>TZS {{ plan.unit_price|floatformat:0|intcomma }}</dd>
+          <dt>Plan total</dt><dd class="ly-num">TZS {{ plan.total_amount|floatformat:0|intcomma }}</dd>
+          <dt>Received in cash</dt><dd>TZS {{ cash_paid|floatformat:0|intcomma }}</dd>
+          <dt>Mobile / bank / other</dt><dd>TZS {{ other_paid|floatformat:0|intcomma }}</dd>
+          <dt>Sellable stock</dt><dd>{{ stock.sellable }}</dd>
+          <dt>Handover value</dt><dd class="ly-num">Up to TZS {{ plan.unit_price|floatformat:0|intcomma }} × {{ stock.handover_max }}</dd>
+        </dl>
+        <label for="ly-ho-quantity">Quantity to hand over</label>
+        <input class="spx-input" id="ly-ho-quantity" name="quantity" type="number" min="1" max="{{ stock.handover_max }}" value="{{ stock.handover_max }}" step="1" required>
+        <label for="ly-ho-note">Handover note (optional)</label>
+        <input class="spx-input" id="ly-ho-note" name="note" type="text" maxlength="255" placeholder="e.g. 5 units handed over; 1 pending restock">
+        <p class="ly-merr" style="color:#64748b">The server rechecks payment eligibility and stock before saving. Previously received money is never collected again.</p>
+      </div>
+      <div class="spx-modal-foot">
+        <button type="button" class="spx-btn spx-btn--ghost" data-spx-close>Not yet</button>
+        <button type="submit" class="spx-btn spx-btn--primary" id="ly-ho-submit" {% if stock.handover_max < 1 %}disabled{% endif %}>Confirm handover</button>
+      </div>
+    </form>
+  </div>
+</div>
+<script>
+(function(){var f=document.getElementById('ly-ho-form');if(!f)return;f.addEventListener('submit',function(){var b=document.getElementById('ly-ho-submit');setTimeout(function(){b.disabled=true;b.innerHTML='<span class="spx-spin"></span> Saving\u2026';},0);});})();
+</script>
+{% endif %}
+
+{% if plan.status == 'ACTIVE' or plan.status == 'PAID_PENDING_HANDOVER' or plan.status == 'PARTIALLY_HANDED_OVER' or plan.status == 'NEEDS_RESOLUTION' %}
+<div class="spx-modal" id="spx-modal-layaway-resolve" role="dialog" aria-modal="true" aria-labelledby="ly-res-title" hidden>
+  <div class="spx-modal-card ly-modal sm">
+    <form method="post" action="{% url 'layaway:resolve' plan.pk %}" class="ly-mform">
+      {% csrf_token %}
+      <div class="spx-modal-head">
+        <span class="spx-modal-ico spx-modal-ico--danger">{% ly_icon 'alert' 20 %}</span>
+        <div><h2 id="ly-res-title">Flag, re-open or cancel plan</h2><p>Record the reason. It is kept in the audit trail.</p></div>
+        <button type="button" class="spx-modal-x" data-spx-close aria-label="Close">{% ly_icon 'x' 16 %}</button>
+      </div>
+      <div class="spx-modal-body">
+        <div class="ly-f"><label class="spx-label" for="ly-resolution-note">Reason</label><textarea id="ly-resolution-note" name="note" class="spx-input" rows="3" required placeholder="Explain the issue and the proposed resolution"></textarea></div>
+        {% if is_manager and plan.amount_paid > 0 %}
+        <div class="ly-mgrid" style="margin-top:.6rem">
+          <div class="ly-f"><label class="spx-label" for="ly-refund-amount">Refund to customer if cancelling (TZS)</label><input type="number" min="0" max="{{ plan.amount_paid|floatformat:2 }}" step="any" id="ly-refund-amount" name="refund_amount" class="spx-input" value="{{ plan.amount_paid|floatformat:2 }}"></div>
+          <div class="ly-f"><label class="spx-label" for="ly-refund-method">Refunded by</label><select id="ly-refund-method" name="refund_method" class="spx-input"><option value="CASH">Cash (from the drawer)</option><option value="MOBILE">Mobile money</option><option value="BANK">Bank transfer</option><option value="OTHER">Other</option></select></div>
+        </div>
+        <p class="ly-merr" style="color:#64748b">Customer has paid TZS {{ plan.amount_paid|floatformat:0|intcomma }}. Enter 0 to keep the money (for example a forfeited deposit) and say why in the reason. A cash refund reduces the cash drawer.</p>
+        {% endif %}
+        <p class="ly-merr" style="color:#64748b">{% if is_manager %}Cancelling closes the plan for good.{% else %}Only a manager or owner can cancel a plan. You can flag it so a manager reviews it.{% endif %}</p>
+      </div>
+      <div class="spx-modal-foot">
+        <button type="button" class="spx-btn spx-btn--ghost" data-spx-close>Close</button>
+        {% if plan.status != 'NEEDS_RESOLUTION' %}<button type="submit" class="spx-btn spx-btn--ghost" name="action" value="needs_resolution">Flag for resolution</button>{% endif %}
+        {% if is_manager and plan.status == 'NEEDS_RESOLUTION' %}<button type="submit" class="spx-btn spx-btn--ghost" name="action" value="reopen">Re-open plan</button>{% endif %}
+        {% if is_manager %}<button type="submit" class="spx-btn spx-btn--danger" name="action" value="cancel">Cancel plan</button>{% endif %}
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

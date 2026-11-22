@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Business Overview{% endblock %}
+{% block content %}
+{# V117.5 — Business Overview: same card system as the Dashboard (stat-card), one place per figure, no duplicated cash block. #}
+<div class="flex flex-wrap items-center justify-between gap-3 mb-6">
+    <div>
+        <h1 class="text-2xl font-bold text-ink-900 tracking-tight">Business Overview</h1>
+        <p class="text-sm text-ink-500 mt-0.5">Stock health, expiry and debt alerts at a glance.</p>
+    </div>
+    <div class="flex flex-wrap gap-2">
+        <a href="{% url 'expenses:cash' %}" class="btn btn-secondary">Cash Control</a>
+        <a href="{% url 'dashboard:workforce' %}" class="btn btn-secondary">Workforce presence</a>
+        <a href="{% url 'dashboard:home' %}" class="btn btn-secondary">← Back to Dashboard</a>
+    </div>
+</div>
+
+{% if not today_cash_day and cash_automation_state == 'FIRST_SETUP' %}
+<div class="mb-5 p-4 rounded-xl bg-amber-50 border border-amber-100 text-amber-800 text-sm flex flex-wrap items-center justify-between gap-3">
+    <span>First cash day for this branch: enter the opening cash once. After that, daily closing and carry-forward are automatic.</span>
+    <a href="{% url 'expenses:cash' %}" class="btn btn-secondary">Set opening cash</a>
+</div>
+{% elif not today_cash_day and cash_automation_state == 'BLOCKED' %}
+<div class="mb-5 p-4 rounded-xl bg-red-50 border border-red-100 text-red-800 text-sm flex flex-wrap items-center justify-between gap-3">
+    <span>Cash preparation is waiting for the previous cash day to be reconciled.</span>
+    <a href="{% url 'expenses:cash' %}" class="btn btn-secondary">Open Cash Control</a>
+</div>
+{% endif %}
+
+<div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-5">
+    <div class="card stat-card">
+        <div class="stat-head">
+            <div class="stat-icon bg-red-50 text-red-600">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z"/><path d="M9 8h6M9 12h6M9 16h3"/></svg>
+            </div>
+            <p class="stat-label">Approved Expenses Today</p>
+        </div>
+        {% with amount=today_expenses|floatformat:0|intcomma %}
+        <p class="stat-value text-ink-900" style="--n: {{ amount|length }}"><span class="stat-cur">TZS</span>{{ amount }}</p>
+        {% endwith %}
+        <p class="text-xs mt-1">
+            {% if pending_expenses_count %}<span class="text-amber-700 font-semibold">{{ pending_expenses_count }} pending approval</span> · {% endif %}<a href="{% url 'expenses:list' %}" class="text-brand-700 font-semibold">Expense register →</a>
+        </p>
+    </div>
+
+    <div class="card stat-card">
+        <div class="stat-head">
+            <div class="stat-icon bg-ink-100 text-ink-600">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7.5l9-4 9 4-9 4-9-4z"/><path d="M3 7.5v9l9 4 9-4v-9"/></svg>
+            </div>
+            <p class="stat-label">Total Products</p>
+        </div>
+        <p class="stat-value text-ink-900" style="--n: {{ total_products|stringformat:'s'|length }}">{{ total_products|intcomma }}</p>
+        <p class="text-xs mt-1"><a href="{% url 'inventory:product_list' %}" class="text-brand-700 font-semibold">View inventory →</a></p>
+    </div>
+
+    <div class="card stat-card">
+        <div class="stat-head">
+            <div class="stat-icon bg-amber-50 text-amber-600">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><rect x="3" y="5.5" width="18" height="13" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            </div>
+            <p class="stat-label">Pending Debts</p>
+        </div>
+        {% with amount=total_debt_outstanding|floatformat:0|intcomma %}
+        <p class="stat-value text-ink-900" style="--n: {{ amount|length }}"><span class="stat-cur">TZS</span>{{ amount }}</p>
+        {% endwith %}
+        <p class="text-xs text-ink-400 mt-1">{{ pending_debts_count }} unsettled · <a href="{% url 'sales:debt_list' %}" class="text-brand-700 font-semibold">Open debts →</a></p>
+    </div>
+
+    <div class="card stat-card">
+        <div class="stat-head">
+            <div class="stat-icon bg-red-50 text-red-600">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="13"/><circle cx="12" cy="16.3" r="0.6" fill="currentColor"/></svg>
+            </div>
+            <p class="stat-label">Expired Products</p>
+        </div>
+        <p class="stat-value {% if expired_count %}text-red-600{% else %}text-ink-900{% endif %}" style="--n: {{ expired_count|stringformat:'s'|length }}">{{ expired_count|intcomma }}</p>
+        <p class="text-xs text-ink-400 mt-1">{% if expired_count %}Remove from sale{% else %}No expired stock{% endif %}</p>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5 items-start">
+    <section class="card">
+        <div class="flex items-center justify-between gap-3 mb-3">
+            <h2 class="section-title">
+                <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+                Low Stock
+                <span class="chip chip-warn">{{ low_stock_count|intcomma }}</span>
+            </h2>
+            <a href="{% url 'inventory:product_list' %}?stock=low" class="text-xs font-semibold text-brand-700">View all →</a>
+        </div>
+        <div class="divide-y divide-ink-100">
+            {% for p in low_stock_products %}
+            <div class="flex items-center justify-between gap-3 py-2.5 text-sm">
+                <span class="text-ink-700 truncate min-w-0" title="{{ p.name }}">{{ p.name }}</span>
+                {% if p.total_quantity <= 0 %}
+                <span class="badge bg-red-50 text-red-700 shrink-0">Out of stock</span>
+                {% else %}
+                <span class="badge bg-amber-50 text-amber-700 shrink-0">{{ p.total_quantity }} left</span>
+                {% endif %}
+            </div>
+            {% empty %}
+            <p class="text-sm text-ink-400 py-3">All products are well stocked.</p>
+            {% endfor %}
+        </div>
+        {% if low_stock_count > 10 %}
+        <p class="text-xs text-ink-400 mt-3 pt-3 border-t border-ink-100">Showing the 10 lowest of {{ low_stock_count|intcomma }} products.</p>
+        {% endif %}
+    </section>
+
+    <section class="card">
+        <div class="flex items-center justify-between gap-3 mb-3">
+            <h2 class="section-title">
+                <span class="w-2 h-2 rounded-full bg-red-500"></span>
+                Expiring Soon
+                <span class="chip {% if expiring_count %}chip-warn{% else %}chip-ok{% endif %}">{{ expiring_count|intcomma }}</span>
+            </h2>
+            <a href="{% url 'inventory:product_list' %}?stock=expiring" class="text-xs font-semibold text-brand-700">View all →</a>
+        </div>
+        <div class="divide-y divide-ink-100">
+            {% for p in expiring_products %}
+            <div class="flex items-center justify-between gap-3 py-2.5 text-sm">
+                <span class="text-ink-700 truncate min-w-0" title="{{ p.name }}">{{ p.name }}</span>
+                <span class="badge {% if p.days_to_expiry <= 7 %}bg-red-50 text-red-700{% else %}bg-amber-50 text-amber-700{% endif %} shrink-0">{{ p.days_to_expiry }} day(s)</span>
+            </div>
+            {% empty %}
+            <div class="flex items-center gap-3 py-3 text-sm text-ink-500">
+                <span class="w-6 h-6 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                    <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>
+                </span>
+                Nothing expiring in the next 30 days.
+            </div>
+            {% endfor %}
+        </div>
+        {% if expiring_count > 10 %}
+        <p class="text-xs text-ink-400 mt-3 pt-3 border-t border-ink-100">Showing 10 of {{ expiring_count|intcomma }} products.</p>
+        {% endif %}
+    </section>
+</div>
+
+{% endblock %}

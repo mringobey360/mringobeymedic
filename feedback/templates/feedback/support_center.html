@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Technical Support · SmartPOS{% endblock %}
+{% block extra_head %}{% include "feedback/_styles.html" %}{% endblock %}
+{% block content %}
+<div class="fbp">
+  {% include "feedback/_header.html" with eyebrow="Customer care" heading="Technical support" lead="Open a support ticket, share the issue securely, and follow the conversation until it is resolved." %}
+  <section class="fbp-card">
+    <h2>Contact SmartPOS support</h2><p class="fbp-note">Do not include passwords, PINs, or payment secrets. Add the steps that caused the problem.</p>
+    <form method="post" action="{% url 'feedback:support_create' %}" class="fbp-support-form">{% csrf_token %}
+      <label class="fbp-label" for="sp-subject">Subject</label><input class="fbp-field" id="sp-subject" name="subject" maxlength="160" minlength="4" required placeholder="e.g. Sales receipt is not printing">
+      <label class="fbp-label" for="sp-category">Issue category</label><select class="fbp-select" id="sp-category" name="category">{% for value,label in categories %}<option value="{{ value }}">{{ label }}</option>{% empty %}<option value="TECHNICAL">Technical problem</option><option value="ACCOUNT">Account or login</option><option value="SALES">Sales / POS</option><option value="INVENTORY">Inventory / stock</option><option value="BILLING">Billing or subscription</option><option value="OTHER">Other</option>{% endfor %}</select>
+      <label class="fbp-label" for="sp-description">Describe the problem</label><textarea class="fbp-field" id="sp-description" name="description" minlength="10" maxlength="5000" rows="5" required placeholder="What happened? What did you expect? What steps reproduce it?"></textarea>
+      <input type="hidden" name="page_url" id="sp-page-url"><div class="fbp-foot"><small>Support ticket and replies remain in your account.</small><button class="fbp-btn" type="submit">Create support ticket</button></div>
+    </form>
+  </section>
+  <section class="fbp-card"><h2>My support tickets</h2><p class="fbp-note">Open a ticket to read replies, add information or confirm the issue is fixed.</p>
+    <div class="fbp-list">{% for ticket in tickets %}<a class="fbp-support-ticket" href="{% url 'feedback:support_detail' ticket.pk %}"><div><strong>{{ ticket.ticket_number|default:ticket.pk }} · {{ ticket.subject }}</strong><small>{{ ticket.created_at|date:"d M Y, H:i" }} · {{ ticket.get_category_display }}</small></div><span class="fbp-badge s-{{ ticket.status }}">{{ ticket.get_status_display }}</span></a>{% empty %}<div class="fbp-empty"><b>No support tickets yet</b>Your support requests and replies will appear here.</div>{% endfor %}</div>
+  </section>
+</div>
+<script>(function(){var e=document.getElementById('sp-page-url');if(e)e.value=location.pathname;})();</script>
+{% endblock %}

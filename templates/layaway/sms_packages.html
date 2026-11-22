@@ -1,0 +1,129 @@
+{% extends 'base.html' %}
+{% load humanize layaway_extras %}
+{% block title %}Premium Messaging | SmartPOS{% endblock %}
+{% block content %}
+{% include 'layaway/_styles.html' %}
+<div class="sp-container ly">
+  <header class="ly-head">
+    <div>
+      <nav class="ly-crumbs" aria-label="Breadcrumb"><a href="{% url 'layaway:list' %}">Layaway</a>{% ly_icon 'chevron-right' 14 %}<span>Premium Messaging</span></nav>
+      <h1 class="ly-title">Premium Messaging</h1>
+      <p class="ly-sub">Buy SMS credits for automatic Layaway customer updates. Pay online securely when enabled, or use manual mobile-money payment and submit the transaction reference for verification. Credits activate only after confirmed payment.</p>
+    </div>
+  </header>
+
+  <div class="ly-layout">
+    <div class="ly-stack">
+      <div class="ly-pkgs">
+        {% for package in packages %}
+        <article class="ly-card ly-pkg {% if package.is_featured %}feat{% endif %}">
+          {% if package.is_featured %}<span class="badge">Best value</span>{% endif %}
+          <h2 class="ly-h2" style="font-size:1.0625rem">{{ package.name }}</h2>
+          {% if package.tagline %}<p class="ly-hint">{{ package.tagline }}</p>{% endif %}
+          <div class="price">TZS {{ package.price|floatformat:0|intcomma }}</div>
+          <div class="ly-muted">One-time payment &middot; about TZS {{ package.per_sms }} per SMS</div>
+          <ul>
+            <li>{% ly_icon 'check' 16 %}{{ package.sms_credits|intcomma }} SMS credits</li>
+            <li>{% ly_icon 'check' 16 %}Plan opened, payment and balance-cleared messages</li>
+            <li>{% ly_icon 'check' 16 %}Sent automatically, no extra steps for cashiers</li>
+          </ul>
+          {% if online_ready %}<form method="post" action="{% url 'payments:pay_layaway_sms' %}" style="margin-top:.65rem">{% csrf_token %}<input type="hidden" name="package_id" value="{{ package.pk }}"><button type="submit" class="btn {% if package.is_featured %}btn-primary{% else %}btn-secondary{% endif %}" style="width:100%">Pay securely online</button></form>{% endif %}
+          <button type="button" class="btn btn-secondary" style="width:100%;margin-top:.55rem" data-spx-open="sms-request" data-pkg-id="{{ package.pk }}" data-pkg-name="{{ package.name }}" data-pkg-price="{{ package.price|floatformat:0|intcomma }}" data-pkg-credits="{{ package.sms_credits|intcomma }}">Request activation</button>
+        </article>
+        {% empty %}
+        <div class="ly-card ly-empty" style="grid-column:1/-1"><span class="ly-ico">{% ly_icon 'package' 22 %}</span><div class="ly-strong">Packages are being configured</div><p class="ly-sub" style="margin:.35rem auto 0">They will appear here once the administrator sets them up.</p></div>
+        {% endfor %}
+      </div>
+
+      {% if payment_settings.enable_lipa_namba %}
+      <section class="ly-card">
+        <div class="ly-card-h"><span class="ly-ico">{% ly_icon 'wallet' %}</span><div class="grow"><h2 class="ly-h2">Manual mobile-money payment</h2><p class="ly-hint">Use this only if you are not paying through secure online checkout</p></div></div>
+        <div class="ly-card-b">
+          <p class="ly-muted">Pay the exact package amount to the official platform payment number below. Then select “Request activation” on the package and enter the transaction reference. Credits will be added after the platform administrator verifies the payment.</p>
+          <div class="ly-box" style="margin-top:.75rem"><b>Pay number:</b> {{ payment_settings.lipa_namba }}<br><b>Payee:</b> {{ payment_settings.payee_name }}<br><b>Support:</b> {{ payment_settings.support_phone }}</div>
+          {% if payment_settings.instructions_text %}<p class="ly-muted" style="margin-top:.65rem">{{ payment_settings.instructions_text|linebreaksbr }}</p>{% endif %}
+        </div>
+      </section>
+      {% endif %}
+      <section class="ly-card">
+        <div class="ly-card-h"><span class="ly-ico info">{% ly_icon 'clock' %}</span><div class="grow"><h2 class="ly-h2">Purchase history</h2><p class="ly-hint">Online and manual purchases, with activation status</p></div></div>
+        {% if purchases %}
+        <div class="ly-tw"><table class="ly-table stack">
+          <thead><tr><th>Package</th><th>Reference</th><th>Requested</th><th>Status</th><th class="r">Amount</th></tr></thead>
+          <tbody>{% for p in purchases %}
+            <tr>
+              <td data-label="Package" class="ly-strong">{{ p.package.name }}</td>
+              <td data-label="Reference">{{ p.payment_reference|default:'-' }}</td>
+              <td data-label="Requested" class="ly-nowrap">{{ p.requested_at|date:'d M Y, H:i' }}</td>
+              <td data-label="Status">{% if p.status == 'APPROVED' %}<span class="ly-chip ok">Approved</span>{% elif p.status == 'REJECTED' %}<span class="ly-chip bad">Rejected</span>{% else %}<span class="ly-chip warn">Pending verification</span>{% endif %}</td>
+              <td data-label="Amount" class="r ly-nowrap ly-num ly-strong">TZS {{ p.amount|floatformat:0|intcomma }}</td>
+            </tr>
+          {% endfor %}</tbody>
+        </table></div>
+        {% else %}<div class="ly-empty" style="padding:2.5rem 1rem"><div class="ly-muted" style="font-size:.875rem">No requests yet.</div></div>{% endif %}
+      </section>
+    </div>
+
+    <aside class="ly-stack ly-sticky">
+      <section class="ly-deep" aria-label="SMS credits">
+        <div class="l">SMS credits available</div>
+        <div class="big">{{ wallet.total_remaining|intcomma }}</div>
+        <div class="row" style="margin-top:.9rem"><span>Free trial remaining</span><b>{{ wallet.trial_remaining }} of 5</b></div>
+        <div class="row"><span>Paid credits</span><b>{{ wallet.paid_remaining|intcomma }}</b></div>
+      </section>
+
+      <section class="ly-card">
+        <div class="ly-card-h"><span class="ly-ico">{% ly_icon 'message' %}</span><div class="grow"><h2 class="ly-h2">What your customers receive</h2><p class="ly-hint">Sample messages</p></div></div>
+        <div class="ly-card-b">
+          <div class="ly-sms"><div class="tag">Plan opened</div><div class="bubble">{{ sms_shop }}
+Habari Amina, mpango wako wa Layaway LAY-20261022-A1B2C3 umesajiliwa.
+Vaseline Lotion x2
+Jumla: TZS 90,000
+Umelipa: TZS 30,000
+Salio: TZS 60,000{% if sms_footer %}
+{{ sms_footer }}{% endif %}</div></div>
+          <div class="ly-sms"><div class="tag">Payment received</div><div class="bubble">{{ sms_shop }}
+Habari Amina, tumepokea TZS 10,000 kwa Layaway LAY-20261022-A1B2C3. Asante.
+Umelipa jumla: TZS 40,000
+Salio: TZS 50,000</div></div>
+          <p class="ly-muted" style="margin:.85rem 0 0">One credit covers one SMS segment (up to 160 GSM characters; Unicode and longer messages can use multiple credits). These are prepaid credit packs, not automatic recurring billing. Buy a new pack whenever you need more credits.</p>
+        </div>
+      </section>
+    </aside>
+  </div>
+</div>
+
+<div class="spx-modal" id="spx-modal-sms-request" role="dialog" aria-modal="true" aria-labelledby="ly-sms-title" hidden>
+  <div class="spx-modal-card ly-modal sm">
+    <form method="post" class="ly-mform">
+      {% csrf_token %}
+      <input type="hidden" name="package_id" id="ly-pkg-id">
+      <div class="spx-modal-head">
+        <span class="spx-modal-ico spx-modal-ico--brand">{% ly_icon 'message' 20 %}</span>
+        <div><h2 id="ly-sms-title">Request activation</h2><p>Credits are added after your payment is verified.</p></div>
+        <button type="button" class="spx-modal-x" data-spx-close aria-label="Close">{% ly_icon 'x' 16 %}</button>
+      </div>
+      <div class="spx-modal-body">
+        <div class="ly-box"><b id="ly-pkg-name">Package</b> &middot; TZS <span id="ly-pkg-price">0</span> &middot; <span id="ly-pkg-credits">0</span> SMS credits</div>
+        <div class="ly-mgrid" style="margin-top:.8rem">
+          <div class="ly-f span2"><label class="spx-label" for="ly-pay-ref">Mobile-money payment reference</label><input id="ly-pay-ref" name="payment_reference" class="spx-input" maxlength="150" required placeholder="Transaction ID" autocomplete="off"></div>
+          <div class="ly-f span2"><label class="spx-label" for="ly-pay-note">Note <span style="font-weight:500;color:#94a3b8">(optional)</span></label><input id="ly-pay-note" name="customer_note" class="spx-input" maxlength="500" autocomplete="off"></div>
+        </div>
+      </div>
+      <div class="spx-modal-foot">
+        <button type="button" class="spx-btn spx-btn--ghost" data-spx-close>Cancel</button>
+        <button type="submit" class="spx-btn spx-btn--primary">Submit request</button>
+      </div>
+    </form>
+  </div>
+</div>
+<script>
+document.addEventListener('click',function(e){
+  var b=e.target.closest&&e.target.closest('[data-pkg-id]'); if(!b) return;
+  document.getElementById('ly-pkg-id').value=b.dataset.pkgId;
+  document.getElementById('ly-pkg-name').textContent=b.dataset.pkgName;
+  document.getElementById('ly-pkg-price').textContent=b.dataset.pkgPrice;
+  document.getElementById('ly-pkg-credits').textContent=b.dataset.pkgCredits;
+});
+</script>
+{% endblock %}

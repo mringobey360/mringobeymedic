@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Add New Batch{% endblock %}
+{% block content %}
+{% include "inventory/_batch_form_styles.html" %}
+<div class="bf">
+    <div class="bf-head">
+        <h1 class="bf-title"><small>New stock batch</small>{{ product.name }}</h1>
+        <p class="bf-lead">Base unit: <strong>{{ product.get_unit_display }}</strong>. Packaging is optional — if you buy a package, enter the base units it contains and the price of one package; the cost per unit is calculated for you.</p>
+    </div>
+    {% if product.requires_expiry %}
+    <p class="bf-notice is-warn">This product requires an expiry date for every batch.</p>
+    {% else %}
+    <p class="bf-notice">This product does not expire, so the expiry date is optional.</p>
+    {% endif %}
+    <form method="post" class="bf-form" id="batch-form">
+        {% csrf_token %}
+        {% if form.non_field_errors %}<p class="bf-error">{{ form.non_field_errors.0 }}</p>{% endif %}
+        <div class="bf-grid">
+        {% for field in form %}
+            <div class="bf-field{% if field.name == 'note' %} is-wide{% endif %}{% if field.errors %} has-error{% endif %}">
+                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% if field.errors %}<p class="bf-error">{{ field.errors.0 }}</p>{% endif %}
+                {% if field.help_text %}<p class="bf-help">{{ field.help_text }}</p>{% endif %}
+            </div>
+        {% endfor %}
+        </div>
+        <div class="bf-preview"><b>Automatic cost preview</b><span id="cost-preview">Enter purchase price and base units per purchase unit.</span></div>
+        <div class="bf-actions">
+            <a href="{% url 'inventory:product_batches' product.pk %}" class="btn btn-secondary">Cancel</a>
+            <button type="submit" class="btn btn-primary">Add Batch</button>
+        </div>
+    </form>
+</div>
+<script>
+(function () {
+    const price = document.getElementById('id_purchase_unit_price');
+    const units = document.getElementById('id_units_per_purchase_unit');
+    const qty = document.getElementById('id_purchase_quantity');
+    const preview = document.getElementById('cost-preview');
+    function update() {
+        const p = parseFloat(String(price?.value || 0).replace(/,/g, ''));
+        const u = parseInt(units?.value || 1, 10);
+        const q = parseInt(qty?.value || 0, 10);
+        if (p > 0 && u > 0 && q > 0) {
+            preview.textContent = `Base-unit cost: TSh ${(p / u).toFixed(2)} · Stock added: ${q * u} {{ product.get_unit_display|escapejs }}`;
+        } else {
+            preview.textContent = 'Enter purchase price and base units per purchase unit.';
+        }
+    }
+    [price, units, qty].forEach(el => el && el.addEventListener('input', update));
+    update();
+})();
+</script>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'js/pm-inline-add.js' %}?v=2"></script>
+{% endblock %}

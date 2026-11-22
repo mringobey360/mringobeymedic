@@ -1,0 +1,259 @@
+{% load static humanize cart_tags %}<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,interactive-widget=resizes-content"><title>{% block title %}Marketplace{% endblock %} | SmartPOS</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" media="print" onload="this.media='all'"><noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"></noscript><link rel="stylesheet" href="{% static 'marketplace/marketplace.css' %}?v=mp-v76"><link rel="stylesheet" href="{% static 'marketplace/social.css' %}?v=sx-5"><link rel="stylesheet" href="{% static 'css/sp-images.css' %}?v=1"><link rel="stylesheet" href="{% static 'marketplace/movies.css' %}?v=mv-4"><link rel="stylesheet" href="{% static 'marketplace/previews.css' %}?v=pv-4"><script>document.documentElement.classList.add('mk-js');setTimeout(function(){if(!window.MKImages)document.documentElement.classList.remove('mk-js');},15000);</script><script src="{% static 'marketplace/mk-dialog.js' %}?v=2"></script><script src="{% static 'marketplace/mk-select.js' %}?v=1" defer></script><script src="{% static 'marketplace/mk-images.js' %}?v=75" defer onerror="document.documentElement.classList.remove('mk-js')"></script>{% block head_extra %}{% endblock %}</head><body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></symbol>
+<symbol id="i-cart" viewBox="0 0 24 24"><circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M2 3h3l2.7 12.4a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.5L21 8H6"/></symbol>
+<symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+<symbol id="i-verified" viewBox="0 0 24 24"><path d="M12 2l2.4 1.8 3-.2 1 2.8 2.5 1.7-.9 2.9.9 2.9-2.5 1.7-1 2.8-3-.2L12 22l-2.4-1.8-3 .2-1-2.8L3.1 15.9 4 13l-.9-2.9 2.5-1.7 1-2.8 3 .2z" fill="currentColor" stroke="none"/><path d="m8.5 12 2.5 2.5 4.5-5" stroke="#fff"/></symbol>
+<symbol id="i-whatsapp" viewBox="0 0 24 24"><path d="M3 21l1.6-4.7A9 9 0 1 1 8 19.6L3 21z"/><path d="M9 9.5c0 3 2.5 5.5 5.5 5.5l1-1.2-2-1-.8.7a3.5 3.5 0 0 1-1.7-1.7l.7-.8-1-2z"/></symbol>
+<symbol id="i-phone" viewBox="0 0 24 24"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/></symbol>
+<symbol id="i-share" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/></symbol>
+<symbol id="i-back" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+<symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+<symbol id="i-flame" viewBox="0 0 24 24"><path d="M12 22c4 0 7-2.8 7-7 0-3-1.8-5-3.5-7C14.5 7 14 5 14 3c-3 2-5 4.5-5 8-1 0-2-.8-2.5-2C5 11 5 13 5 15c0 4.2 3 7 7 7z"/></symbol>
+<symbol id="i-box" viewBox="0 0 24 24"><path d="M21 8 12 3 3 8v8l9 5 9-5V8z"/><path d="M3 8l9 5 9-5M12 13v8"/></symbol>
+<symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/></symbol>
+<symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3z"/><path d="m9 12 2 2 4-4"/></symbol>
+<symbol id="i-truck" viewBox="0 0 24 24"><path d="M1 6h13v10H1zM14 9h4l3 3v4h-7"/><circle cx="6" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="i-bag" viewBox="0 0 24 24"><path d="M5 8h14l-1 13H6L5 8z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></symbol>
+<symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></symbol>
+<symbol id="i-star" viewBox="0 0 24 24"><path d="m12 2.8 2.9 5.9 6.5.9-4.7 4.6 1.1 6.5L12 17.6l-5.8 3.1 1.1-6.5L2.6 9.6l6.5-.9z" fill="currentColor"/></symbol>
+</defs></svg>
+
+<header class="sp-header">
+  <div class="sp-header-row">
+    <a class="sp-logo" href="{% url 'landing' %}" aria-label="SmartPOS home"><img src="{% static 'img/smartPOS.svg' %}" alt="SmartPOS" width="143" height="32"></a>
+    <form class="sp-search" id="sp-search" action="{% url 'marketplace:catalog' %}" method="get" role="search" data-suggest-url="{% url 'marketplace:search_suggest' %}" data-catalog-url="{% url 'marketplace:catalog' %}"><svg class="i"><use href="#i-search"/></svg><input name="q" value="{{ q|default:'' }}" placeholder="Search products, shops or category…" aria-label="Search products" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="sp-suggest" aria-autocomplete="list"><button type="submit">Search</button><div class="sp-suggest" id="sp-suggest" role="listbox" hidden></div></form>
+    <div class="sp-actions">
+      {% if request.user.is_authenticated %}<a class="sp-pill-btn" href="{% url 'dashboard:home' %}">Dashboard</a>{% else %}<a class="sp-pill-btn" href="{% url 'accounts:login' %}">Log in</a>{% endif %}
+      <a class="sp-icon-btn" href="{% url 'marketplace:cart' %}" aria-label="Shopping cart"><svg class="i"><use href="#i-cart"/></svg><span class="sp-badge" data-cart-badge{% if not cart_count %} hidden{% endif %}>{{ cart_count|default:0 }}</span></a>
+      <a class="sp-cta" href="{% url 'marketplace:seller_dashboard' %}">Sell on SmartPOS</a>
+    </div>
+  </div>
+  <nav class="sp-subnav" aria-label="Marketplace">
+    <a class="{% if request.resolver_match.url_name == 'catalog' %}on{% endif %}" href="{% url 'marketplace:catalog' %}">Marketplace</a>
+    <a class="{% if request.resolver_match.url_name == 'movies' %}on{% endif %}" href="{% url 'marketplace:movies' %}">Movies</a>
+    <a class="{% if request.resolver_match.url_name == 'listings' or request.resolver_match.url_name == 'listings_rent' or request.resolver_match.url_name == 'listings_sale' or request.resolver_match.url_name == 'listing_detail' %}on{% endif %}" href="{% url 'marketplace:listings' %}">Properties</a>
+    <a href="{% url 'landing' %}">SmartPOS Home</a>
+    <a class="{% if request.resolver_match.url_name == 'track' %}on{% endif %}" href="{% url 'marketplace:track' %}" data-track-open>Track order</a>
+    {% if request.user.is_authenticated %}{% if request.user.is_superuser or request.user.role == 'ADMIN' %}<a href="{% url 'marketplace:seller_dashboard' %}">Seller Centre</a><a href="{% url 'marketplace:seller_service_requests' %}">My service requests</a>{% if request.user.is_staff %}<a href="{% url 'marketplace:admin_service_requests' %}">Service requests</a>{% endif %}{% endif %}{% if request.user.is_superuser %}<a href="{% url 'admin:marketplace_product_changelist' %}">Manage products</a><a href="{% url 'admin:marketplace_order_changelist' %}">Orders</a>{% endif %}{% endif %}
+  </nav>
+</header>
+
+<div class="sp-toasts" id="sp-toasts" role="status" aria-live="polite"></div>
+{% if messages %}{% for message in messages %}<div class="sp-flash" data-tag="{{ message.tags }}">{{ message }}</div>{% endfor %}{% endif %}
+<form id="sp-csrf" hidden>{% csrf_token %}</form>
+
+<main class="wrap" data-add-url="{% url 'marketplace:add_cart' 987654321 %}" data-cart-url="{% url 'marketplace:cart' %}">{% block body %}{% endblock %}</main>
+
+<footer class="sp-footer">
+  <div class="sp-footer-grid">
+    <div><a class="sp-logo" href="{% url 'landing' %}" aria-label="SmartPOS home"><img src="{% static 'img/smartPOS.svg' %}" alt="SmartPOS" width="143" height="32"></a><p>SmartPOS Marketplace connects customers with trusted Tanzanian sellers — secure checkout and live order tracking in one place.</p><p style="margin-top:8px">A product by Mutech Apex Innovations.</p></div>
+    <div><h4>Marketplace</h4><ul><li><a href="{% url 'marketplace:catalog' %}">Browse products</a></li><li><a href="{% url 'marketplace:listings_rent' %}">Houses &amp; rooms for rent</a></li><li><a href="{% url 'marketplace:listings_sale' %}">Land &amp; property for sale</a></li><li><a href="{% url 'marketplace:track' %}" data-track-open>Track your order</a></li><li><a href="{% url 'marketplace:cart' %}">Shopping cart</a></li><li><a href="{% url 'landing' %}">SmartPOS Home</a></li></ul></div>
+    <div><h4>Reach us</h4><ul><li>Tanzania</li>{% if SUPPORT_WHATSAPP_PHONE %}<li><a href="https://wa.me/{{ SUPPORT_WHATSAPP_PHONE|intl_phone }}" rel="noopener">WhatsApp support: {{ SUPPORT_WHATSAPP_PHONE }}</a></li>{% endif %}</ul><a class="seller-link" href="{% url 'marketplace:seller_dashboard' %}">Become a seller →</a></div>
+  </div>
+  <div class="sp-footer-bottom"><span>© SmartPOS · Mutech Apex Innovations</span><span>Secure checkout · Verified sellers</span></div>
+</footer>
+
+{% if request.resolver_match.url_name != 'track' %}<aside class="mp-track-widget" aria-label="Track Marketplace order"><button class="mp-track-toggle" type="button" id="mp-track-toggle" aria-haspopup="dialog" aria-expanded="false" aria-controls="mk-tm" data-track-open><svg class="i"><use href="#i-box"/></svg> Track order</button></aside>{% endif %}
+
+<div class="mk-tm-back" id="mk-tm" aria-hidden="true">
+  <div class="mk-tm" role="dialog" aria-modal="true" aria-labelledby="mk-tm-title">
+    <div class="mk-tm-head"><span class="mk-tm-ico"><svg class="i"><use href="#i-box"/></svg></span><div><h2 id="mk-tm-title">Track your order</h2><p>Use your Ticket ID and checkout phone</p></div><button type="button" class="mk-tm-x" data-tm-close aria-label="Close"><svg class="i"><use href="#i-x"/></svg></button></div>
+    <div class="mk-tm-body">
+      <section data-tm-view="form" class="on">
+        <div class="mk-tm-alert" id="mk-tm-alert" role="alert"><svg class="i"><use href="#i-x"/></svg><span><b></b><em style="font-style:normal"></em></span></div>
+        <form class="sp-form" id="mk-tm-form" action="{% url 'marketplace:track' %}" method="get" data-no-loading novalidate>
+          <label for="tm-ref">Order / Ticket ID</label><input id="tm-ref" name="reference" placeholder="e.g. SP-7CA55820" autocomplete="off" autocapitalize="characters" spellcheck="false" required>
+          <label for="tm-phone">Phone number used at checkout</label><input id="tm-phone" name="phone" type="tel" inputmode="tel" placeholder="e.g. 0712345678" autocomplete="tel" required>
+          <button class="sp-pay-btn" type="submit">Find my order</button>
+        </form>
+        <p class="mk-tm-hint">Your Ticket ID is in the payment confirmation SMS. Never share your payment PIN.</p>
+      </section>
+      <section data-tm-view="loading" aria-live="polite" aria-busy="true"><div class="mk-tm-skel"><i></i><i></i><i></i><i></i><i></i></div></section>
+      <section data-tm-view="result" class="mk-tm-result">
+        <div id="mk-tm-result"></div>
+        <div class="mk-tm-actions"><button class="sp-btn outline" type="button" data-tm-again>Track another order</button><a class="sp-btn primary" id="mk-tm-full" href="{% url 'marketplace:track' %}" data-no-loading>Open full page</a></div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var main=document.querySelector('main.wrap'),ADD=main.dataset.addUrl,CART=main.dataset.cartUrl;
+  var tokenEl=document.querySelector('#sp-csrf [name=csrfmiddlewaretoken]'),token=tokenEl?tokenEl.value:'';
+  var host=document.getElementById('sp-toasts');
+  function toast(msg,kind,opts){
+    if(!msg||!host)return;opts=opts||{};var t=document.createElement('div');t.className='sp-toast'+(kind==='error'?' error':'');
+    t.innerHTML='<span class="ic"><svg class="i"><use href="#i-'+(kind==='error'?'x':'check')+'"/></svg></span><span></span>';
+    t.children[1].textContent=msg;
+    function dismiss(){if(!t.parentNode)return;t.classList.add('out');setTimeout(function(){t.remove();},260);}
+    if(opts.action){var a=document.createElement('button');a.type='button';a.className='sp-toast-act';a.textContent=opts.action;a.addEventListener('click',function(){dismiss();if(opts.onAction)opts.onAction();});t.appendChild(a);}
+    host.appendChild(t);
+    while(host.children.length>3)host.removeChild(host.firstChild);
+    setTimeout(dismiss,opts.action?7000:2600);
+  }
+  function busy(el,on){if(!el)return;if(on){if(el.tagName==='BUTTON'&&!el.style.minWidth){el.style.minWidth=el.offsetWidth+'px';el.dataset.mw='1';}el.classList.add('is-loading');el.setAttribute('aria-busy','true');}else{el.classList.remove('is-loading');el.removeAttribute('aria-busy');if(el.dataset&&el.dataset.mw){el.style.minWidth='';delete el.dataset.mw;}}}
+  function setCount(n){document.querySelectorAll('[data-cart-badge]').forEach(function(b){b.textContent=n;b.hidden=!n;});}
+  function post(pk,operation,quantity){
+    var body=new URLSearchParams();body.set('csrfmiddlewaretoken',token);body.set('operation',operation);body.set('quantity',String(quantity||1));
+    return fetch(ADD.replace('987654321',pk),{method:'POST',credentials:'same-origin',headers:{'X-Requested-With':'XMLHttpRequest','Accept':'application/json','X-CSRFToken':token,'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:body.toString()})
+      .then(function(r){return r.json().catch(function(){return {ok:false,message:'Unexpected response. Please try again.'};}).then(function(p){if(!r.ok||!p.ok){var e=new Error(p.message||'Unable to update cart.');e.payload=p;throw e;}return p;});});
+  }
+  window.SP={toast:toast,setCount:setCount,post:post,busy:busy,cartUrl:CART};
+
+  /* keep every card/buy-box for the same product in sync */
+  function sync(pk,qty,stock){
+    document.querySelectorAll('.mp-product-card[data-product-id="'+pk+'"]').forEach(function(c){
+      var row=c.querySelector('.mp-quantity-row'),form=c.querySelector('.mp-add-form'),out=c.querySelector('.mp-qty-value'),plus=c.querySelector('[data-operation="increment"]');
+      if(out)out.textContent=qty;if(row)row.hidden=qty<=0;if(form)form.hidden=qty>0;if(plus)plus.disabled=qty>=stock;c.dataset.inCart=qty;
+    });
+  }
+  function change(card,op,btn){
+    var pk=card.dataset.productId,name=card.dataset.name||'Product';card.classList.add('is-busy');busy(btn,true);
+    return post(pk,op).then(function(p){
+      sync(pk,p.quantity,p.stock);setCount(p.cart_count);
+      if(op==='add')toast(name+' added to cart');
+      else if(p.quantity)toast('Cart updated');
+      else toast(name+' removed from cart','',{action:'Undo',onAction:function(){change(card,'add');}});
+      return p;
+    }).catch(function(e){toast(e.message||'Connection problem. Please try again.','error');}).then(function(){card.classList.remove('is-busy');busy(btn,false);});
+  }
+  document.addEventListener('submit',function(e){var f=e.target.closest('.mp-add-form');if(!f)return;var c=f.closest('.mp-product-card');if(!c)return;e.preventDefault();change(c,'add',e.submitter||f.querySelector('button'));});
+  document.addEventListener('click',function(e){
+    var b=e.target.closest('[data-operation]');
+    if(b){var c=b.closest('.mp-product-card');if(c){e.preventDefault();change(c,b.dataset.operation==='decrement'?'decrement':'add',b);}return;}
+    var buy=e.target.closest('[data-buy-now]');
+    if(buy){var card=buy.closest('.mp-product-card');e.preventDefault();
+      if(Number(card.dataset.inCart||0)>0){location.href=CART;return;}
+      card.classList.add('is-busy');busy(buy,true);post(card.dataset.productId,'add').then(function(){location.href=CART;}).catch(function(err){card.classList.remove('is-busy');busy(buy,false);toast(err.message,'error');});return;}
+    var sh=e.target.closest('[data-share]');
+    if(sh){e.preventDefault();var data={title:document.title,url:location.href};
+      if(navigator.share){navigator.share(data).catch(function(){});}
+      else if(navigator.clipboard){navigator.clipboard.writeText(location.href).then(function(){toast('Link copied');},function(){toast('Copy the link from your address bar','error');});}
+      else{toast('Copy the link from your address bar','error');}}
+  });
+  document.querySelectorAll('.sp-flash').forEach(function(m){toast(m.textContent.trim(),/error|warning/.test(m.dataset.tag||'')?'error':'');});
+
+  /* Global loading feedback: progress bar + spinner on any button/link that navigates or submits */
+  var bar=document.createElement('div');bar.className='sp-progress';document.body.appendChild(bar);
+  function startBar(){bar.className='sp-progress on';clearTimeout(startBar.t);startBar.t=setTimeout(reset,25000);}
+  function reset(){bar.className='sp-progress';document.querySelectorAll('a.is-nav').forEach(function(x){x.classList.remove('is-nav');});document.querySelectorAll('.sp-card.is-opening').forEach(function(x){x.classList.remove('is-opening');});document.querySelectorAll('.is-loading').forEach(function(x){busy(x,false);});document.querySelectorAll('form[data-submitting]').forEach(function(f){delete f.dataset.submitting;});}
+  document.addEventListener('submit',function(e){var f=e.target;if(e.defaultPrevented||f.hasAttribute('data-no-loading'))return;
+    if(f.dataset.submitting){e.preventDefault();return;}f.dataset.submitting='1';
+    busy(e.submitter||f.querySelector('button[type=submit],button:not([type])'),true);startBar();});
+  document.addEventListener('click',function(e){var a=e.target.closest('a[href]');
+    if(!a||e.defaultPrevented||a.hasAttribute('data-no-loading')||a.target==='_blank'||e.metaKey||e.ctrlKey||e.shiftKey||e.button)return;
+    var h=a.getAttribute('href');if(!h||h.charAt(0)==='#'||/^(tel|mailto|javascript):/i.test(h)||a.origin!==location.origin)return;
+    if(a.matches('.sp-btn,.sp-cta,.sp-pill-btn,.sp-chip-link,.sp-chip,.sp-back,.sp-seg a,.sp-icon-btn,.btn'))a.classList.add('is-nav');
+    if(a.matches('.sp-card-media,.sp-card-title')){var cd=a.closest('.sp-card');if(cd)cd.classList.add('is-opening');}
+    startBar();});
+  window.addEventListener('pageshow',reset);
+
+  /* ---- live search suggestions ---- */
+  (function(){
+    var form=document.getElementById('sp-search');if(!form)return;
+    var input=form.querySelector('input[name=q]'),box=document.getElementById('sp-suggest');
+    var URL_=form.dataset.suggestUrl,CAT=form.dataset.catalogUrl,timer=null,ctrl=null,items=[],idx=-1,last='';
+    var ICON_SEARCH='<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>';
+    function esc(s){var d=document.createElement('div');d.textContent=s;return d.innerHTML;}
+    function hi(name,q){var out=esc(name);q.split(/\s+/).filter(Boolean).slice(0,4).forEach(function(w){
+      var re=new RegExp('('+w.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','ig');out=out.replace(re,'<mark>$1</mark>');});return out;}
+    function show(html){box.innerHTML=html;box.hidden=false;input.setAttribute('aria-expanded','true');items=[].slice.call(box.querySelectorAll('.sp-sg-item'));idx=-1;}
+    function hide(){box.hidden=true;input.setAttribute('aria-expanded','false');idx=-1;}
+    function chips(cats){if(!cats||!cats.length)return '';return '<div class="sp-sg-chips">'+cats.map(function(c){return '<a href="'+CAT+'?category='+encodeURIComponent(c.slug)+'">'+esc(c.name)+'</a>';}).join('')+'</div>';}
+    function render(data,q){
+      if(data.error){show('<div class="sp-sg-state"><div class="sp-sg-ic">'+ICON_SEARCH+'</div><b>Search is taking a break</b>We could not load suggestions. Press Search to see full results.</div>');return;}
+      if(!data.results.length){
+        show('<div class="sp-sg-state"><div class="sp-sg-ic">'+ICON_SEARCH+'</div><b>No product found for “'+esc(q)+'”</b>It may be out of stock or not listed yet. Check the spelling, try a shorter word, or browse a category.'+chips(data.categories)+'</div>');return;}
+      var h=data.results.map(function(r){
+        return '<a class="sp-sg-item" role="option" href="'+esc(r.url)+'"><span class="sp-sg-img">'+(r.image?'<img loading="lazy" alt="" src="'+esc(r.image)+'">':'<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></svg>')+'</span>'+
+          '<span class="sp-sg-body"><span class="sp-sg-name">'+hi(r.name,q)+'</span><span class="sp-sg-meta">'+esc(r.shop)+' · '+esc(r.category)+'</span></span>'+
+          '<span class="sp-sg-price">TSh '+esc(r.price)+(r.in_stock?'':'<small>Sold out</small>')+'</span></a>';}).join('');
+      h+='<a class="sp-sg-all" href="'+CAT+'?q='+encodeURIComponent(q)+'">'+(data.more?'See all results for “'+esc(q)+'” →':'View in marketplace →')+'</a>';
+      show(h);
+    }
+    function run(q){
+      if(ctrl)ctrl.abort();ctrl=('AbortController' in window)?new AbortController():null;last=q;
+      show('<div class="sp-sg-state"><span class="sp-sg-spin"></span>Searching…</div>');
+      fetch(URL_+'?q='+encodeURIComponent(q),{credentials:'same-origin',headers:{'Accept':'application/json'},signal:ctrl?ctrl.signal:undefined})
+        .then(function(r){return r.json();}).then(function(d){if(q===last&&document.activeElement===input)render(d,q);})
+        .catch(function(e){if(e&&e.name==='AbortError')return;if(q===last)render({error:true,results:[]},q);});
+    }
+    input.addEventListener('input',function(){clearTimeout(timer);var q=input.value.trim();
+      if(q.length<2){if(ctrl)ctrl.abort();hide();return;}timer=setTimeout(function(){run(q);},220);});
+    input.addEventListener('focus',function(){var q=input.value.trim();if(q.length>=2&&box.innerHTML&&q===last)box.hidden=false;});
+    input.addEventListener('keydown',function(e){
+      if(e.key==='Escape'){hide();return;}
+      if(box.hidden||!items.length)return;
+      if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();idx=(idx+(e.key==='ArrowDown'?1:-1)+items.length)%items.length;
+        items.forEach(function(el,i){el.classList.toggle('on',i===idx);});items[idx].scrollIntoView({block:'nearest'});}
+      else if(e.key==='Enter'&&idx>=0){e.preventDefault();location.href=items[idx].href;}
+    });
+    document.addEventListener('click',function(e){if(!form.contains(e.target))hide();});
+    form.addEventListener('submit',function(){hide();});
+  })();
+
+  /* ---- Track Order popup (no page reload) ---- */
+  (function(){
+    var tm=document.getElementById('mk-tm'),tf=document.getElementById('mk-tm-form');if(!tm||!tf)return;
+    var fab=document.getElementById('mp-track-toggle'),views=[].slice.call(tm.querySelectorAll('[data-tm-view]')),
+        alertEl=document.getElementById('mk-tm-alert'),resBox=document.getElementById('mk-tm-result'),full=document.getElementById('mk-tm-full'),
+        URL_=tf.getAttribute('action'),last=null,ctrl=null,busyNow=false;
+    function view(n){views.forEach(function(v){v.classList.toggle('on',v.getAttribute('data-tm-view')===n);});}
+    function say(title,msg,info){alertEl.classList.toggle('info',!!info);alertEl.querySelector('b').textContent=title;alertEl.querySelector('em').textContent=msg;alertEl.classList.add('on');}
+    function hush(){alertEl.classList.remove('on');}
+    function open(ref,phone){
+      last=document.activeElement;if(ref)tf.elements.reference.value=ref;if(phone)tf.elements.phone.value=phone;
+      view('form');hush();tm.classList.add('on');tm.setAttribute('aria-hidden','false');document.body.classList.add('mk-tm-lock');
+      if(fab)fab.setAttribute('aria-expanded','true');
+      setTimeout(function(){(tf.elements.reference.value?tf.elements.phone:tf.elements.reference).focus();},60);
+    }
+    function close(){
+      if(ctrl)ctrl.abort();busyNow=false;tm.classList.remove('on');tm.setAttribute('aria-hidden','true');document.body.classList.remove('mk-tm-lock');
+      if(fab)fab.setAttribute('aria-expanded','false');if(last&&last.focus)try{last.focus();}catch(e){}
+    }
+    window.SP=window.SP||{};window.SP.openTrack=open;
+    /* capture phase so we run before the generic link-loading handler */
+    document.addEventListener('click',function(e){
+      var t=e.target.closest('[data-track-open]');
+      if(t){if(e.metaKey||e.ctrlKey||e.shiftKey||e.button)return;e.preventDefault();open();return;}
+      if(e.target===tm||e.target.closest('[data-tm-close]')){e.preventDefault();close();return;}
+      if(e.target.closest('[data-tm-again]')){e.preventDefault();hush();view('form');tf.elements.reference.focus();}
+    },true);
+    document.addEventListener('keydown',function(e){
+      if(!tm.classList.contains('on'))return;
+      if(e.key==='Escape'){close();return;}
+      if(e.key==='Tab'){var f=[].slice.call(tm.querySelectorAll('a[href],button:not([disabled]),input,select,textarea')).filter(function(x){return x.offsetParent!==null;});
+        if(!f.length)return;var first=f[0],lastEl=f[f.length-1];
+        if(e.shiftKey&&document.activeElement===first){e.preventDefault();lastEl.focus();}else if(!e.shiftKey&&document.activeElement===lastEl){e.preventDefault();first.focus();}}
+    });
+    tf.addEventListener('submit',function(e){
+      e.preventDefault();if(busyNow)return;hush();
+      var ref=tf.elements.reference.value.trim(),phone=tf.elements.phone.value.trim(),digits=phone.replace(/\D/g,'');
+      if(!ref){say('Enter your Ticket ID','It is in your payment confirmation SMS, e.g. SP-7CA55820.',true);tf.elements.reference.focus();return;}
+      if(digits.length<9){say('Check your phone number','Use the same number you entered at checkout, e.g. 0712345678.',true);tf.elements.phone.focus();return;}
+      busyNow=true;view('loading');
+      if(ctrl)ctrl.abort();ctrl=('AbortController' in window)?new AbortController():null;
+      var qs='?reference='+encodeURIComponent(ref)+'&phone='+encodeURIComponent(phone);
+      var wait=new Promise(function(r){setTimeout(r,380);}); /* never flash the loader */
+      var req=fetch(URL_+qs,{credentials:'same-origin',headers:{'X-Requested-With':'XMLHttpRequest','Accept':'text/html'},signal:ctrl?ctrl.signal:undefined})
+        .then(function(r){if(!r.ok)throw new Error('bad');return r.text().then(function(html){return{html:html,found:r.headers.get('X-Track-Found')==='1'};});});
+      Promise.all([req,wait]).then(function(x){
+        busyNow=false;var d=x[0];
+        if(d.found){resBox.innerHTML='<div class="mk-tm-found"><svg class="i"><use href="#i-check"/></svg> Order found</div>'+d.html;full.href=URL_+qs;view('result');tm.querySelector('.mk-tm-body').scrollTop=0;}
+        else{view('form');say("We couldn't find that order",'Check the Ticket ID and the phone number used at checkout. If you have just paid, wait a moment for confirmation and try again.');}
+      }).catch(function(err){
+        if(err&&err.name==='AbortError')return;busyNow=false;view('form');
+        say('Connection problem','We could not reach the server. Check your internet connection and try again.');
+      });
+    });
+    window.addEventListener('pageshow',function(ev){if(ev.persisted&&tm.classList.contains('on'))close();});
+  })();
+})();
+</script>
+<script src="{% static 'marketplace/movies.js' %}?v=mv-5" defer></script><script src="{% static 'js/sp-images.js' %}?v=1" defer></script></body></html>

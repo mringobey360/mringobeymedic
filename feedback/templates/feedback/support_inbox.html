@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Support Desk · SmartPOS HQ{% endblock %}
+{% block extra_head %}{% include "feedback/_styles.html" %}{% endblock %}
+{% block content %}
+<div class="fbp">
+  {% include "feedback/_header.html" with eyebrow="Service operations" heading="Technical support desk" lead="Prioritise incoming customer cases, assign ownership through the case detail page, and keep every reply in one auditable thread." %}
+  <div class="fbp-stats"><div class="fbp-stat"><small>Cases in view</small><b>{{ stats.total }}</b></div><div class="fbp-stat"><small>Open / active</small><b>{{ stats.open }}</b></div><div class="fbp-stat"><small>Urgent active</small><b>{{ stats.urgent }}</b></div><div class="fbp-stat"><small>Resolved</small><b>{{ stats.resolved }}</b></div></div>
+  <form method="get" class="fbp-card fbp-filters" role="search" aria-label="Search and filter support tickets">
+    <label class="fbp-filter-search"><span class="fbp-sr-only">Search tickets</span><input class="fbp-field" type="search" name="q" value="{{ query }}" maxlength="120" placeholder="Search ticket number, subject or customer…"></label>
+    <label><span class="fbp-sr-only">Status</span><select class="fbp-select" name="status"><option value="">All statuses</option>{% for v,l in statuses %}<option value="{{ v }}" {% if request.GET.status == v %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></label>
+    <label><span class="fbp-sr-only">Priority</span><select class="fbp-select" name="priority"><option value="">All priorities</option>{% for v,l in priorities %}<option value="{{ v }}" {% if request.GET.priority == v %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></label>
+    <label><span class="fbp-sr-only">Category</span><select class="fbp-select" name="category"><option value="">All categories</option>{% for v,l in categories %}<option value="{{ v }}" {% if request.GET.category == v %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></label>
+    <button class="fbp-btn" type="submit">Apply filters</button><a class="fbp-btn-ghost" href="{% url 'feedback:support_inbox' %}">Clear</a>
+  </form>
+  <div class="fbp-list">{% for ticket in tickets %}<a class="fbp-support-ticket" href="{% url 'feedback:support_detail' ticket.pk %}"><div><strong>{{ ticket.ticket_number }} · {{ ticket.subject }}</strong><small>{% firstof ticket.user.get_full_name ticket.user.username %} · {{ ticket.branch|default:"No branch" }} · {{ ticket.get_category_display }} · Updated {{ ticket.updated_at|date:"d M Y, H:i" }}</small></div><div style="display:flex;gap:.4rem;flex-wrap:wrap"><span class="fbp-badge s-{{ ticket.priority }}">{{ ticket.get_priority_display }}</span><span class="fbp-badge s-{{ ticket.status }}">{{ ticket.get_status_display }}</span></div></a>{% empty %}<div class="fbp-empty"><b>No support cases found</b>New customer requests will appear here.</div>{% endfor %}</div>
+</div>
+{% endblock %}

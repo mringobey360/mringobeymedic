@@ -1,0 +1,17 @@
+{% if not in_seller_centre %}
+<nav class="mk-tabs" aria-label="Marketplace sections">
+ {% if request.user.is_superuser %}
+ <a class="mk-tab {% if active == 'overview' %}is-active{% endif %}" href="{% url 'marketplace:manage' %}">Overview</a>
+ <a class="mk-tab {% if active == 'orders' %}is-active{% endif %}" href="{% url 'marketplace:manage_orders' %}">Orders</a>
+ {% endif %}
+ {% if request.user.is_superuser or request.user.is_staff %}
+ <a class="mk-tab {% if active == 'requests' %}is-active{% endif %}" href="{% url 'marketplace:admin_service_requests' %}">Service requests</a>
+ {% endif %}
+ <a class="mk-tab {% if active == 'seller' %}is-active{% endif %}" href="{% url 'marketplace:seller_dashboard' %}">Seller Centre</a>
+ <a class="mk-tab {% if active == 'seller_products' %}is-active{% endif %}" href="{% url 'marketplace:seller_products' %}">Products &amp; downloads</a>
+ <a class="mk-tab {% if active == 'seller_listings' %}is-active{% endif %}" href="{% url 'marketplace:seller_listings' %}">Rooms &amp; property</a>
+ <a class="mk-tab {% if active == 'seller_orders' %}is-active{% endif %}" href="{% url 'marketplace:seller_orders' %}">Orders</a>
+ <a class="mk-tab {% if active == 'seller_categories' %}is-active{% endif %}" href="{% url 'marketplace:seller_categories' %}">My categories</a>
+ <a class="mk-tab" href="{% url 'marketplace:catalog' %}" target="_blank" rel="noopener">View marketplace ↗</a>
+</nav>
+{% endif %}

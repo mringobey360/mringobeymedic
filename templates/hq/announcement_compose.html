@@ -1,0 +1,444 @@
+{% extends "base.html" %}
+{% block title %}New SMS Announcement - HQ{% endblock %}
+{% block content %}
+<div class="max-w-6xl mx-auto">
+
+    <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-6">
+        <div>
+            <a href="{% url 'hq:announcement_list' %}" class="text-xs font-medium text-brand-700 hover:text-brand-800">&larr; SMS announcements</a>
+            <h1 class="text-2xl font-bold text-ink-900 tracking-tight mt-1">New SMS Announcement</h1>
+            <p class="text-sm text-ink-500 mt-1">Send an official announcement or system update to your customers. Every message includes the announcement title and the official administrator signature.</p>
+        </div>
+    </div>
+
+    {% if not provider_ready %}
+    <div class="card !py-3.5 mb-6 ring-1 ring-red-200 bg-red-50/70">
+        <p class="text-sm font-semibold text-red-800">SMS sending is not available</p>
+        <p class="text-sm text-red-700 mt-0.5">{{ provider_reason }}</p>
+    </div>
+    {% endif %}
+
+    <form method="post" id="announcement-form" class="grid lg:grid-cols-3 gap-6" novalidate>
+        {% csrf_token %}
+
+        <!-- Left: compose -->
+        <div class="lg:col-span-2 space-y-6">
+
+            <section class="card space-y-4">
+                <h2 class="text-sm font-semibold text-ink-800">1. Announcement details</h2>
+                <div class="grid sm:grid-cols-2 gap-4">
+                    <div>
+                        <label for="{{ form.title.id_for_label }}" class="block text-sm font-medium text-ink-700 mb-1">{{ form.title.label }}</label>
+                        {{ form.title }}
+                        <p class="text-xs text-ink-400 mt-1">{{ form.title.help_text }}</p>
+                        {% if form.title.errors %}<p class="text-xs text-red-600 mt-1">{{ form.title.errors.0 }}</p>{% endif %}
+                    </div>
+                    <div>
+                        <label for="{{ form.message_type.id_for_label }}" class="block text-sm font-medium text-ink-700 mb-1">{{ form.message_type.label }}</label>
+                        {{ form.message_type }}
+                        {% if form.message_type.errors %}<p class="text-xs text-red-600 mt-1">{{ form.message_type.errors.0 }}</p>{% endif %}
+                    </div>
+                </div>
+            </section>
+
+            <section class="card space-y-4">
+                <h2 class="text-sm font-semibold text-ink-800">2. Audience</h2>
+                <div class="grid sm:grid-cols-2 gap-3" id="audience-options">
+                    {% for value, label in form.fields.audience.choices %}
+                    <label class="flex items-start gap-3 rounded-xl border border-ink-200 p-3.5 cursor-pointer hover:bg-ink-50 transition has-[:checked]:border-brand-500 has-[:checked]:bg-brand-50/60">
+                        <input type="radio" name="audience" value="{{ value }}" class="mt-1 accent-teal-700" {% if form.audience.value == value %}checked{% endif %}>
+                        <span class="min-w-0">
+                            <span class="block text-sm font-medium text-ink-800">{{ label }}</span>
+                            <span class="block text-xs text-ink-400 mt-0.5" data-audience-count="{{ value }}">
+                                {% if value == 'SELECTED' %}Choose customers below{% endif %}
+                            </span>
+                        </span>
+                    </label>
+                    {% endfor %}
+                </div>
+                {% if form.audience.errors %}<p class="text-xs text-red-600">{{ form.audience.errors.0 }}</p>{% endif %}
+
+                <label id="include-assistants-wrap" class="flex items-start gap-3 rounded-xl border border-ink-200 bg-ink-50/60 p-3.5 cursor-pointer">
+                    <input type="checkbox" name="include_assistants" value="on" id="id_include_assistants" class="mt-1 accent-teal-700" {% if form.include_assistants.value %}checked{% endif %}>
+                    <span class="min-w-0">
+                        <span class="block text-sm font-medium text-ink-800">{{ form.include_assistants.label }}</span>
+                        <span class="block text-xs text-ink-400 mt-0.5">Each active assistant manager receives the same announcement by SMS (and in the bell if enabled). Assistants without a phone number are skipped and listed in the delivery report.</span>
+                    </span>
+                </label>
+
+                <div id="selected-panel" class="hidden">
+                    <div class="flex flex-col sm:flex-row sm:items-center gap-2 mb-2">
+                        <input type="search" id="customer-search" class="form-input sm:max-w-xs" placeholder="Search customer or phone">
+                        <div class="flex items-center gap-2 text-xs">
+                            <button type="button" id="select-all-visible" class="btn btn-secondary !px-3 !py-1.5 !text-xs">Select shown</button>
+                            <button type="button" id="clear-selection" class="btn btn-secondary !px-3 !py-1.5 !text-xs">Clear</button>
+                            <span class="text-ink-500"><span id="selected-count">0</span> selected</span>
+                        </div>
+                    </div>
+                    <div class="max-h-64 overflow-y-auto rounded-xl border border-ink-200 divide-y divide-ink-100" id="customer-selection-list">
+                        {% for c in customers %}
+                        <label class="customer-row flex items-center gap-3 px-3.5 py-2.5 hover:bg-ink-50 cursor-pointer" data-search="{{ c.get_full_name|lower }} {{ c.username|lower }} {{ c.phone_number }}" data-has-phone="{% if c.phone_number %}1{% else %}0{% endif %}" data-assistants="{{ c.assistant_sms_count }}">
+                            <input type="checkbox" name="customer_ids" value="{{ c.pk }}" class="accent-teal-700" {% if c.pk|stringformat:"s" in selected_ids %}checked{% endif %}>
+                            <span class="flex-1 min-w-0">
+                                <span class="block text-sm font-medium text-ink-800 truncate">{% firstof c.get_full_name c.username %}</span>
+                                <span class="block text-xs text-ink-400">{{ c.phone_number|default:"No phone number" }}{% if c.assistant_sms_count %} &middot; {{ c.assistant_sms_count }} assistant manager{{ c.assistant_sms_count|pluralize }}{% endif %}</span>
+                            </span>
+                            {% if c.subscription %}
+                                {% if c.subscription.is_expired %}<span class="badge bg-red-100 text-red-700">Expired</span>
+                                {% else %}<span class="badge bg-emerald-100 text-emerald-700">Active</span>{% endif %}
+                            {% else %}<span class="badge bg-ink-100 text-ink-500">No plan</span>{% endif %}
+                        </label>
+                        {% empty %}
+                        <p class="px-4 py-6 text-center text-sm text-ink-400">No customer accounts yet.</p>
+                        {% endfor %}
+                    </div>
+                    {% if form.customer_ids.errors %}<p class="text-xs text-red-600 mt-2">{{ form.customer_ids.errors.0 }}</p>{% endif %}
+                </div>
+            </section>
+
+            <section class="card space-y-4">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <h2 class="text-sm font-semibold text-ink-800">3. Message content</h2>
+                    <div class="flex flex-wrap gap-1.5">
+                        <span class="text-xs text-ink-400 self-center mr-1">Quick templates:</span>
+                        {% for t in quick_templates %}
+                        <button type="button" class="quick-template btn btn-secondary !px-2.5 !py-1 !text-xs"
+                                data-type="{{ t.type }}" data-title="{{ t.title }}" data-text="{{ t.text }}">{{ t.label }}</button>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div>
+                    {{ form.message }}
+                    <div class="flex flex-wrap items-center justify-between gap-2 mt-2 text-xs text-ink-500">
+                        <span>Use <code class="px-1 py-0.5 rounded bg-ink-100 text-ink-700">{name}</code> to greet each customer by first name, and <code class="px-1 py-0.5 rounded bg-ink-100 text-ink-700">{link}</code> for your link (set below; sent exactly as you type it).</span>
+                        <span><span id="char-count">0</span>/{{ max_chars }} body characters</span>
+                    </div>
+                    <p id="unicode-warning" class="hidden text-xs text-amber-700 mt-1">This message contains special characters, so each SMS segment holds fewer characters (70) and costs more. Remove accents/emojis to keep it cheaper.</p>
+                    {% if form.message.errors %}<p class="text-xs text-red-600 mt-1">{{ form.message.errors.0 }}</p>{% endif %}
+                </div>
+                <div>
+                    <label for="{{ form.link_url.id_for_label }}" class="block text-sm font-medium text-ink-700 mb-1">{{ form.link_url.label }}</label>
+                    {{ form.link_url }}
+                    <p class="text-xs text-ink-400 mt-1">{{ form.link_url.help_text }}</p>
+                    <p id="link-missing-warning" class="hidden text-xs text-amber-700 mt-1">Ujumbe wako unatumia <code class="px-1 py-0.5 rounded bg-amber-100">{link}</code> lakini bado hujajaza link hapa &mdash; itabaki tupu kwenye SMS.</p>
+                    <p id="link-unused-warning" class="hidden text-xs text-ink-400 mt-1">Umejaza link lakini ujumbe hauna <code class="px-1 py-0.5 rounded bg-ink-100">{link}</code>, kwa hiyo haitatumwa kwa wateja.</p>
+                    {% if form.link_url.errors %}<p class="text-xs text-red-600 mt-1">{{ form.link_url.errors.0 }}</p>{% endif %}
+                </div>
+                <label class="flex items-start gap-2.5 text-sm text-ink-700">
+                    <input type="checkbox" name="also_in_app" value="on" class="mt-0.5 accent-teal-700" {% if form.also_in_app.value %}checked{% endif %}>
+                    <span>{{ form.also_in_app.label }}</span>
+                </label>
+            </section>
+        </div>
+
+        <!-- Right: preview + send -->
+        <aside class="lg:sticky lg:top-24 self-start space-y-6">
+            <section class="card">
+                <h2 class="text-sm font-semibold text-ink-800 mb-3">Preview</h2>
+                <div class="rounded-2xl bg-ink-100 p-4">
+                    <p class="text-[11px] text-ink-400 mb-1.5">From: SmartPOS</p>
+                    <div class="rounded-2xl rounded-tl-sm bg-white shadow-sm ring-1 ring-ink-900/5 px-3.5 py-3 text-sm text-ink-800 whitespace-pre-line break-words min-h-[3.5rem]" id="sms-preview">
+                        <span class="text-ink-400">Your message will appear here.</span>
+                    </div>
+                </div>
+                <dl class="mt-4 space-y-2 text-sm">
+                    <div class="flex justify-between"><dt class="text-ink-500">Shop owners</dt><dd class="font-semibold text-ink-900" id="sum-owners">0</dd></div>
+                    <div class="flex justify-between"><dt class="text-ink-500">Assistant managers</dt><dd class="font-semibold text-ink-900" id="sum-assistants">0</dd></div>
+                    <div class="flex justify-between"><dt class="text-ink-500">Recipients</dt><dd class="font-semibold text-ink-900" id="sum-recipients">0</dd></div>
+                    <div class="flex justify-between"><dt class="text-ink-500">Segments per SMS</dt><dd class="font-semibold text-ink-900" id="sum-segments">0</dd></div>
+                    <div class="flex justify-between"><dt class="text-ink-500">Final characters</dt><dd class="font-semibold text-ink-900" id="sum-chars">0</dd></div>
+                    <div class="flex justify-between border-t border-ink-100 pt-2"><dt class="text-ink-500">Total SMS to send</dt><dd class="font-bold text-brand-700" id="sum-total">0</dd></div>
+                </dl>
+                <p class="text-xs text-ink-400 mt-3">Final SMS format: <strong>Title</strong> + message + <strong>SmartPOS Team</strong>. The preview updates as you type. Recipients without a valid phone number are skipped and listed in the delivery report.</p>
+                <button type="button" id="open-confirm" class="btn btn-primary w-full mt-4" {% if not provider_ready %}disabled data-locked="1"{% endif %}>Review &amp; send</button>
+            </section>
+        </aside>
+
+    </form>
+</div>
+
+
+<!-- SmartPOS dialog (alerts + send confirmation). Unique id: base.html owns #confirm-modal. -->
+<div id="sms-dialog" role="dialog" aria-modal="true" aria-labelledby="sms-dialog-title" aria-describedby="sms-dialog-body"
+     style="display:none;position:fixed;inset:0;z-index:2147482000;align-items:center;justify-content:center;padding:max(1rem,env(safe-area-inset-top)) max(1rem,env(safe-area-inset-right)) max(1rem,env(safe-area-inset-bottom)) max(1rem,env(safe-area-inset-left));background:rgba(2,8,23,.55);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);box-sizing:border-box;">
+    <div class="bg-white rounded-2xl shadow-2xl ring-1 ring-ink-900/10 w-full max-w-md p-6" style="max-height:calc(100dvh - 2rem);overflow-y:auto;">
+        <div class="flex items-start gap-3 mb-4">
+            <span id="sms-dialog-icon" class="w-10 h-10 shrink-0 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center font-black">!</span>
+            <div class="min-w-0">
+                <h3 class="text-lg font-extrabold text-ink-900" id="sms-dialog-title">Are you sure?</h3>
+                <p class="text-sm text-ink-500 mt-1 leading-5" id="sms-dialog-body"></p>
+            </div>
+        </div>
+        <dl id="sms-dialog-rows" class="hidden space-y-2 text-sm rounded-xl bg-ink-50 p-4 mb-4"></dl>
+        <div id="sms-dialog-preview-wrap" class="hidden mb-4">
+            <p class="text-[11px] font-semibold uppercase tracking-wide text-ink-400 mb-1.5">Message preview</p>
+            <div id="sms-dialog-preview" class="rounded-xl bg-ink-100 px-3.5 py-3 text-sm text-ink-800 whitespace-pre-line break-words" style="max-height:9rem;overflow-y:auto;"></div>
+        </div>
+        <div class="flex justify-end gap-3">
+            <button type="button" id="sms-dialog-cancel" class="btn btn-secondary">Back</button>
+            <button type="button" id="sms-dialog-accept" class="btn btn-primary">Confirm</button>
+        </div>
+    </div>
+</div>
+
+{{ audience_counts|json_script:"audience-counts" }}
+<script>
+(function () {
+    var counts = JSON.parse(document.getElementById('audience-counts').textContent);
+    var form = document.getElementById('announcement-form');
+    var msg = document.getElementById('id_message');
+    var radios = form.querySelectorAll('input[name="audience"]');
+    var panel = document.getElementById('selected-panel');
+    var rows = form.querySelectorAll('.customer-row');
+    var boxes = form.querySelectorAll('input[name="customer_ids"]');
+    var includeBox = document.getElementById('id_include_assistants');
+    var includeWrap = document.getElementById('include-assistants-wrap');
+    var titleInput = document.getElementById('id_title');
+    var linkInput = document.getElementById('id_link_url');
+    var SAMPLE_NAME = 'Neema';
+    var ADMIN_FOOTER = 'SmartPOS Team';
+
+    var GSM = new Set("@£$¥èéùìòÇ\nØø\rÅåΔ_ΦΓΛΩΠΨΣΘΞÆæßÉ !\"#¤%&'()*+,-./0123456789:;<=>?¡ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÑÜ§¿abcdefghijklmnopqrstuvwxyzäöñüà^{}\\[~]|€".split(''));
+
+    // ------------------------------------------------------------------ SmartPOS dialog
+    // Professional replacement for window.alert / window.confirm (own element ids: base.html owns #confirm-modal).
+    var dlg = document.getElementById('sms-dialog');
+    document.body.appendChild(dlg); // escape any transformed/sticky ancestor so position:fixed always centres on the screen
+    var dlgEls = {
+        icon: document.getElementById('sms-dialog-icon'), title: document.getElementById('sms-dialog-title'),
+        body: document.getElementById('sms-dialog-body'), rows: document.getElementById('sms-dialog-rows'),
+        previewWrap: document.getElementById('sms-dialog-preview-wrap'), preview: document.getElementById('sms-dialog-preview'),
+        cancel: document.getElementById('sms-dialog-cancel'), accept: document.getElementById('sms-dialog-accept')
+    };
+    var TONES = {
+        warning: { glyph: '!', cls: 'bg-amber-50 text-amber-700' },
+        info:    { glyph: 'i', cls: 'bg-sky-50 text-sky-700' },
+        send:    { glyph: '✉', cls: 'bg-emerald-50 text-emerald-700' }
+    };
+    var dlgResolve = null, dlgReturnFocus = null;
+
+    function closeDialog(result) {
+        dlg.style.display = 'none';
+        document.body.style.overflow = '';
+        var done = dlgResolve; dlgResolve = null;
+        if (dlgReturnFocus && dlgReturnFocus.focus) { try { dlgReturnFocus.focus(); } catch (e) {} }
+        if (done) done(!!result);
+    }
+    // opts: {title, body, tone, rows:[[label,value]], preview, confirmText, cancelText, alertOnly}
+    function showDialog(opts) {
+        if (dlgResolve) closeDialog(false);
+        var tone = TONES[opts.tone] || TONES.warning;
+        dlgEls.icon.className = 'w-10 h-10 shrink-0 rounded-xl flex items-center justify-center font-black ' + tone.cls;
+        dlgEls.icon.textContent = tone.glyph;
+        dlgEls.title.textContent = opts.title || 'Are you sure?';
+        dlgEls.body.textContent = opts.body || '';
+        dlgEls.rows.innerHTML = '';
+        (opts.rows || []).forEach(function (r) {
+            var line = document.createElement('div'); line.className = 'flex justify-between gap-4';
+            var dt = document.createElement('dt'); dt.className = 'text-ink-500'; dt.textContent = r[0];
+            var dd = document.createElement('dd'); dd.className = 'font-medium text-ink-900 text-right'; dd.textContent = r[1];
+            line.appendChild(dt); line.appendChild(dd); dlgEls.rows.appendChild(line);
+        });
+        dlgEls.rows.classList.toggle('hidden', !(opts.rows && opts.rows.length));
+        dlgEls.preview.textContent = opts.preview || '';
+        dlgEls.previewWrap.classList.toggle('hidden', !opts.preview);
+        dlgEls.accept.textContent = opts.confirmText || (opts.alertOnly ? 'Got it' : 'Confirm');
+        dlgEls.accept.disabled = false;
+        dlgEls.cancel.textContent = opts.cancelText || 'Back';
+        dlgEls.cancel.style.display = opts.alertOnly ? 'none' : '';
+        dlgReturnFocus = document.activeElement;
+        dlg.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+        dlgEls.accept.focus();
+        return new Promise(function (resolve) { dlgResolve = resolve; });
+    }
+    dlgEls.accept.addEventListener('click', function () { closeDialog(true); });
+    dlgEls.cancel.addEventListener('click', function () { closeDialog(false); });
+    dlg.addEventListener('mousedown', function (e) { if (e.target === dlg) closeDialog(false); });
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && dlg.style.display === 'flex') closeDialog(false);
+    });
+    function notice(title, body, focusEl) {
+        showDialog({ title: title, body: body, tone: 'warning', alertOnly: true }).then(function () {
+            if (focusEl && focusEl.focus) focusEl.focus();
+        });
+    }
+
+    // ------------------------------------------------------------------ helpers
+    function audience() { var r = form.querySelector('input[name="audience"]:checked'); return r ? r.value : ''; }
+    function selectedTotal() { return form.querySelectorAll('input[name="customer_ids"]:checked').length; }
+    function includeAssistants() { return audience() === 'ASSISTANTS' || !!(includeBox && includeBox.checked); }
+
+    // {owners, assistants, total} that will actually receive an SMS (numbers present on the account).
+    function recipients() {
+        var a = audience(), owners = 0, assistants = 0;
+        if (a === 'ASSISTANTS') {
+            assistants = counts.assistants[a] || 0;
+        } else if (a === 'SELECTED') {
+            form.querySelectorAll('input[name="customer_ids"]:checked').forEach(function (b) {
+                var row = b.closest('.customer-row');
+                if (row && row.dataset.hasPhone === '1') owners += 1;
+                if (row && includeAssistants()) assistants += parseInt(row.dataset.assistants || '0', 10);
+            });
+        } else {
+            owners = (counts.customers[a] || 0);
+            if (includeAssistants()) assistants = (counts.assistants[a] || 0);
+        }
+        return { owners: owners, assistants: assistants, total: owners + assistants };
+    }
+    function preview() {
+        var link = (linkInput && linkInput.value.trim()) ? linkInput.value.trim() : '';
+        var title = (titleInput && titleInput.value.trim()) ? titleInput.value.trim() : '';
+        var body = (msg.value || '').split('{name}').join(SAMPLE_NAME).split('{link}').join(link).trim();
+        return [title, body, ADMIN_FOOTER].filter(function (part) { return !!part; }).join('\n');
+    }
+    function segments(text) {
+        if (!text) return 0;
+        var gsm = text.split('').every(function (c) { return GSM.has(c); });
+        var n = text.length;
+        if (gsm) return n <= 160 ? 1 : Math.ceil(n / 153);
+        return n <= 70 ? 1 : Math.ceil(n / 67);
+    }
+    function audienceLabel() {
+        var r = form.querySelector('input[name="audience"]:checked');
+        return r ? r.closest('label').querySelector('.font-medium').textContent.trim() : '-';
+    }
+    function plural(n, word) { return n + ' ' + word + (n === 1 ? '' : 's'); }
+
+    function refresh() {
+        var text = preview();
+        var seg = segments(text);
+        var rec = recipients();
+        var bodyChars = (msg && msg.value || '').length;
+        var box = document.getElementById('sms-preview');
+
+        document.getElementById('char-count').textContent = bodyChars;
+        document.getElementById('sum-chars').textContent = text.length;
+        document.getElementById('sum-segments').textContent = seg;
+        document.getElementById('sum-owners').textContent = rec.owners;
+        document.getElementById('sum-assistants').textContent = rec.assistants;
+        document.getElementById('sum-recipients').textContent = rec.total;
+        document.getElementById('sum-total').textContent = rec.total * seg;
+
+        if (box) {
+            box.textContent = text || '';
+            if (!text) box.innerHTML = '<span class="text-ink-400">Your message will appear here.</span>';
+        }
+
+        var unicode = !!text && !text.split('').every(function (c) { return GSM.has(c); });
+        var unicodeWarning = document.getElementById('unicode-warning');
+        if (unicodeWarning) unicodeWarning.classList.toggle('hidden', !unicode);
+
+        var usesLink = (msg.value || '').indexOf('{link}') !== -1;
+        var hasLinkUrl = !!(linkInput && linkInput.value.trim());
+        var missingWarning = document.getElementById('link-missing-warning');
+        var unusedWarning = document.getElementById('link-unused-warning');
+        if (missingWarning) missingWarning.classList.toggle('hidden', !(usesLink && !hasLinkUrl));
+        if (unusedWarning) unusedWarning.classList.toggle('hidden', !(hasLinkUrl && !usesLink));
+
+        panel.classList.toggle('hidden', audience() !== 'SELECTED');
+        if (includeWrap) includeWrap.classList.toggle('hidden', audience() === 'ASSISTANTS');
+        document.getElementById('selected-count').textContent = selectedTotal();
+
+        Object.keys(counts.customers).forEach(function (k) {
+            var el = form.querySelector('[data-audience-count="' + k + '"]');
+            if (!el) return;
+            var c = counts.customers[k] || 0, a = counts.assistants[k] || 0;
+            if (k === 'ASSISTANTS') { el.textContent = plural(a, 'assistant manager') + ' with a phone number'; return; }
+            el.textContent = plural(c, 'customer') + (includeAssistants() ? ' + ' + plural(a, 'assistant manager') : '') + ' with a phone number';
+        });
+    }
+
+    radios.forEach(function (r) { r.addEventListener('change', refresh); });
+    boxes.forEach(function (b) { b.addEventListener('change', refresh); });
+    if (includeBox) includeBox.addEventListener('change', refresh);
+    msg.addEventListener('input', refresh);
+    if (titleInput) titleInput.addEventListener('input', refresh);
+    if (linkInput) linkInput.addEventListener('input', refresh);
+
+    document.getElementById('customer-search').addEventListener('input', function () {
+        var q = this.value.trim().toLowerCase();
+        rows.forEach(function (row) { row.classList.toggle('hidden', q && row.dataset.search.indexOf(q) === -1); });
+    });
+    document.getElementById('select-all-visible').addEventListener('click', function () {
+        rows.forEach(function (row) { if (!row.classList.contains('hidden')) row.querySelector('input').checked = true; });
+        refresh();
+    });
+    document.getElementById('clear-selection').addEventListener('click', function () {
+        boxes.forEach(function (b) { b.checked = false; }); refresh();
+    });
+
+    document.querySelectorAll('.quick-template').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            function applyTemplate() {
+                msg.value = btn.dataset.text;
+                var type = form.querySelector('select[name="message_type"]');
+                if (type) type.value = btn.dataset.type;
+                var title = form.querySelector('input[name="title"]');
+                if (title && !title.value.trim()) title.value = btn.dataset.title;
+                refresh();
+                // This template needs a destination — send focus there instead of the message box,
+                // since the message itself is already filled in.
+                if (btn.dataset.text.indexOf('{link}') !== -1 && linkInput && !linkInput.value.trim()) linkInput.focus();
+                else msg.focus();
+            }
+            if (!msg.value.trim()) { applyTemplate(); return; }
+            showDialog({
+                title: 'Replace the current message?', tone: 'warning', confirmText: 'Replace message', cancelText: 'Keep mine',
+                body: 'The "' + btn.textContent.trim() + '" template will overwrite the message you have written so far.'
+            }).then(function (ok) { if (ok) applyTemplate(); });
+        });
+    });
+
+    // ------------------------------------------------------------------ Review & send
+    var sending = false;
+    document.getElementById('open-confirm').addEventListener('click', function () {
+        if (sending) return;
+        if (!titleInput.value.trim()) { notice('Announcement title required', 'Enter the announcement title. It appears at the top of every SMS and notification.', titleInput); return; }
+        if (!msg.value.trim()) { notice('Message is empty', 'Write the SMS message before sending.', msg); return; }
+        if (msg.value.indexOf('{link}') !== -1 && !(linkInput && linkInput.value.trim())) {
+            notice('Link destination missing', 'Ujumbe wako unatumia {link} — jaza "Link destination" kabla ya kuendelea.', linkInput); return;
+        }
+        if (!audience()) { notice('Choose an audience', 'Select who should receive this announcement.', null); return; }
+        if (audience() === 'SELECTED' && selectedTotal() === 0) { notice('No customers selected', 'Select at least one customer from the list.', document.getElementById('customer-search')); return; }
+        var rec = recipients();
+        if (rec.total === 0) { notice('No recipients with a phone number', 'Nobody in this audience has a phone number on their account, so nothing would be sent.', null); return; }
+
+        var text = preview(), seg = segments(text);
+        var detailRows = [['Audience', audienceLabel()], ['Shop owners', String(rec.owners)]];
+        if (includeAssistants()) detailRows.push(['Assistant managers', String(rec.assistants)]);
+        detailRows.push(['Recipients', String(rec.total)]);
+        detailRows.push(['Total SMS', (rec.total * seg) + ' (' + plural(seg, 'segment') + ' each)']);
+        if (form.querySelector('input[name="also_in_app"]').checked) detailRows.push(['Bell notification', 'Yes']);
+
+        showDialog({
+            title: 'Send this announcement?', tone: 'send', confirmText: 'Confirm & send', cancelText: 'Back',
+            body: 'Review the details below. Messages cannot be recalled once delivered.',
+            rows: detailRows, preview: text
+        }).then(function (ok) {
+            if (!ok) return;
+            sending = true;
+            var openBtn = document.getElementById('open-confirm');
+            openBtn.disabled = true; openBtn.textContent = 'Sending...';
+            form.submit();
+        });
+    });
+
+    // Enter inside a text input must never submit: sending always goes through the confirmation dialog.
+    form.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' && e.target.tagName === 'INPUT') e.preventDefault();
+    });
+    // Any other submit route (should not exist) is blocked; only the confirmed path calls form.submit().
+    form.addEventListener('submit', function (e) { if (!sending) e.preventDefault(); });
+
+    // Back/forward cache: never leave the button stuck on "Sending...".
+    window.addEventListener('pageshow', function () {
+        sending = false;
+        var b = document.getElementById('open-confirm');
+        if (b) { b.disabled = b.dataset.locked === '1'; b.textContent = 'Review & send'; }
+    });
+
+    refresh();
+})();
+</script>
+{% endblock %}

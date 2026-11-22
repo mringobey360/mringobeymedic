@@ -1,0 +1,131 @@
+{% extends "base.html" %}{% load humanize %}
+{% block title %}Marketplace Management · SmartPOS HQ{% endblock %}
+{% block extra_head %}{% include 'marketplace/_mk_styles.html' %}{% endblock %}
+{% block content %}
+<div class="mk-page">
+ <header class="mk-head">
+  <div>
+   <p class="mk-eyebrow">SmartPOS · Platform HQ</p>
+   <h1 class="mk-title">Marketplace control centre</h1>
+   <p class="mk-sub">Publish products, maintain categories, manage visibility and follow paid orders.</p>
+  </div>
+  <div class="mk-actions">
+   <a class="btn btn-primary" href="{% url 'marketplace:manage_product_add' %}">+ Add product</a>
+   <a class="btn btn-secondary" href="{% url 'marketplace:manage_category' %}">+ Add category</a>
+  </div>
+ </header>
+
+ {% include 'marketplace/_mk_nav.html' with active='overview' %}
+
+ <section class="mk-stats" aria-label="Marketplace summary">
+  <div class="mk-card mk-stat"><div class="mk-stat-label">All products</div><div class="mk-stat-value">{{ product_count }}</div><div class="mk-stat-hint">{{ active_products }} published</div></div>
+  <div class="mk-card mk-stat"><div class="mk-stat-label">Categories</div><div class="mk-stat-value">{{ category_count }}</div></div>
+  <div class="mk-card mk-stat"><div class="mk-stat-label">Official orders</div><div class="mk-stat-value">{{ order_count }}</div><div class="mk-stat-hint">Created after payment confirmation</div></div>
+  <div class="mk-card mk-stat"><div class="mk-stat-label">New orders</div><div class="mk-stat-value">{{ pending_orders }}</div></div>
+  <div class="mk-card mk-stat"><div class="mk-stat-label">Not marked paid</div><div class="mk-stat-value">{{ unpaid_orders }}</div></div>
+ </section>
+
+ <section class="mk-card" aria-labelledby="mk-products-h">
+  <div class="mk-sec-head">
+   <div><h2 id="mk-products-h">Product catalogue &amp; photos</h2><p>Edit details, update price/stock, feature products, publish or hide listings.</p></div>
+   <form class="mk-search" method="get" action="{% url 'marketplace:manage' %}">
+    <input type="search" name="product_q" value="{{ product_q }}" placeholder="Search name or category…" aria-label="Search products">
+    <button class="btn btn-secondary" type="submit">Search</button>
+    {% if product_q %}<a class="btn btn-ghost" href="{% url 'marketplace:manage' %}">Clear</a>{% endif %}
+   </form>
+  </div>
+  <div class="mk-table-wrap">
+   <table class="mk-table" id="marketProductsTable">
+    <thead><tr><th>Product</th><th>Category</th><th class="mk-num">Price</th><th class="mk-num">Stock</th><th>Listing</th><th>Featured</th><th></th></tr></thead>
+    <tbody>
+    {% for p in product_page %}
+     <tr>
+      <td><div class="mk-prod">{% if p.image %}<img class="mk-thumb" src="{{ p.image.url }}" alt="{{ p.name }}" loading="lazy">{% else %}<div class="mk-thumb mk-thumb-empty" aria-label="No product image">No image</div>{% endif %}<div style="min-width:0"><div class="mk-strong">{{ p.name }}</div><div class="mk-muted">/{{ p.slug }}</div></div></div></td>
+      <td>{{ p.category.name }}</td>
+      <td class="mk-num">TSh {{ p.price|floatformat:0|intcomma }}</td>
+      <td class="mk-num">{{ p.stock }}</td>
+      <td>{% if p.is_active %}<span class="mk-badge mk-b-published">Published</span>{% else %}<span class="mk-badge mk-b-hidden">Hidden</span>{% endif %}</td>
+      <td>{% if p.featured %}<span class="mk-badge mk-b-info">Featured</span>{% else %}<span class="mk-muted">—</span>{% endif %}</td>
+      <td><div class="mk-cell-actions">
+       <a class="btn btn-secondary btn-sm" href="{% url 'marketplace:manage_product_edit' p.pk %}">Edit</a>
+       <form method="post" action="{% url 'marketplace:manage_product_delete' p.pk %}" data-mk-confirm="Delete this product?" data-mk-detail="If it appears in order history it is archived (hidden) instead of erased." data-mk-accept="Yes, delete" data-mk-cancel="Keep product" data-mk-tone="danger">{% csrf_token %}<button class="btn btn-secondary btn-sm mk-btn-danger-soft" type="submit">Delete / archive</button></form>
+      </div></td>
+     </tr>
+    {% empty %}
+     <tr><td colspan="7"><div class="mk-empty"><b>No products yet</b>Use “Add product” to publish your first listing.</div></td></tr>
+    {% endfor %}
+    </tbody>
+   </table>
+  </div>
+  <nav class="mk-pager" aria-label="Product pages">
+   <span>Showing {{ product_page.start_index }}–{{ product_page.end_index }} of {{ product_page.paginator.count }} products · Page {{ product_page.number }} of {{ product_page.paginator.num_pages }}</span>
+   <div class="mk-pager-nav">
+    {% if product_page.has_previous %}<a class="btn btn-secondary btn-sm" href="?product_q={{ product_q|urlencode }}&product_page={{ product_page.previous_page_number }}" aria-label="Previous product page">Previous</a>{% endif %}
+    {% for num in product_page.paginator.page_range %}{% if num == product_page.number %}<span class="mk-page-current" aria-current="page">{{ num }}</span>{% elif num >= product_page.number|add:"-2" and num <= product_page.number|add:"2" %}<a class="btn btn-secondary btn-sm" href="?product_q={{ product_q|urlencode }}&product_page={{ num }}">{{ num }}</a>{% endif %}{% endfor %}
+    {% if product_page.has_next %}<a class="btn btn-secondary btn-sm" href="?product_q={{ product_q|urlencode }}&product_page={{ product_page.next_page_number }}" aria-label="Next product page">Next</a>{% endif %}
+   </div>
+  </nav>
+ </section>
+
+ <section class="mk-card" aria-labelledby="mk-cats-h">
+  <div class="mk-sec-head">
+   <div><h2 id="mk-cats-h">Categories</h2><p>Categories with products cannot be deleted until their products are moved or removed.</p></div>
+   <a class="btn btn-secondary" href="{% url 'marketplace:manage_category' %}">Add category</a>
+  </div>
+  <div class="mk-table-wrap">
+   <table class="mk-table" style="min-width:560px">
+    <thead><tr><th>Category</th><th>Slug</th><th class="mk-num">Products</th><th>Visibility</th><th></th></tr></thead>
+    <tbody>
+    {% for c in category_page %}
+     <tr>
+      <td class="mk-strong">{{ c.name }}</td>
+      <td class="mk-muted">{{ c.slug }}</td>
+      <td class="mk-num">{{ c.product_count }}</td>
+      <td>{% if c.is_active %}<span class="mk-badge mk-b-active">Active</span>{% else %}<span class="mk-badge mk-b-hidden">Hidden</span>{% endif %}</td>
+      <td><div class="mk-cell-actions">
+       <a class="btn btn-secondary btn-sm" href="{% url 'marketplace:manage_category_edit' c.pk %}">Edit</a>
+       <form method="post" action="{% url 'marketplace:manage_category_delete' c.pk %}" data-mk-confirm="Delete this category?" data-mk-detail="Categories that still have products cannot be deleted." data-mk-accept="Yes, delete" data-mk-cancel="Keep category" data-mk-tone="danger">{% csrf_token %}<button type="submit" class="btn btn-secondary btn-sm mk-btn-danger-soft">Delete</button></form>
+      </div></td>
+     </tr>
+    {% empty %}
+     <tr><td colspan="5"><div class="mk-empty"><b>No categories yet</b>Create a category to organise your products.</div></td></tr>
+    {% endfor %}
+    </tbody>
+   </table>
+  </div>
+  <nav class="mk-pager" aria-label="Category pages">
+   <span>Showing {{ category_page.start_index }}–{{ category_page.end_index }} of {{ category_page.paginator.count }} categories · Page {{ category_page.number }} of {{ category_page.paginator.num_pages }}</span>
+   <div class="mk-pager-nav">
+    {% if category_page.has_previous %}<a class="btn btn-secondary btn-sm" href="?product_q={{ product_q|urlencode }}&category_page={{ category_page.previous_page_number }}">Previous</a>{% endif %}
+    {% if category_page.has_next %}<a class="btn btn-secondary btn-sm" href="?product_q={{ product_q|urlencode }}&category_page={{ category_page.next_page_number }}">Next</a>{% endif %}
+   </div>
+  </nav>
+ </section>
+
+ <section class="mk-card" aria-labelledby="mk-orders-h">
+  <div class="mk-sec-head">
+   <div><h2 id="mk-orders-h">Recent orders</h2><p>Only confirmed payments create official orders and customer Ticket IDs. Verify payment with the provider before manually marking any order as paid.</p></div>
+   <a class="btn btn-secondary" href="{% url 'marketplace:manage_orders' %}">View all orders</a>
+  </div>
+  <div class="mk-table-wrap">
+   <table class="mk-table">
+    <thead><tr><th>Ticket ID</th><th>Customer</th><th class="mk-num">Total</th><th>Order</th><th>Payment</th><th></th></tr></thead>
+    <tbody>
+    {% for o in recent_orders %}
+     <tr>
+      <td class="mk-ref">{{ o.reference }}</td>
+      <td><div class="mk-strong">{{ o.customer_name }}</div><div class="mk-muted">{{ o.phone }}</div></td>
+      <td class="mk-num">TSh {{ o.total|floatformat:0|intcomma }}</td>
+      <td><span class="mk-badge mk-b-{{ o.status }}">{{ o.get_status_display }}</span></td>
+      <td><span class="mk-badge mk-b-{{ o.payment_status }}">{{ o.get_payment_status_display }}</span></td>
+      <td><div class="mk-cell-actions"><a class="btn btn-secondary btn-sm" href="{% url 'marketplace:manage_order' o.reference %}">Manage</a></div></td>
+     </tr>
+    {% empty %}
+     <tr><td colspan="6"><div class="mk-empty"><b>No official orders yet</b>Orders appear here once a customer payment is confirmed.</div></td></tr>
+    {% endfor %}
+    </tbody>
+   </table>
+  </div>
+ </section>
+</div>
+{% endblock %}

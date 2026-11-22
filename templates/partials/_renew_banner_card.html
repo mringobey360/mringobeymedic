@@ -1,0 +1,160 @@
+{% comment %}
+  Internal compact card (V54.15). Inputs: tone (soon|urgent|grace|danger), days, due, scope, deadline (YYYY-MM-DD),
+  progress (0-100, branch mode), cta (url, branch mode), key, st or legacy.
+{% endcomment %}
+{% if legacy_mode %}{% widthratio days 7 100 as pct %}{% else %}{% firstof progress 0 as pct %}{% endif %}
+{% if legacy_mode %}{% url 'hq:packages_center' as renew_href %}{% else %}{% firstof cta '' as renew_href %}{% endif %}
+{% with can_renew=user.is_admin_role %}
+<div class="sp-container sp-container-top w-full rb-wrap">
+<section class="rb rb--{{ tone }}" role="alert" aria-live="polite"
+         data-rb data-rb-key="{{ key }}:{{ tone }}:{{ days }}" data-rb-deadline="{{ deadline }}"
+         data-rb-dismissible="{% if tone == 'soon' or tone == 'trial' %}1{% else %}0{% endif %}">
+  <span class="rb__accent" aria-hidden="true"></span>
+
+  <div class="rb__icon" aria-hidden="true">
+    {% if tone == 'danger' %}
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>
+    {% elif tone == 'trial' %}
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.4 5.2 5.6.7-4.1 3.9 1.1 5.6L12 15.6 7 18.4l1.1-5.6L4 8.9l5.6-.7z"/></svg>
+    {% elif tone == 'grace' or tone == 'urgent' %}
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+    {% else %}
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
+    {% endif %}
+    {% if tone == 'urgent' or tone == 'grace' %}<i class="rb__pulse"></i>{% endif %}
+  </div>
+
+  <div class="rb__main">
+    <p class="rb__title">
+      {% if st.locked and st.trial %}Free trial ended &mdash; upgrade to continue
+      {% elif st.trial or legacy.is_trial %}{% if days is None %}Your free trial is ending{% elif days == 0 %}Your free trial ends today{% elif days == 1 %}Your free trial ends tomorrow{% else %}Your free trial ends in {{ days }} days{% endif %}
+      {% elif st.locked and st.view_only %}Subscription expired &mdash; view-only mode
+      {% elif st.locked %}Subscription expired &mdash; access locked
+      {% elif st.read_only %}Read-only mode &mdash; new sales paused
+      {% elif st.grace %}Subscription ended {{ st.days_overdue }} day{{ st.days_overdue|pluralize }} ago
+      {% elif days is None %}Subscription needs renewal
+      {% elif days == 0 %}Subscription ends today
+      {% else %}Subscription ends in {{ days }} day{{ days|pluralize }}
+      {% endif %}
+    </p>
+    <p class="rb__sub">
+      {% if scope %}<span class="rb__scope">{{ scope }}</span>{% endif %}
+      {% if due %}<span class="rb__due">Due {{ due|date:"d M Y" }}</span>{% endif %}
+      <span class="rb__adv{% if tone == 'grace' or tone == 'danger' or not can_renew %} rb__adv--keep{% endif %}">
+        {% if not can_renew %}{% if st.trial or legacy.is_trial %}Ask your account owner to upgrade.{% else %}Ask your account owner or admin to renew.{% endif %}
+        {% elif st.trial or legacy.is_trial %}Choose a plan to keep selling. All your products, sales and customers are kept.
+        {% elif st.locked and st.view_only %}View data and reports. Renew to record sales and make changes.
+        {% elif st.locked %}Your data is safe. Renew to unlock.
+        {% elif st.read_only %}View-only. Renew within {{ st.lock_in_days }} day{{ st.lock_in_days|pluralize }} to avoid a full lock.
+        {% elif st.grace %}Works for {{ st.grace_days_left }} more day{{ st.grace_days_left|pluralize }}, then read-only.
+        {% else %}Renew early to avoid interruption.
+        {% endif %}
+      </span>
+    </p>
+  </div>
+
+  <div class="rb__side">
+    {% if deadline %}
+    <span class="rb__count" data-rb-count title="{% if st.trial or legacy.is_trial %}Until your trial ends{% elif st.grace %}Until read-only{% elif st.read_only %}Until full lock{% else %}Until renewal date{% endif %}">
+      <b data-rb-d>{% if days is not None and days >= 0 %}{{ days }}{% else %}0{% endif %}</b><i>d</i>
+      <b data-rb-h>--</b><i>h</i>
+      <b data-rb-m>--</b><i>m</i>
+    </span>
+    {% endif %}
+    {% if can_renew %}
+    <a href="{{ renew_href }}{% if legacy_mode %}?renew=1{% endif %}" class="rb__cta">
+      {% if st.trial or legacy.is_trial %}Choose a plan{% elif st.locked or st.read_only %}Renew &amp; unlock{% else %}Renew now{% endif %}
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+    </a>
+    {% endif %}
+  </div>
+
+  <button type="button" class="rb__close" data-rb-close aria-label="Hide until tomorrow" title="Hide until tomorrow">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+  </button>
+
+  {% if not st.locked %}
+  <div class="rb__bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ pct }}" aria-label="Time left in this stage"><span style="width:{{ pct }}%"></span></div>
+  {% endif %}
+</section>
+</div>
+{% endwith %}
+
+<style>
+.rb-wrap{padding-bottom:0!important}
+.rb{--c1:#b45309;--c2:#f59e0b;--bg:#fffbeb;--bd:#fde68a;--ink:#78350f;--soft:#92400e;
+  position:relative;display:flex;align-items:center;gap:.75rem;
+  padding:.55rem .75rem .65rem 1rem;border:1px solid var(--bd);border-radius:.75rem;overflow:hidden;background:var(--bg);color:var(--ink);
+  box-shadow:0 1px 2px rgba(15,23,42,.05);animation:rb-in .35s ease both}
+.rb--trial{--c1:#0f766e;--c2:#14b8a6;--bg:#f0fdfa;--bd:#99f6e4;--ink:#134e4a;--soft:#0f766e}
+.rb--urgent{--c1:#c2410c;--c2:#f97316;--bg:#fff4ec;--bd:#fdba74;--ink:#7c2d12;--soft:#9a3412}
+.rb--grace{--c1:#c2410c;--c2:#ea580c;--bg:#fff1e8;--bd:#fb923c;--ink:#7c2d12;--soft:#9a3412}
+.rb--danger{--c1:#b91c1c;--c2:#ef4444;--bg:#fef2f2;--bd:#fca5a5;--ink:#7f1d1d;--soft:#991b1b}
+.rb__accent{position:absolute;inset:0 auto 0 0;width:3px;background:linear-gradient(180deg,var(--c2),var(--c1))}
+.rb__icon{position:relative;flex:none;width:1.9rem;height:1.9rem;border-radius:.55rem;display:grid;place-items:center;color:#fff;background:linear-gradient(145deg,var(--c2),var(--c1))}
+.rb__icon svg{width:1rem;height:1rem}
+.rb__pulse{position:absolute;inset:-3px;border-radius:.75rem;border:2px solid var(--c2);opacity:0;animation:rb-pulse 2s ease-out infinite}
+.rb__main{flex:1 1 auto;min-width:0}
+.rb__title{margin:0;font-size:.875rem;font-weight:700;line-height:1.25;letter-spacing:-.005em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rb__sub{margin:.1rem 0 0;font-size:.75rem;line-height:1.3;color:var(--soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rb__sub>span+span::before{content:"\00b7";margin:0 .4rem;opacity:.6}
+.rb__scope{font-weight:600;color:var(--ink)}
+.rb__side{flex:none;display:flex;align-items:center;gap:.6rem}
+.rb__count{display:inline-flex;align-items:baseline;gap:.1rem;padding:.2rem .55rem;border-radius:999px;background:rgba(255,255,255,.75);border:1px solid var(--bd);
+  font-size:.75rem;color:var(--soft);font-variant-numeric:tabular-nums;white-space:nowrap}
+.rb__count b{font-weight:800;color:var(--ink)}.rb__count i{font-style:normal;margin:0 .3rem 0 .05rem;font-size:.675rem}.rb__count i:last-child{margin-right:0}
+.rb__cta{display:inline-flex;align-items:center;justify-content:center;gap:.35rem;padding:.4rem .85rem;min-height:34px;border-radius:.55rem;
+  font-size:.8125rem;font-weight:700;color:#fff;text-decoration:none;white-space:nowrap;background:linear-gradient(145deg,var(--c2),var(--c1));transition:filter .15s,transform .15s}
+.rb__cta:hover{filter:brightness(1.07);transform:translateY(-1px)}.rb__cta svg{width:.85rem;height:.85rem}
+.rb__cta:focus-visible,.rb__close:focus-visible{outline:2px solid var(--c2);outline-offset:2px}
+.rb__close{flex:none;width:1.6rem;height:1.6rem;min-height:0!important;display:none;place-items:center;border:0;border-radius:.4rem;background:transparent;color:var(--soft);cursor:pointer}
+.rb[data-rb-dismissible="1"] .rb__close{display:grid}.rb__close:hover{background:rgba(0,0,0,.06)}.rb__close svg{width:.8rem;height:.8rem}
+.rb__bar{position:absolute;left:0;right:0;bottom:0;height:3px;background:rgba(0,0,0,.05)}
+.rb__bar span{display:block;height:100%;background:linear-gradient(90deg,var(--c1),var(--c2));transition:width .8s ease}
+.rb.rb--hide{animation:rb-out .22s ease forwards}
+@keyframes rb-in{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+@keyframes rb-out{to{opacity:0;transform:translateY(-6px);height:0;padding:0;margin:0;border-width:0}}
+@keyframes rb-pulse{0%{opacity:.5;transform:scale(.95)}100%{opacity:0;transform:scale(1.25)}}
+
+/* Tablet & small laptops: drop the long advice text, keep one clean line */
+@media (max-width:900px){ .rb__adv:not(.rb__adv--keep){display:none} .rb__sub>.rb__due+.rb__adv--keep::before{content:"\00b7"} }
+
+/* Phones: two compact rows -> [icon + title/sub + close] then [countdown + button] */
+@media (max-width:640px){
+  .rb{flex-wrap:wrap;gap:.45rem .6rem;padding:.55rem .6rem .7rem .85rem;border-radius:.7rem}
+  .rb__main{flex:1 1 0}
+  .rb__sub{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+  .rb__side{flex:1 1 100%;gap:.5rem}
+  .rb__count{flex:none}
+  .rb__cta{flex:1 1 auto;min-height:38px}
+  .rb__close{position:absolute;top:.35rem;right:.35rem}
+  .rb[data-rb-dismissible="1"] .rb__main{padding-right:1.6rem}
+}
+@media (max-width:360px){ .rb__count{font-size:.7rem;padding:.2rem .45rem} .rb__title{font-size:.8125rem} }
+@media print{.rb-wrap{display:none}}
+@media (prefers-reduced-motion:reduce){.rb,.rb__pulse,.rb__cta,.rb__bar span{animation:none!important;transition:none!important}}
+</style>
+
+<script>
+(function(){
+  var box=document.querySelector('[data-rb]'); if(!box||box.__rb) return; box.__rb=1;
+  var wrap=box.parentNode, today=new Date().toISOString().slice(0,10), storeKey='sp.rb.'+box.getAttribute('data-rb-key');
+  try{ if(box.getAttribute('data-rb-dismissible')==='1' && localStorage.getItem(storeKey)===today){ wrap.style.display='none'; return; } }catch(e){}
+  var dl=box.getAttribute('data-rb-deadline');
+  var d=box.querySelector('[data-rb-d]'),h=box.querySelector('[data-rb-h]'),m=box.querySelector('[data-rb-m]');
+  function pad(n){return n<10?'0'+n:''+n}
+  function tick(){
+    if(!document.body.contains(box)){clearInterval(t);return}
+    if(!dl||!d)return;
+    var p=dl.split('-'); var end=new Date(+p[0],+p[1]-1,+p[2],23,59,59);
+    var s=Math.max(0,Math.floor((end-new Date())/1000));
+    d.textContent=Math.floor(s/86400); h.textContent=pad(Math.floor(s%86400/3600)); m.textContent=pad(Math.floor(s%3600/60));
+  }
+  tick(); var t=setInterval(tick,30000);
+  var x=box.querySelector('[data-rb-close]');
+  if(x)x.addEventListener('click',function(){
+    try{localStorage.setItem(storeKey,today)}catch(e){}
+    box.classList.add('rb--hide'); setTimeout(function(){wrap.style.display='none'},240);
+  });
+})();
+</script>

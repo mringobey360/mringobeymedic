@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}{{ product.name }} — Batches{% endblock %}
+{% block content %}
+<div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+    <div>
+        <h1 class="text-2xl font-bold text-ink-900 tracking-tight">{{ product.name }}</h1>
+        <p class="text-sm text-ink-500 mt-0.5">{{ product.category|default:"Uncategorized" }} · Base unit: {{ product.get_unit_display }} · Total stock: {{ product.total_quantity }}
+            {% if product.requires_expiry %}<span class="badge bg-amber-100 text-amber-700 ml-1">Has expiry</span>{% else %}<span class="badge bg-ink-100 text-ink-500 ml-1">Non-expiring</span>{% endif %}
+        </p>
+        {% if product.weighted_average_cost %}<p class="text-sm text-ink-500 mt-1">Current weighted average cost: <strong>TSh {{ product.weighted_average_cost }}</strong> per {{ product.get_unit_display }}</p>{% endif %}
+    </div>
+    {% if user.is_management_user %}
+    <div class="flex gap-2">
+        <a href="{% url 'inventory:product_merge' product.pk %}" class="btn btn-secondary">Merge Product</a>
+        <a href="{% url 'inventory:batch_add' product.pk %}" class="btn btn-primary" data-batch-modal>+ Add New Batch</a>
+    </div>
+    {% endif %}
+</div>
+
+<div class="card overflow-x-auto">
+    <table class="w-full text-sm">
+        <thead>
+            <tr class="text-left text-ink-500 border-b border-ink-100">
+                <th class="py-2 pr-4">Batch No.</th>
+                <th class="py-2 pr-4">Received</th>
+                <th class="py-2 pr-4">Purchase</th>
+                <th class="py-2 pr-4">Base Qty</th>
+                <th class="py-2 pr-4">Remaining</th>
+                {% if user.is_management_user %}<th class="py-2 pr-4">Cost/Base Unit</th>{% endif %}
+                <th class="py-2 pr-4">Sell/Base Unit</th>
+                <th class="py-2 pr-4">Expiry</th>
+                <th class="py-2 pr-4">Status</th>
+                {% if user.is_management_user %}<th class="py-2 pr-4"></th>{% endif %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for batch in page_obj %}
+            <tr class="border-b border-ink-100">
+                <td class="py-3 pr-4 font-medium">{{ batch.batch_number|default:"—" }}</td>
+                <td class="py-3 pr-4 text-ink-500">{{ batch.received_at|date:"d M Y" }}</td>
+                <td class="py-3 pr-4">{{ batch.purchase_quantity }} {{ batch.get_purchase_unit_display|default:product.get_unit_display }} @ TSh {{ batch.purchase_unit_price|default:batch.purchase_price }}</td>
+                <td class="py-3 pr-4">{{ batch.initial_quantity }} {{ product.get_unit_display }}</td>
+                <td class="py-3 pr-4">{{ batch.quantity }}</td>
+                {% if user.is_management_user %}<td class="py-3 pr-4">{{ batch.purchase_price }}</td>{% endif %}
+                <td class="py-3 pr-4">{{ batch.selling_price }}{% if batch.discount_cap_amount is not None %}<div class="text-[11px] text-amber-700 mt-0.5">{% if batch.discount_cap_amount == 0 %}No discount{% else %}Max discount {{ batch.discount_cap_amount|floatformat:"-2" }}{% endif %}</div>{% endif %}</td>
+                <td class="py-3 pr-4">{% if batch.expiry_date %}{{ batch.expiry_date|date:"d M Y" }}{% else %}<span class="text-ink-400">No expiry</span>{% endif %}</td>
+                <td class="py-3 pr-4">
+                    {% if batch.is_depleted %}<span class="badge bg-ink-100 text-ink-500">Depleted</span>
+                    {% elif batch.is_expired %}<span class="badge bg-red-100 text-red-700">Expired</span>
+                    {% elif batch.is_expiring_soon %}<span class="badge bg-amber-100 text-amber-700">{{ batch.days_to_expiry }}d left</span>
+                    {% else %}<span class="badge bg-emerald-50 text-emerald-700">Active</span>{% endif %}
+                </td>
+                {% if user.is_management_user %}<td class="py-3 pr-4"><a href="{% url 'inventory:batch_edit' product.pk batch.pk %}" class="row-action" data-batch-modal>Edit</a></td>{% endif %}
+            </tr>
+            {% empty %}
+            <tr><td colspan="10" class="py-8 text-center text-ink-400">No batches recorded yet for this product.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% include "partials/pagination.html" with page_obj=page_obj %}
+
+<div class="mt-4"><a href="{% url 'inventory:product_list' %}" class="row-action -ml-2">← Back to Products</a></div>
+{% endblock %}

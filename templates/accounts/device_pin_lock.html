@@ -1,0 +1,42 @@
+{% extends "accounts/auth_base.html" %}
+{% block title %}Session locked - SmartPOS{% endblock %}
+{% block auth_head %}{% include "accounts/partials/pin_pad_styles.html" %}{% endblock %}
+{% block auth_content %}
+<div id="pin-lock-root" class="pin-root w-full max-w-[20rem] text-center" data-url="{% url 'accounts:device_pin_unlock' %}" data-next="{{ next_url|escape }}" data-length="{{ pin_length }}">
+  {% csrf_token %}
+  <div class="auth-icon" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+  </div>
+  <p class="text-[10px] font-bold uppercase tracking-[.2em] text-brand-700">SmartPOS · Session locked</p>
+  <h1 class="mt-1 text-xl font-semibold tracking-tight text-ink-900">Welcome back, {{ request.user.first_name|default:request.user.username }}</h1>
+  <p class="mt-1.5 text-xs leading-5 text-ink-600">Your account is still signed in. SmartPOS locked this screen after 5 minutes of inactivity. Enter your PIN to continue without signing out.</p>
+  <p id="pin-lock-label" class="mt-4 text-xs font-semibold text-ink-800">Enter your {{ pin_length }}-digit PIN</p>
+  <div id="pin-lock-dots" class="pin-dots" aria-hidden="true">{% for ch in "x"|ljust:pin_length %}<span class="pin-dot"></span>{% endfor %}</div>
+  <p id="pin-lock-error" class="mt-1 min-h-[1rem] text-xs font-medium text-red-600" role="alert" aria-live="polite"></p>
+  {% include "accounts/partials/pin_pad_keys.html" %}
+  <a href="{% url 'accounts:logout' %}" class="mt-4 inline-block text-[10px] font-semibold uppercase tracking-[.2em] text-ink-500 hover:text-brand-700">Sign out and use password</a>
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+(function(){
+  var root=document.getElementById('pin-lock-root'); if(!root)return;
+  var len=parseInt(root.dataset.length,10)||4, url=root.dataset.url, csrf=root.querySelector('input[name="csrfmiddlewaretoken"]').value;
+  var dots=root.querySelectorAll('.pin-dot'), error=document.getElementById('pin-lock-error'), pin='', busy=false, locked=false, timer=null;
+  function render(){PinUI.render(pin);}
+  function err(m){error.textContent=m||'';}
+  function shake(){var w=document.getElementById('pin-lock-dots');w.classList.remove('is-shake');void w.offsetWidth;w.classList.add('is-shake');}
+  function setKeys(v){root.querySelectorAll('[data-digit],#pin-back').forEach(function(b){b.disabled=v;});}
+  function cooldown(sec){clearInterval(timer);locked=true;setKeys(true);var left=Math.max(1,parseInt(sec,10)||1);function tick(){err('Please wait '+left+' seconds before trying again.');if(left<=0){clearInterval(timer);locked=false;setKeys(false);err('You can try your PIN again.');}left--;}tick();timer=setInterval(tick,1000);}
+  function fail(data){busy=false;pin='';PinUI.state('idle');render();shake();if(data&&data.redirect&&data.session_preserved){setKeys(true);setTimeout(function(){location.href=data.redirect;},900);return;}if(data&&data.fallback){setKeys(true);setTimeout(function(){location.href=data.redirect;},1800);return;}if(data&&data.cooldown){cooldown(data.retry_after);return;}err(data&&data.error||'Wrong PIN. Please try again.');}
+  function submit(){if(busy||locked||pin.length!==len)return;busy=true;setKeys(true);PinUI.state('busy');fetch(url,{method:'POST',credentials:'same-origin',headers:{'X-CSRFToken':csrf,'X-Requested-With':'XMLHttpRequest','Content-Type':'application/x-www-form-urlencoded'},body:'pin='+encodeURIComponent(pin)+'&next='+encodeURIComponent(root.dataset.next||'')}).then(function(r){return r.json().catch(function(){return{ok:false,error:'Unexpected response.'};});}).then(function(data){if(data&&data.ok){err('');PinUI.leave(function(){location.href=data.redirect;});return;}fail(data);}).catch(function(){fail({error:'Network problem. Check your connection and try again.'});});}
+  function add(d){if(busy||locked||pin.length>=len)return;pin+=d;err('');render();if(pin.length===len)setTimeout(submit,220);}
+  function back(){if(busy||locked)return;pin=pin.slice(0,-1);render();}
+  root.querySelectorAll('[data-digit]').forEach(function(b){b.addEventListener('click',function(){add(b.dataset.digit);});});
+  document.getElementById('pin-back').addEventListener('click',back);
+  PinUI.setLabel({idle:'Enter PIN',ready:'Verifying\u2026',busy:'Verifying PIN\u2026',success:'Unlocked'});
+  PinUI.onConfirm(submit);
+  document.addEventListener('keydown',function(e){if(e.ctrlKey||e.metaKey||e.altKey)return;if(/^[0-9]$/.test(e.key)){e.preventDefault();add(e.key);}else if(e.key==='Backspace'){e.preventDefault();back();}});
+})();
+</script>
+{% endblock %}

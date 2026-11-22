@@ -1,0 +1,1 @@
+Marketplace patch: Trending scrollbar hidden with automatic motion (pauses on hover/focus/touch; reduced motion respected). Seller delete now safely unpublishes instead of deleting order-linked files and records. Run manage.py check and tests in your Railway environment before deployment. Note: archived products remain in seller management and can be shown again.

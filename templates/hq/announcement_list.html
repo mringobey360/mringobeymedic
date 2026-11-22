@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}SMS Announcements - HQ{% endblock %}
+{% block content %}
+<div class="max-w-6xl mx-auto">
+
+    <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-6">
+        <div>
+            <h1 class="text-2xl font-bold text-ink-900 tracking-tight">SMS Announcements</h1>
+            <p class="text-sm text-ink-500 mt-1">Announcements and system updates sent to your customers, with a delivery report for each.</p>
+        </div>
+        <a href="{% url 'hq:announcement_compose' %}" class="btn btn-primary text-sm">
+            <svg class="icon !w-4 !h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+            New announcement
+        </a>
+    </div>
+
+    <div class="card">
+        <form method="get" class="flex flex-wrap items-center gap-2 mb-4">
+            <label for="status" class="text-xs font-medium text-ink-500">Status</label>
+            <select name="status" id="status" class="form-input !w-auto !py-2" onchange="this.form.submit()">
+                <option value="">All</option>
+                {% for value, label in status_choices %}<option value="{{ value }}" {% if current_status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+            </select>
+        </form>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-left border-b border-ink-200">
+                        <th class="py-2 pr-4">Campaign</th>
+                        <th class="py-2 pr-4">Type</th>
+                        <th class="py-2 pr-4">Audience</th>
+                        <th class="py-2 pr-4">Delivery</th>
+                        <th class="py-2 pr-4">Status</th>
+                        <th class="py-2 pr-4">Sent</th>
+                        <th class="py-2"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in page_obj %}
+                    <tr class="border-b border-ink-100 align-top">
+                        <td class="py-3 pr-4 max-w-xs">
+                            <a href="{% url 'hq:announcement_detail' item.pk %}" class="font-medium text-brand-700 hover:text-brand-800">{{ item.title }}</a>
+                            <p class="text-xs text-ink-400 mt-0.5 truncate">{{ item.message|truncatechars:70 }}</p>
+                        </td>
+                        <td class="py-3 pr-4 text-ink-600 whitespace-nowrap">{{ item.get_message_type_display }}</td>
+                        <td class="py-3 pr-4 text-ink-600">{{ item.get_audience_display }}</td>
+                        <td class="py-3 pr-4 whitespace-nowrap">
+                            <p class="font-medium text-ink-800">{{ item.sent_count }} / {{ item.total_recipients }}</p>
+                            <div class="mt-1 h-1.5 w-24 rounded-full bg-ink-100 overflow-hidden"><div class="h-full bg-brand-600" style="width: {{ item.progress_percent }}%"></div></div>
+                            {% if item.failed_count %}<p class="text-xs text-red-600 mt-1">{{ item.failed_count }} failed</p>{% endif %}
+                        </td>
+                        <td class="py-3 pr-4">
+                            <span class="badge {% if item.status == 'COMPLETED' %}bg-emerald-100 text-emerald-700{% elif item.status == 'PARTIAL' %}bg-amber-100 text-amber-700{% elif item.status == 'FAILED' %}bg-red-100 text-red-700{% else %}bg-brand-100 text-brand-700{% endif %}">{{ item.get_status_display }}</span>
+                        </td>
+                        <td class="py-3 pr-4 text-ink-500 whitespace-nowrap">
+                            {{ item.created_at|date:"d M Y H:i" }}
+                            <p class="text-xs text-ink-400">{% firstof item.created_by.get_full_name item.created_by.username "System" %}</p>
+                        </td>
+                        <td class="py-3 text-right"><a href="{% url 'hq:announcement_detail' item.pk %}" class="btn btn-secondary !px-3 !py-1.5 !text-xs">Report</a></td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="7" class="py-12 text-center">
+                        <p class="text-ink-500">No announcements yet.</p>
+                        <a href="{% url 'hq:announcement_compose' %}" class="text-sm font-medium text-brand-700 hover:text-brand-800">Send your first announcement &rarr;</a>
+                    </td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% include "partials/pagination.html" with page_obj=page_obj %}
+    </div>
+</div>
+{% endblock %}

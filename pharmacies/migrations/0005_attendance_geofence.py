@@ -1,0 +1,4 @@
+from django.db import migrations, models
+class Migration(migrations.Migration):
+ dependencies=[('pharmacies','0004_branchaddon_payment_reference')]
+ operations=[migrations.AddField(model_name='pharmacy',name='latitude',field=models.DecimalField(blank=True,decimal_places=7,help_text='Branch latitude used for attendance geofencing.',max_digits=10,null=True)),migrations.AddField(model_name='pharmacy',name='longitude',field=models.DecimalField(blank=True,decimal_places=7,help_text='Branch longitude used for attendance geofencing.',max_digits=10,null=True)),migrations.AddField(model_name='pharmacy',name='geofence_radius_m',field=models.PositiveIntegerField(default=150,help_text='Maximum distance in metres allowed for automatic attendance verification.'))]

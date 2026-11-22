@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}{% if mode == 'edit' %}Edit Employee{% else %}Register Employee{% endif %}{% endblock %}
+{% block content %}
+<style data-spa-page-style="employee-form">
+  .ef-intro{display:flex;gap:.75rem;align-items:flex-start;padding:.75rem .9rem;border-radius:12px;background:#f0fdfa;border:1px solid #ccfbf1;color:#115e59;font-size:.8125rem;line-height:1.3rem}
+  .ef-intro svg{flex:none;width:1.1rem;height:1.1rem;margin-top:.15rem}
+  .ef-id{display:flex;align-items:center;gap:.75rem;padding:.7rem .9rem;border-radius:12px;background:#f8fafc;border:1px solid #e2e8f0}
+  .ef-avatar{flex:none;width:2.5rem;height:2.5rem;border-radius:999px;background:#0f766e;color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:.95rem}
+  .ef-id b{display:block;color:#0f172a;font-size:.875rem}
+  .ef-id span{color:#64748b;font-size:.75rem}
+  .ef-field label{display:block;font-size:.8125rem;font-weight:600;color:#334155;margin-bottom:.3rem}
+  .ef-field .ef-hint{font-size:.72rem;color:#94a3b8;margin-top:.3rem;line-height:1.2rem}
+  .ef-field .ef-err{font-size:.75rem;color:#dc2626;margin-top:.3rem;font-weight:600}
+  .ef-field input.is-invalid{border-color:#f87171;background:#fef2f2}
+</style>
+<div class="max-w-lg">
+    <h1 class="text-xl font-semibold mb-1">{% if mode == 'edit' %}Edit Employee{% else %}Register New Employee{% endif %}</h1>
+    <form method="post" class="card space-y-4" novalidate>
+        {% csrf_token %}
+
+        {% if mode == 'edit' %}
+        <div class="ef-id rounded-xl">
+            <div class="ef-avatar">{{ employee.get_full_name|default:employee.username|slice:":1"|upper }}</div>
+            <div><b>{% firstof employee.get_full_name employee.username %}</b><span>Login ID: {{ employee.username }} &middot; cannot be changed</span></div>
+        </div>
+        {% else %}
+        <div class="ef-intro rounded-xl">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>
+            <p>A temporary password is generated automatically and sent to the employee by SMS. They will be asked to change it on first login.</p>
+        </div>
+        {% endif %}
+
+        {% for field in form %}
+        <div data-field class="ef-field">
+            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+            {{ field }}
+            {% if field.errors %}<p class="ef-err text-xs text-red-600">{{ field.errors.0 }}</p>
+            {% elif field.help_text %}<p class="ef-hint">{{ field.help_text }}</p>{% endif %}
+        </div>
+        {% endfor %}
+
+        <div class="flex gap-3">
+            <a href="{% url 'accounts:employee_list' %}" class="btn btn-secondary">Cancel</a>
+            <button type="submit" class="btn btn-primary">{% if mode == 'edit' %}Save Changes{% else %}Register Employee{% endif %}</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

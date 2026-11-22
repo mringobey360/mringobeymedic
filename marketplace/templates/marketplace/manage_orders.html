@@ -1,0 +1,58 @@
+{% extends "base.html" %}{% load humanize %}
+{% block title %}Marketplace Orders · SmartPOS HQ{% endblock %}
+{% block extra_head %}{% include 'marketplace/_mk_styles.html' %}{% endblock %}
+{% block content %}
+<div class="mk-page">
+ <header class="mk-head">
+  <div>
+   <p class="mk-eyebrow">SmartPOS · Platform HQ</p>
+   <h1 class="mk-title">Marketplace orders</h1>
+   <p class="mk-sub">Search and manage official orders, customer Ticket IDs and payment states.</p>
+  </div>
+ </header>
+
+ {% include 'marketplace/_mk_nav.html' with active='orders' %}
+
+ <section class="mk-card mk-pad" aria-label="Filter orders">
+  <form class="mk-filter" method="get">
+   <label>Search customer / phone / Ticket ID<input name="q" value="{{ q }}" placeholder="Name, phone or reference"></label>
+   <label>Order status<select name="status"><option value="">All statuses</option>{% for value,label in status_choices %}<option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+   <label>Payment status<select name="payment"><option value="">All payments</option>{% for value,label in payment_choices %}<option value="{{ value }}" {% if payment == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+   <div class="mk-actions"><button class="btn btn-primary" type="submit">Apply filters</button>{% if q or status or payment %}<a class="btn btn-ghost" href="{% url 'marketplace:manage_orders' %}">Reset</a>{% endif %}</div>
+  </form>
+ </section>
+
+ <section class="mk-card">
+  <div class="mk-table-wrap">
+   <table class="mk-table" style="min-width:860px">
+    <thead><tr><th>Ticket ID</th><th>Customer</th><th>Items</th><th class="mk-num">Total</th><th>Order</th><th>Payment</th><th>Created</th><th></th></tr></thead>
+    <tbody>
+    {% for o in page_obj %}
+     <tr>
+      <td class="mk-ref">{{ o.reference }}</td>
+      <td><div class="mk-strong">{{ o.customer_name }}</div><div class="mk-muted">{{ o.phone }}</div></td>
+      <td>{% for item in o.items.all %}<div>{{ item.name }} <span class="mk-muted">× {{ item.quantity }}</span></div>{% endfor %}</td>
+      <td class="mk-num">TSh {{ o.total|floatformat:0|intcomma }}</td>
+      <td><span class="mk-badge mk-b-{{ o.status }}">{{ o.get_status_display }}</span></td>
+      <td><span class="mk-badge mk-b-{{ o.payment_status }}">{{ o.get_payment_status_display }}</span></td>
+      <td class="mk-muted" style="white-space:nowrap">{{ o.created_at|date:'d M Y H:i' }}</td>
+      <td><div class="mk-cell-actions"><a class="btn btn-secondary btn-sm" href="{% url 'marketplace:manage_order' o.reference %}">Manage</a></div></td>
+     </tr>
+    {% empty %}
+     <tr><td colspan="8"><div class="mk-empty"><b>No matching orders found</b>Try a different search or clear the filters.</div></td></tr>
+    {% endfor %}
+    </tbody>
+   </table>
+  </div>
+  <nav class="mk-pager" aria-label="Order pages">
+   <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }} · {{ page_obj.paginator.count }} order{{ page_obj.paginator.count|pluralize }}</span>
+   <div class="mk-pager-nav">
+    {% if page_obj.has_previous %}<a class="btn btn-secondary btn-sm" href="?q={{ q|urlencode }}&status={{ status|urlencode }}&payment={{ payment|urlencode }}&page={{ page_obj.previous_page_number }}">Previous</a>{% endif %}
+    {% if page_obj.has_next %}<a class="btn btn-secondary btn-sm" href="?q={{ q|urlencode }}&status={{ status|urlencode }}&payment={{ payment|urlencode }}&page={{ page_obj.next_page_number }}">Next</a>{% endif %}
+   </div>
+  </nav>
+ </section>
+
+ <p class="mk-muted">For audit integrity, orders are managed by changing their status rather than permanently deleting paid order history. Verify provider records before marking any order Paid.</p>
+</div>
+{% endblock %}

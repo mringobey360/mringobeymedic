@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+{% block title %}{{ mode }}{% endblock %}
+{% block content %}
+<div class="page-shell max-w-6xl mx-auto">
+  <div class="mb-6">
+    <a href="{% url 'customer_registry:list' %}" class="btn btn-secondary btn-nav">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+      Customer Registry
+    </a>
+    <div class="mt-4 flex flex-col lg:flex-row lg:items-end lg:justify-between gap-3">
+      <div>
+        <p class="eyebrow">Customer Management</p>
+        <h1 class="page-title">{% if customer %}Edit Customer{% else %}Register Customer{% endif %}</h1>
+        <p class="page-subtitle">{% if customer %}Update this customer's contact information safely. Changes apply only to the active branch.{% else %}Create a clean customer contact that can be used for receipts, communication and premium marketing campaigns.{% endif %}</p>
+      </div>
+      {% if customer %}
+      <span class="badge {% if customer.is_active %}bg-emerald-100 text-emerald-700{% else %}bg-ink-100 text-ink-500{% endif %} px-3 py-1.5">
+        <span class="inline-block w-1.5 h-1.5 rounded-full mr-1.5 {% if customer.is_active %}bg-emerald-500{% else %}bg-ink-400{% endif %}"></span>
+        {{ customer.is_active|yesno:"Active,Inactive" }}
+      </span>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-5 items-start">
+    <form method="post" id="customer-edit-form" class="card p-0 overflow-hidden" novalidate>
+      {% csrf_token %}
+      <div class="px-5 sm:px-6 py-5 border-b border-ink-100 bg-ink-50/50">
+        <div class="flex items-start gap-3">
+          <div class="w-10 h-10 rounded-xl bg-brand-100 text-brand-700 flex items-center justify-center shrink-0">
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/></svg>
+          </div>
+          <div>
+            <h2 class="font-bold text-ink-900">Customer details</h2>
+            <p class="text-sm text-ink-500 mt-0.5">Keep the name and mobile number accurate for receipt delivery and future contact.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="p-5 sm:p-6 space-y-5">
+        {% if form.non_field_errors %}
+          <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {{ form.non_field_errors.0 }}
+          </div>
+        {% endif %}
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div>
+            <label for="{{ form.name.id_for_label }}" class="block text-sm font-semibold text-ink-700 mb-1.5">Customer name <span class="text-red-500">*</span></label>
+            {{ form.name }}
+            <p class="text-xs text-ink-400 mt-1.5">Use the customer's preferred full name.</p>
+            {% for error in form.name.errors %}<p class="text-xs text-red-600 mt-1">{{ error }}</p>{% endfor %}
+          </div>
+
+          <div>
+            <label for="{{ form.phone.id_for_label }}" class="block text-sm font-semibold text-ink-700 mb-1.5">Mobile phone <span class="text-red-500">*</span></label>
+            <div class="relative">
+              <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-ink-400 pointer-events-none">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2.5" width="12" height="19" rx="2"/><path d="M10 18.5h4"/></svg>
+              </span>
+              {{ form.phone }}
+            </div>
+            <p class="text-xs text-ink-400 mt-1.5">Example: +255712345678. Tanzanian numbers are normalized automatically.</p>
+            {% for error in form.phone.errors %}<p class="text-xs text-red-600 mt-1">{{ error }}</p>{% endfor %}
+          </div>
+        </div>
+
+        <div>
+          <label for="{{ form.notes.id_for_label }}" class="block text-sm font-semibold text-ink-700 mb-1.5">Notes <span class="font-normal text-ink-400">(optional)</span></label>
+          {{ form.notes }}
+          <p class="text-xs text-ink-400 mt-1.5">Optional internal note, e.g. VIP customer or preferred contact details.</p>
+          {% for error in form.notes.errors %}<p class="text-xs text-red-600 mt-1">{{ error }}</p>{% endfor %}
+        </div>
+
+        <div class="rounded-xl border border-ink-200 bg-ink-50/60 px-4 py-3.5">
+          <div class="flex items-start gap-3">
+            <div class="mt-0.5 text-brand-700">
+              <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 10v6"/><path d="M12 7h.01"/></svg>
+            </div>
+            <div>
+              <p class="text-sm font-semibold text-ink-800">Branch protection</p>
+              <p class="text-xs text-ink-500 mt-1">This record belongs to the currently selected branch. You cannot accidentally move the customer to another branch from this form.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2 pt-1">
+          {{ form.is_active }}
+          <label for="{{ form.is_active.id_for_label }}" class="text-sm font-medium text-ink-700">Customer is active</label>
+          <span class="text-xs text-ink-400">Inactive customers can be excluded from active communication lists.</span>
+        </div>
+        {% for error in form.is_active.errors %}<p class="text-xs text-red-600 -mt-3">{{ error }}</p>{% endfor %}
+      </div>
+
+      <div class="px-5 sm:px-6 py-4 border-t border-ink-100 bg-ink-50/40 flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+        <a class="btn btn-secondary" href="{% url 'customer_registry:list' %}">Cancel</a>
+        <button type="submit" id="save-customer-btn" class="btn btn-primary min-w-32">
+          {% if customer %}Save Changes{% else %}Register Customer{% endif %}
+        </button>
+      </div>
+    </form>
+
+    <aside class="space-y-5">
+      {% if customer %}
+      <div class="card">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="w-10 h-10 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center font-bold">
+            {{ customer.name|slice:":1"|upper }}
+          </div>
+          <div class="min-w-0">
+            <p class="text-xs font-semibold uppercase tracking-wide text-ink-400">Customer profile</p>
+            <p class="font-bold text-ink-900 truncate mt-0.5">{{ customer.name }}</p>
+          </div>
+        </div>
+        <div class="space-y-3 text-sm">
+          <div class="flex justify-between gap-4"><span class="text-ink-500">Current phone</span><strong class="font-mono text-xs">{{ customer.phone }}</strong></div>
+          <div class="flex justify-between gap-4"><span class="text-ink-500">Registered</span><span>{{ customer.created_at|date:"d M Y, H:i" }}</span></div>
+          <div class="flex justify-between gap-4"><span class="text-ink-500">Last updated</span><span>{{ customer.updated_at|date:"d M Y, H:i" }}</span></div>
+          <div class="pt-3 border-t border-ink-100 flex justify-between gap-4"><span class="text-ink-500">Status</span><span class="font-semibold">{{ customer.is_active|yesno:"Active,Inactive" }}</span></div>
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="card bg-brand-50/50 border-brand-100">
+        <div class="flex items-center gap-2 text-brand-800">
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16v16H4z"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>
+          <h3 class="font-bold">Why accurate details matter</h3>
+        </div>
+        <ul class="mt-3 space-y-2 text-sm text-ink-600">
+          <li class="flex gap-2"><span class="text-brand-700">✓</span><span>Receipts can be resent to the correct phone number.</span></li>
+          <li class="flex gap-2"><span class="text-brand-700">✓</span><span>Customer communication stays branch-specific.</span></li>
+          <li class="flex gap-2"><span class="text-brand-700">✓</span><span>Premium marketing campaigns use active customer contacts.</span></li>
+        </ul>
+      </div>
+
+      {% if customer %}
+      <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
+        <strong>Important:</strong> Changing the phone number updates the customer contact used for future communication. Existing campaign delivery history remains preserved.
+      </div>
+      {% endif %}
+    </aside>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+  var form = document.getElementById('customer-edit-form');
+  var phone = document.getElementById('{{ form.phone.id_for_label }}');
+  var save = document.getElementById('save-customer-btn');
+  if (!form) return;
+
+  if (phone) {
+    phone.classList.add('pl-10');
+    phone.addEventListener('blur', function () {
+      var value = phone.value.trim().replace(/[\s()-]/g, '');
+      if (/^0\d{9}$/.test(value)) value = '+255' + value.substring(1);
+      if (/^255\d{9}$/.test(value)) value = '+' + value;
+      phone.value = value;
+    });
+  }
+
+  form.addEventListener('submit', function () {
+    if (!save) return;
+    save.disabled = true;
+    save.setAttribute('aria-busy', 'true');
+    save.innerHTML = '<span class="inline-flex items-center gap-2"><span class="w-4 h-4 rounded-full border-2 border-current border-t-transparent animate-spin"></span>Saving...</span>';
+  });
+})();
+</script>
+{% endblock %}

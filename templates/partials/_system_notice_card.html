@@ -1,0 +1,21 @@
+{% comment %}
+  One banner card. Used by partials/system_notices.html (what customers see) and by the HQ review page
+  (preview=True: the close button and link do nothing). Text is auto-escaped.
+{% endcomment %}
+<div class="spn spn-{{ n.tone }}"{% if not preview %} data-notice-id="{{ n.id }}" data-notice-version="{{ n.version }}" data-dismissible="{% if n.dismissible %}1{% else %}0{% endif %}"{% endif %} role="{% if n.kind == 'INCIDENT' %}alert{% else %}status{% endif %}">
+  <span class="spn-ico" aria-hidden="true">{% include 'partials/_system_notice_icon.html' with tone=n.tone %}</span>
+  <div class="spn-body">
+    <div class="spn-head">
+      <span class="spn-badge">{{ n.badge }}</span>
+      <strong class="spn-title">{{ n.title }}</strong>
+      {% if n.dismissible %}<button type="button" class="spn-x" aria-label="Funga taarifa"{% if preview %} tabindex="-1"{% endif %}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>{% endif %}
+    </div>
+    <p class="spn-msg" title="Bonyeza kusoma yote">{{ n.message|linebreaksbr }}</p>
+    {% if n.link_url or n.published_at %}
+    <div class="spn-foot">
+      {% if n.published_at %}<span class="spn-meta">{{ n.published_at|date:"d/m/Y, H:i" }}</span>{% else %}<span></span>{% endif %}
+      {% if n.link_url %}<a class="spn-link" href="{% if preview %}#{% else %}{{ n.link_url }}{% endif %}"{% if preview %} onclick="return false"{% else %} rel="noopener noreferrer"{% endif %}>{% include 'partials/_system_notice_link_icon.html' with icon=n.link_icon %}<span>{{ n.link_label|default:"Soma zaidi" }}</span></a>{% endif %}
+    </div>
+    {% endif %}
+  </div>
+</div>

@@ -1,0 +1,131 @@
+{% load static %}
+{% comment %}
+SmartPOS WhatsApp Support Widget (dark card style)
+- Click launcher to open / close. Closes by itself ~8s after opening if the visitor does not touch it,
+  when clicking anywhere outside, with Escape, or after sending.
+- "Chat" hands the typed message to WhatsApp (wa.me) with the page context attached.
+- Agent name: SUPPORT_AGENT_NAME (settings) -> default "Mutech". Photo: SUPPORT_ADMIN_USER.profile_photo -> logo.
+{% endcomment %}
+{% if not user.is_superuser %}
+<div id="smartpos-whatsapp-support" class="print:hidden" data-whatsapp="{{ SUPPORT_WHATSAPP_PHONE|default:'+255610117824'|cut:' ' }}" data-autoclose="8000">
+  <section id="smartpos-wa-panel" class="swa-panel" role="dialog" aria-modal="false" aria-labelledby="swa-title" hidden>
+    <header class="swa-head">
+      <div class="swa-avatar">
+        {% if SUPPORT_ADMIN_USER and SUPPORT_ADMIN_USER.profile_photo %}<img src="{{ SUPPORT_ADMIN_USER.profile_photo.url }}" alt="">{% else %}<img src="{% static 'img/logo.jpg' %}" alt="">{% endif %}
+      </div>
+      <div class="swa-head-copy">
+        <h2 id="swa-title">{{ SUPPORT_AGENT_NAME|default:'Mutech' }} is here. Want to connect?</h2>
+        <p>Typically replies in a few minutes</p>
+      </div>
+      <button type="button" id="smartpos-wa-close" class="swa-close" aria-label="Close support chat">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+    </header>
+    <p class="swa-msg">Got a question or idea? I&rsquo;m here to help.</p>
+    <form id="smartpos-wa-form" class="swa-foot" autocomplete="off">
+      <input id="smartpos-wa-input" class="swa-input" type="text" maxlength="1000" value="Hello 👋 I need support." aria-label="Your message" enterkeyhint="send">
+      <button type="submit" id="smartpos-wa-send" class="swa-send">Chat</button>
+    </form>
+  </section>
+
+  <button type="button" id="smartpos-wa-launcher" class="swa-launcher" aria-label="Open WhatsApp support" aria-expanded="false" aria-controls="smartpos-wa-panel">
+    <span class="swa-ring" aria-hidden="true"></span>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 11.5a8.5 8.5 0 0 1-12.8 7.35L3.5 20l1.25-4.05A8.5 8.5 0 1 1 20.5 11.5Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8.6 9.2c.25-.55.48-.58.88-.59.16 0 .34 0 .51.01.16.01.35.08.49.42.16.4.55 1.35.6 1.45.05.1.08.22.02.35-.06.13-.1.22-.2.34-.1.12-.21.26-.3.35-.1.1-.2.2-.08.4.12.2.54.9 1.16 1.46.8.71 1.48.94 1.68 1.05.2.1.32.09.44-.05.12-.14.51-.6.65-.8.14-.2.27-.16.46-.1.19.07 1.2.57 1.4.67.2.1.33.15.38.23.05.09.05.5-.12.97-.17.47-.98.9-1.36.96-.35.05-.8.08-1.3-.08-.3-.1-.69-.23-1.19-.44-2.1-.9-3.48-3.03-3.59-3.18-.1-.14-.85-1.02-.85-1.95 0-.92.53-1.37.72-1.55Z" fill="currentColor"/></svg>
+  </button>
+</div>
+
+<style>
+#smartpos-whatsapp-support{position:fixed;right:18px;bottom:18px;z-index:95;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+.swa-launcher{position:relative;width:52px;height:52px;border:0;border-radius:50%;display:grid;place-items:center;cursor:pointer;color:#0b1220;background:#25d366;box-shadow:0 8px 20px rgba(37,211,102,.32),0 0 0 5px rgba(37,211,102,.14);transition:transform .18s ease,box-shadow .18s ease}
+.swa-launcher:hover{transform:translateY(-2px) scale(1.04)}
+.swa-launcher:focus-visible{outline:3px solid #fff;outline-offset:2px;box-shadow:0 0 0 6px #25d366}
+.swa-launcher svg{width:26px;height:26px;position:relative;z-index:2}
+.swa-ring{position:absolute;inset:-5px;border-radius:50%;border:1px solid rgba(37,211,102,.3);animation:swaPulse 2.8s ease-out infinite}
+.swa-panel[hidden]{display:none!important}
+.swa-panel{position:absolute;right:0;bottom:66px;width:min(288px,calc(100vw - 24px));background:#0b1220;color:#fff;border:1px solid rgba(255,255,255,.08);border-radius:14px;overflow:hidden;box-shadow:0 16px 40px -10px rgba(0,0,0,.5);transform-origin:bottom right;animation:swaIn .2s ease both}
+.swa-head{display:flex;align-items:center;gap:10px;padding:10px 10px 10px 12px;background:#101a2e}
+.swa-avatar{flex:none;width:34px;height:34px}
+.swa-avatar img{width:34px;height:34px;border-radius:50%;object-fit:cover;background:#334155;display:block}
+.swa-head-copy{flex:1;min-width:0}
+.swa-head h2{margin:0;font-size:13px;line-height:1.25;font-weight:700;color:#fff}
+.swa-head p{margin:1px 0 0;font-size:11px;color:#cbd5e1}
+.swa-close{flex:none;width:28px;height:28px;border:0;border-radius:10px;background:transparent;color:#e2e8f0;cursor:pointer;display:grid;place-items:center}
+.swa-close:hover{background:rgba(255,255,255,.1)}
+.swa-close svg{width:18px;height:18px}
+.swa-msg{margin:0;padding:12px 14px;font-size:13px;line-height:1.45;color:#f1f5f9;border-bottom:1px solid rgba(255,255,255,.08)}
+.swa-foot{display:flex;gap:8px;padding:10px 12px 12px;background:#0a101d}
+.swa-input{flex:1;min-width:0;height:36px;border-radius:8px;border:1px solid rgba(255,255,255,.14);background:#0b1220;color:#fff;padding:0 10px;font-size:13px;outline:none;transition:border-color .15s,box-shadow .15s}
+.swa-input::placeholder{color:#64748b}
+.swa-input:focus{border-color:#25d366;box-shadow:0 0 0 3px rgba(37,211,102,.22)}
+.swa-send{flex:none;height:36px;padding:0 14px;border:0;border-radius:8px;background:#25d366;color:#06210f;font-weight:700;font-size:13px;cursor:pointer;transition:filter .15s,transform .1s}
+.swa-send:hover{filter:brightness(1.07)}.swa-send:active{transform:translateY(1px)}
+.swa-send:disabled{opacity:.5;cursor:not-allowed}
+@keyframes swaPulse{0%{transform:scale(.92);opacity:.7}70%{transform:scale(1.22);opacity:.12}100%{transform:scale(1.32);opacity:0}}
+@keyframes swaIn{from{opacity:0;transform:translateY(8px) scale(.97)}to{opacity:1;transform:none}}
+@media(max-width:640px){#smartpos-whatsapp-support{right:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px))}.swa-launcher{width:48px;height:48px}.swa-panel{bottom:60px;width:min(288px,calc(100vw - 24px))}}
+@media(prefers-reduced-motion:reduce){.swa-ring,.swa-panel{animation:none}.swa-launcher{transition:none}}
+</style>
+
+<script>
+(function(){
+  var root=document.getElementById('smartpos-whatsapp-support'); if(!root) return;
+  var panel=document.getElementById('smartpos-wa-panel');
+  var launcher=document.getElementById('smartpos-wa-launcher');
+  var closeBtn=document.getElementById('smartpos-wa-close');
+  var form=document.getElementById('smartpos-wa-form');
+  var input=document.getElementById('smartpos-wa-input');
+  var send=document.getElementById('smartpos-wa-send');
+  var phone=String(root.dataset.whatsapp||'+255610117824').replace(/\D/g,'');
+  var delay=parseInt(root.dataset.autoclose,10)||8000;
+  var DEFAULT=input.value, timer=null, touched=false;
+
+  function pageContext(){
+    var title=(document.title||'SmartPOS').replace(/\s+/g,' ').trim();
+    var h=document.querySelector('h1'); var heading=h?h.textContent.replace(/\s+/g,' ').trim():'';
+    return heading?title+' — '+heading:title;
+  }
+  function stopTimer(){ if(timer){clearTimeout(timer);timer=null;} }
+  function startTimer(){
+    stopTimer();
+    if(touched) return;
+    timer=setTimeout(function(){ if(!touched) setOpen(false); }, delay);
+  }
+  function isOpen(){ return !panel.hidden; }
+  function setOpen(open){
+    panel.hidden=!open;
+    panel.setAttribute('aria-hidden',open?'false':'true');
+    launcher.setAttribute('aria-expanded',open?'true':'false');
+    launcher.setAttribute('aria-label',open?'Close WhatsApp support':'Open WhatsApp support');
+    if(open){ touched=false; input.value=DEFAULT; startTimer(); }
+    else { stopTimer(); }
+  }
+  setOpen(false);
+
+  launcher.addEventListener('click',function(e){ e.stopPropagation(); setOpen(!isOpen()); });
+  closeBtn.addEventListener('click',function(){ setOpen(false); launcher.focus(); });
+  document.addEventListener('keydown',function(e){ if(e.key==='Escape'&&isOpen()){ setOpen(false); launcher.focus(); } });
+  // Click / tap anywhere outside the widget closes it.
+  document.addEventListener('pointerdown',function(e){ if(isOpen()&&!root.contains(e.target)) setOpen(false); },true);
+
+  // Any real interaction keeps the card open; leaving it untouched closes it.
+  function engage(){ touched=true; stopTimer(); }
+  panel.addEventListener('mouseenter',stopTimer);
+  panel.addEventListener('mouseleave',function(){ if(!touched) startTimer(); });
+  panel.addEventListener('touchstart',engage,{passive:true});
+  input.addEventListener('focus',engage);
+  input.addEventListener('input',function(){ engage(); send.disabled=!input.value.trim(); });
+  input.addEventListener('focus',function(){ if(input.value===DEFAULT) input.select(); });
+
+  form.addEventListener('submit',function(e){
+    e.preventDefault();
+    var message=input.value.trim();
+    if(!message){ input.focus(); return; }
+    var text='Hello SmartPOS Support 👋\n\n'+message+'\n\nPage: '+pageContext()+'\nLink: '+window.location.href;
+    var url='https://wa.me/'+phone+'?text='+encodeURIComponent(text);
+    var w=window.open(url,'_blank','noopener,noreferrer');
+    if(!w) window.location.href=url;   // popup blocked (some mobile browsers)
+    setOpen(false);
+  });
+})();
+</script>
+{% endif %}

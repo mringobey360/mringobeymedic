@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Professional Payroll{% endblock %}
+{% block content %}
+<div class="pro">
+  <div class="pro-head">
+    <div class="pro-head-main">
+      <p class="pro-eyebrow">Team management</p>
+      <h1 class="pro-title">Staff Payroll</h1>
+      <p class="pro-sub">{{ month_label }} · {{ employee_count }} active employee{{ employee_count|pluralize }}</p>
+    </div>
+    <div class="pro-tools">
+      <a href="{% url 'dashboard:export_payroll_pdf' %}?year={{ selected_year }}&month={{ selected_month }}" class="btn btn-secondary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>Download PDF</a>
+    </div>
+  </div>
+
+  <div class="pro-period">
+    <a href="?year={{ prev_year }}&month={{ prev_month }}" class="btn btn-nav btn-secondary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>Previous</a>
+    <div class="pro-period-c"><b>{{ month_label }}</b><span>{{ period_start|date:"d M Y" }} — {{ period_end|date:"d M Y" }}{% if is_current_month %} · In progress{% endif %}</span></div>
+    {% if has_next %}<a href="?year={{ next_year }}&month={{ next_month }}" class="btn btn-nav btn-secondary">Next<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></a>{% else %}<span class="btn btn-secondary opacity-40">Next</span>{% endif %}
+  </div>
+
+  <div class="pro-kpis k4">
+    <div class="pro-kpi acc"><span class="pro-kpi-l">Basic salary</span><span class="pro-kpi-v"><small>TZS</small>{{ total_monthly_salary|floatformat:"0g" }}</span></div>
+    <div class="pro-kpi warn"><span class="pro-kpi-l">Earned meal cost</span><span class="pro-kpi-v warn"><small>TZS</small>{{ total_meal_cost|floatformat:"0g" }}</span></div>
+    <div class="pro-kpi ok"><span class="pro-kpi-l">Payroll gross · salary</span><span class="pro-kpi-v ok"><small>TZS</small>{{ payroll_gross|floatformat:"0g" }}</span></div>
+    <div class="pro-kpi info"><span class="pro-kpi-l">Payroll net</span><span class="pro-kpi-v acc"><small>TZS</small>{{ payroll_net|floatformat:"0g" }}</span></div>
+  </div>
+
+  <section class="pro-note" style="align-items:center;justify-content:space-between;flex-wrap:wrap">
+    <div style="flex:1 1 18rem"><b>Payroll control</b><br>Salary is a fixed reference amount. Earned meals are tracked separately as business operating cost and never form part of employee salary.</div>
+    {% if not payroll_run %}
+      <form method="post">{% csrf_token %}<input type="hidden" name="action" value="create_run"><button class="btn btn-primary">Create Payroll Run</button></form>
+    {% else %}
+      <span class="pro-b {% if payroll_run.status == 'DRAFT' %}warn{% elif payroll_run.status == 'APPROVED' %}info{% else %}ok{% endif %}">{{ payroll_run.get_status_display }}</span>
+    {% endif %}
+  </section>
+
+  {% if payroll_run %}
+  <form method="post" class="pro-panel">
+    {% csrf_token %}<input type="hidden" name="run_id" value="{{ payroll_run.id }}">
+    <div class="pro-panel-h">
+      <div><h2>Payroll Register</h2><p>Attendance is informational; salary is the configured monthly basic salary.</p></div>
+      <div style="text-align:right"><small style="margin:0">Total deductions</small><div style="font-weight:800;color:var(--p-bad)">TZS {{ payroll_deductions|floatformat:"0g" }}</div></div>
+    </div>
+    <div class="pro-tw">
+      <table class="pro-table stack" style="min-width:60rem">
+        <thead><tr><th>Employee</th><th>Attendance</th><th>Salary reference</th><th>Meals · separate</th><th>Other allowance</th><th>Tax</th><th>Other deduction</th><th class="r">Gross</th><th class="r">Net</th></tr></thead>
+        <tbody>
+        {% for item in payroll_items_page %}
+          <tr>
+            <td class="first"><div class="pro-who"><span class="pro-av" aria-hidden="true">{% firstof item.employee.get_full_name item.employee.username as nm %}{{ nm|slice:":1"|upper }}</span><span class="pro-cell-main">{{ nm }}</span></div></td>
+            <td data-label="Attendance" class="mut num">{{ item.attendance_days }}/{{ item.working_days }} days</td>
+            <td data-label="Salary" class="num">TZS {{ item.basic_salary|floatformat:"0g" }}</td>
+            <td data-label="Meals" class="num" style="color:var(--p-warn)">TZS {{ item.earned_meals|floatformat:"0g" }}</td>
+            <td data-label="Allowance" class="num">{% if payroll_run.status == 'DRAFT' %}<input name="allowance_{{ item.id }}" value="{{ item.other_allowances|floatformat:"0g" }}" type="number" min="0" step="0.01" class="form-input">{% else %}TZS {{ item.other_allowances|floatformat:"0g" }}{% endif %}</td>
+            <td data-label="Tax" class="num">{% if payroll_run.status == 'DRAFT' %}<input name="tax_{{ item.id }}" value="{{ item.tax_deduction|floatformat:"0g" }}" type="number" min="0" step="0.01" class="form-input">{% else %}TZS {{ item.tax_deduction|floatformat:"0g" }}{% endif %}</td>
+            <td data-label="Deduction" class="num">{% if payroll_run.status == 'DRAFT' %}<input name="deduction_{{ item.id }}" value="{{ item.other_deductions|floatformat:"0g" }}" type="number" min="0" step="0.01" class="form-input">{% else %}TZS {{ item.other_deductions|floatformat:"0g" }}{% endif %}</td>
+            <td data-label="Gross" class="num r"><b>TZS {{ item.gross_pay|floatformat:"0g" }}</b></td>
+            <td data-label="Net" class="num r"><b style="color:var(--p-accent)">TZS {{ item.net_pay|floatformat:"0g" }}</b></td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="9"><div class="pro-empty"><strong>No payroll lines</strong>No active employees have been added to this branch.</div></td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div id="payroll-items" style="padding:0 1.25rem">{% include "partials/pagination.html" with page_obj=payroll_items_page page_param="payroll_page" page_anchor="payroll-items" %}</div>
+    {% if payroll_run.status == 'DRAFT' and payroll_items %}
+    <div class="pro-panel-f">
+      <button name="action" value="save_items" class="btn btn-secondary">Save Adjustments</button>
+      <button name="action" value="approve" class="btn btn-primary" onclick="return confirm('Approve this payroll? It will be locked for payment.')">Approve Payroll</button>
+    </div>
+    {% elif payroll_run.status == 'APPROVED' %}
+    <div class="pro-panel-f"><button name="action" value="mark_paid" class="btn btn-primary" onclick="return confirm('Confirm that this payroll has been paid?')">Mark as Paid</button></div>
+    {% endif %}
+  </form>
+  {% endif %}
+
+  <section class="pro-panel">
+    <div class="pro-panel-h"><div><h2>Business &amp; Meal Cost Summary</h2><p>This is the business meal-cost ledger. Earned meals reduce the business amount available after meal cost; they never reduce the employee salary reference.</p></div></div>
+    <ul class="pro-stats">
+      <li><span class="l">Sales</span><span class="v"><small>TZS</small>{{ total_sales|floatformat:"0g" }}</span></li>
+      <li><span class="l">Gross profit</span><span class="v ok"><small>TZS</small>{{ total_gross_profit|floatformat:"0g" }}</span></li>
+      <li><span class="l">Earned meals</span><span class="v warn"><small>TZS</small>{{ total_meal_cost|floatformat:"0g" }}</span></li>
+      <li><span class="l">Meal debt</span><span class="v bad"><small>TZS</small>{{ total_meal_debt|floatformat:"0g" }}</span></li>
+      <li class="total"><span class="l">Net profit after meals</span><span class="v acc"><small>TZS</small>{{ total_net_profit|floatformat:"0g" }}</span></li>
+    </ul>
+  </section>
+</div>
+{% endblock %}

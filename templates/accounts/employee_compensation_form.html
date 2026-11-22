@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Salary & Meals — {% firstof employee.get_full_name employee.username %}{% endblock %}
+{% block content %}
+<div class="max-w-5xl mx-auto space-y-6">
+    <div>
+        <h1 class="text-2xl font-bold text-ink-900 tracking-tight">Salary & Meals — {% firstof employee.get_full_name employee.username %}</h1>
+        <p class="text-sm text-ink-500 mt-1">Set the employee's salary, meal rates and a reusable 7-day meal policy. The weekly policy is the single source of truth for normal meal entitlement; a specific date can always be overridden without changing it.</p>
+    </div>
+
+    <form method="post" class="card space-y-4">
+        {% csrf_token %}
+        <input type="hidden" name="save_compensation" value="1">
+        <div class="rounded-xl border border-blue-100 bg-blue-50/60 px-4 py-3 mb-2"><p class="text-sm font-semibold text-blue-900">Meal policy model</p><p class="text-xs text-blue-800 mt-1">Meal rates define the value of each meal. The 7-day policy below decides when each rate is earned. Meal costs are tracked as operating costs and are never subtracted from sales.</p></div>
+        <div class="grid md:grid-cols-2 gap-4">
+            {% for field in form %}
+            <div>
+                <label class="block text-sm font-medium mb-1">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}<p class="text-xs text-ink-400 mt-1">{{ field.help_text }}</p>{% endif %}
+                {% if field.errors %}<p class="text-xs text-red-600 mt-1">{{ field.errors.0 }}</p>{% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        <button type="submit" class="btn btn-primary">Save Salary & Meal Rates</button>
+    </form>
+
+    <form method="post" class="card">
+        {% csrf_token %}
+        <input type="hidden" name="save_schedule" value="1">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <div><h2 class="text-lg font-bold">Weekly Meal Policy</h2><p class="text-xs text-ink-500">This is the normal entitlement and the single source of truth. It repeats every week until you change it.</p></div>
+            <button type="submit" class="btn btn-primary">Save Weekly Policy</button>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {% for d in schedule_days %}
+            <div class="rounded-xl border border-ink-100 p-3">
+                <p class="font-semibold mb-2">{{ d.name }}</p>
+                <div class="space-y-2">
+                    <label class="flex items-center gap-2 text-sm">{{ d.breakfast }} <span>Breakfast / Tea</span></label>
+                    <label class="flex items-center gap-2 text-sm">{{ d.lunch }} <span>Lunch</span></label>
+                    <label class="flex items-center gap-2 text-sm">{{ d.dinner }} <span>Dinner</span></label>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </form>
+
+    <form method="post" class="card space-y-3">
+        {% csrf_token %}
+        <input type="hidden" name="save_attendance" value="1">
+        <div><h2 class="text-lg font-bold">Attendance Methods</h2><p class="text-xs text-ink-500">Choose which verification options this employee sees on their dashboard. Pick only what suits where they work; hidden methods cannot be used.</p></div>
+        {% for cb in attendance_form.methods %}<label class="flex items-center gap-2 text-sm">{{ cb.tag }} {{ cb.choice_label }}</label>{% endfor %}
+        {% for e in attendance_form.methods.errors %}<p class="text-xs text-red-600">{{ e }}</p>{% endfor %}
+        <button class="btn btn-primary">Save Attendance Methods</button>
+    </form>
+
+    <div class="card">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <div><h2 class="text-lg font-bold">Specific-Date Meal Override</h2><p class="text-xs text-ink-500">Use this only for a one-day exception such as a special shift, absence, holiday or overtime. It overrides the weekly policy for that date only.</p></div>
+            <div class="flex gap-2"><a href="{% url 'accounts:meal_history' %}?employee={{ employee.pk }}" class="btn btn-nav btn-secondary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>View Meal History</a><a href="{% url 'accounts:meal_adjustment_create' employee.pk %}" class="btn btn-primary">+ Adjust a Date</a></div>
+        </div>
+        <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead><tr class="text-left text-ink-500 border-b border-ink-100"><th class="py-2">Date</th><th class="py-2">Meals</th><th class="py-2">Reason</th><th class="py-2">Created by</th><th class="py-2"></th></tr></thead>
+            <tbody>
+            {% for a in adjustments %}
+            <tr class="border-b border-ink-100"><td class="py-2">{{ a.date|date:"d M Y (D)" }}</td><td class="py-2">{% if a.breakfast %}Breakfast{% endif %}{% if a.lunch %}{% if a.breakfast %}, {% endif %}Lunch{% endif %}{% if a.dinner %}{% if a.breakfast or a.lunch %}, {% endif %}Dinner{% endif %}{% if not a.breakfast and not a.lunch and not a.dinner %}No meals{% endif %}</td><td class="py-2">{{ a.reason|default:"—" }}</td><td class="py-2">{% firstof a.created_by.get_full_name a.created_by.username %}</td><td class="py-2 text-right"><a class="text-red-600" href="{% url 'accounts:meal_adjustment_delete' employee.pk a.pk %}">Remove</a></td></tr>
+            {% empty %}<tr><td colspan="5" class="py-8 text-center text-ink-400">No date overrides yet.</td></tr>{% endfor %}
+            </tbody>
+        </table></div>
+    </div>
+<div class="card"><p class="text-sm text-ink-600"><strong>Salary & meal protection:</strong> monthly salary is fixed and never reduced by meal records. Meal entitlement comes only from the weekly policy or a specific-date override. Earned meals are tracked as operating cost; unpaid eligible meals become Meal Debt after the workday is closed and the owner is notified.</p><p class="text-sm text-ink-500 mt-2"><a class="text-blue-600" href="{% url 'accounts:meal_timing_settings' %}">Configure branch meal cut-off times →</a></p></div>
+</div>
+{% endblock %}

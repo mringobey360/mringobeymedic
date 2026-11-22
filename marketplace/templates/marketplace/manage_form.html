@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}{{ heading }} · SmartPOS HQ{% endblock %}
+{% block extra_head %}{% include 'marketplace/_mk_styles.html' %}{% endblock %}
+{% block content %}
+<div class="mk-page mk-narrow">
+ <header class="mk-head">
+  <div>
+   <a class="mk-back" href="{% url 'marketplace:manage' %}">← Marketplace control centre</a>
+   <p class="mk-eyebrow">SmartPOS · Platform HQ</p>
+   <h1 class="mk-title">{{ heading }}</h1>
+   <p class="mk-sub">Manage the public listing here. Product images can be uploaded, replaced, or cleared without using Django Admin.</p>
+  </div>
+ </header>
+ <section class="mk-card mk-pad" style="padding:clamp(1rem,3vw,1.6rem)">
+  <form class="mk-form" method="post" enctype="multipart/form-data" novalidate>{% csrf_token %}
+   {% include 'marketplace/_mk_form_fields.html' %}
+   {% if form.instance.image %}
+   <div class="mk-photo"><img src="{{ form.instance.image.url }}" alt="Current {{ form.instance.name }} image"><div><strong class="mk-strong">Current product photo</strong><p>To remove this photo, tick the clear checkbox next to the image field. To replace it, choose a new image file.</p></div></div>
+   {% endif %}
+   <div class="mk-form-actions"><a class="btn btn-secondary" href="{% url 'marketplace:manage' %}">Cancel</a><button type="submit" class="btn btn-primary">Save changes</button></div>
+  </form>
+ </section>
+</div>
+{% endblock %}

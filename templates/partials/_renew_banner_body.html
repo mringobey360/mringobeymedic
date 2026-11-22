@@ -1,0 +1,10 @@
+{% comment %} Internal: rendered by partials/renew_banner.html. Expects: tone, and st OR legacy. {% endcomment %}
+{% if st %}
+  {% with days=st.days_left due=st.due_date scope=st.name deadline=st.deadline_iso progress=st.progress_pct cta=st.renew_url key=st.pharmacy_id %}
+    {% include 'partials/_renew_banner_card.html' %}
+  {% endwith %}
+{% else %}
+  {% with days=legacy.days_remaining due=legacy.end_date scope="" deadline=legacy.end_date|date:"Y-m-d" cta="" key="acct" %}
+    {% include 'partials/_renew_banner_card.html' with legacy_mode=True %}
+  {% endwith %}
+{% endif %}

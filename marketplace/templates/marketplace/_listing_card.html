@@ -1,0 +1,24 @@
+{% load humanize %}{% with cover=l.cover %}
+<a class="ls-card{% if l.status == 'CLOSED' %} is-closed{% endif %}" href="{% url 'marketplace:listing_detail' l.slug %}" aria-label="{{ l.title }} — TSh {{ l.price|floatformat:0|intcomma }} {{ l.price_suffix }}">
+  <div class="ph">
+    {% if cover %}<img src="{{ cover.image.url }}" alt="{{ l.title }}" loading="lazy" decoding="async">{% else %}<div class="ls-noimg"><svg><use href="#ls-i-camera"/></svg>No photo yet</div>{% endif %}
+    <div class="ls-tag">
+      <span class="ls-pill{% if l.purpose == 'SALE' %} sale{% endif %}">{{ l.get_purpose_display }}</span>
+      {% if l.is_featured %}<span class="ls-pill feat">Featured</span>{% elif l.is_new %}<span class="ls-pill new">New</span>{% endif %}
+      {% if l.status == 'RESERVED' %}<span class="ls-pill res">Reserved</span>{% elif l.status == 'CLOSED' %}<span class="ls-pill closed">{% if l.purpose == 'SALE' %}Sold{% else %}Rented{% endif %}</span>{% endif %}
+    </div>
+    {% with n=l.images.all|length %}{% if n > 1 %}<span class="ls-count"><svg><use href="#ls-i-camera"/></svg>{{ n }}</span>{% endif %}{% endwith %}
+  </div>
+  <div class="bd">
+    <div class="ls-price">TSh {{ l.price|floatformat:0|intcomma }} <small>{{ l.price_suffix }}{% if l.negotiable %}{% if l.price_suffix %} · {% endif %}Negotiable{% endif %}</small></div>
+    <div class="ls-title">{{ l.title }}</div>
+    <div class="ls-loc"><svg><use href="#ls-i-pin"/></svg><span>{{ l.location_line }}</span></div>
+    <div class="ls-spec">
+      <span class="ty">{{ l.get_property_type_display }}</span>
+      {% if l.bedrooms %}<span title="Bedrooms"><svg><use href="#ls-i-bed"/></svg>{{ l.bedrooms }}</span>{% endif %}
+      {% if l.bathrooms %}<span title="Bathrooms"><svg><use href="#ls-i-bath"/></svg>{{ l.bathrooms }}</span>{% endif %}
+      {% if l.size_value %}<span title="Size"><svg><use href="#ls-i-area"/></svg>{{ l.size_value|floatformat:"-2" }} {{ l.get_size_unit_display }}</span>{% endif %}
+    </div>
+    <div class="ls-by"><span class="nm">{{ l.store.public_name }}</span>{% if l.store.verified %}<span class="vf"><svg><use href="#ls-i-check"/></svg>Verified</span>{% endif %}</div>
+  </div>
+</a>{% endwith %}

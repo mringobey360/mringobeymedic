@@ -1,0 +1,239 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Returns &amp; Voids{% endblock %}
+{% block content %}
+
+{# ── Page header ───────────────────────────────────────────────── #}
+<div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-5">
+    <div class="min-w-0">
+        <h1 class="text-2xl font-bold text-ink-900 tracking-tight">Returns &amp; Voids</h1>
+        <p class="text-sm text-ink-500 mt-0.5 max-w-2xl">
+            {% if user.is_management_user %}
+                Sales are never deleted. Wrong items are returned here, stock goes back to the batch it came from, and every step is kept in the audit trail.
+            {% else %}
+                Requests you sent to the shop owner. Stock and totals change only after the owner approves.
+            {% endif %}
+        </p>
+    </div>
+    <div class="flex gap-2 self-start sm:self-auto shrink-0">
+    {% if user.is_management_user %}<a href="{% url 'sales:void_review' %}" class="btn btn-secondary btn-nav text-sm"><span>Review &amp; flags</span></a>{% endif %}
+    <a href="{% url 'sales:sale_list' %}" class="btn btn-secondary btn-nav text-sm self-start sm:self-auto shrink-0" aria-label="Back to Sales History">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+        <span>Sales history</span>
+    </a>
+    </div>
+</div>
+
+{# ── Summary tabs (also the status filter) ─────────────────────── #}
+{% with f=status_filter %}
+<div class="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4 mb-6">
+
+    <a href="?status=pending" class="block rounded-xl sm:rounded-2xl bg-white p-4 sm:p-5 transition duration-150 hover:shadow-md {% if f == 'pending' %}ring-2 ring-amber-500 shadow-sm{% else %}ring-1 ring-ink-900/5 hover:ring-ink-900/15{% endif %}">
+        <div class="flex items-center justify-between gap-2">
+            <span class="text-xs font-medium text-ink-500">Pending</span>
+            <span class="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+            </span>
+        </div>
+        <p class="text-2xl font-bold text-ink-900 mt-2 tabular-nums">{{ stats.pending|default:0 }}</p>
+        <p class="text-xs text-ink-400 mt-0.5 truncate">{% if user.is_management_user %}Waiting for your decision{% else %}Waiting for the owner{% endif %}</p>
+    </a>
+
+    <a href="?status=approved" class="block rounded-xl sm:rounded-2xl bg-white p-4 sm:p-5 transition duration-150 hover:shadow-md {% if f == 'approved' %}ring-2 ring-emerald-500 shadow-sm{% else %}ring-1 ring-ink-900/5 hover:ring-ink-900/15{% endif %}">
+        <div class="flex items-center justify-between gap-2">
+            <span class="text-xs font-medium text-ink-500">Approved</span>
+            <span class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l3 3 5-6"/></svg>
+            </span>
+        </div>
+        <p class="text-2xl font-bold text-ink-900 mt-2 tabular-nums">{{ stats.approved|default:0 }}</p>
+        <p class="text-xs text-ink-400 mt-0.5 truncate">TZS {{ stats.approved_value|default:0|floatformat:0|intcomma }}</p>
+    </a>
+
+    <a href="?status=rejected" class="block rounded-xl sm:rounded-2xl bg-white p-4 sm:p-5 transition duration-150 hover:shadow-md {% if f == 'rejected' %}ring-2 ring-red-400 shadow-sm{% else %}ring-1 ring-ink-900/5 hover:ring-ink-900/15{% endif %}">
+        <div class="flex items-center justify-between gap-2">
+            <span class="text-xs font-medium text-ink-500">Rejected</span>
+            <span class="w-8 h-8 rounded-lg bg-red-50 text-red-500 flex items-center justify-center shrink-0">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/></svg>
+            </span>
+        </div>
+        <p class="text-2xl font-bold text-ink-900 mt-2 tabular-nums">{{ stats.rejected|default:0 }}</p>
+        <p class="text-xs text-ink-400 mt-0.5 truncate">Declined requests</p>
+    </a>
+
+    <a href="?status=all" class="block rounded-xl sm:rounded-2xl bg-white p-4 sm:p-5 transition duration-150 hover:shadow-md {% if f == 'all' %}ring-2 ring-brand-600 shadow-sm{% else %}ring-1 ring-ink-900/5 hover:ring-ink-900/15{% endif %}">
+        <div class="flex items-center justify-between gap-2">
+            <span class="text-xs font-medium text-ink-500">All requests</span>
+            <span class="w-8 h-8 rounded-lg bg-brand-50 text-brand-700 flex items-center justify-center shrink-0">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg>
+            </span>
+        </div>
+        <p class="text-2xl font-bold text-ink-900 mt-2 tabular-nums">{{ stats.total|default:0 }}</p>
+        <p class="text-xs text-ink-400 mt-0.5 truncate">Newest first</p>
+    </a>
+</div>
+{% endwith %}
+
+{# ── Live sale-number search ────────────────────────────────────── #}
+<form method="get" id="return-sale-search" class="card !p-3 sm:!p-4 mb-5" role="search">
+    <input type="hidden" name="status" value="{{ status_filter }}">
+    <label for="sale-number-search" class="block text-sm font-semibold text-ink-800 mb-1.5">Find by sale number</label>
+    <div class="flex flex-col sm:flex-row gap-2">
+        <div class="relative flex-1">
+            <svg class="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+            <input id="sale-number-search" name="sale_number" type="search" inputmode="numeric" autocomplete="off" value="{{ sale_number_query }}" placeholder="Type a sale number, e.g. 134…" class="form-input w-full pl-10" aria-describedby="sale-search-help">
+        </div>
+        <button type="submit" class="btn btn-secondary text-sm">Search</button>
+        {% if sale_number_query %}<a href="?status={{ status_filter }}" class="btn btn-secondary text-sm text-center">Clear</a>{% endif %}
+    </div>
+    <p id="sale-search-help" class="text-xs text-ink-500 mt-2">Results update automatically as you type; no need to click Search.</p>
+</form>
+<script>
+(function () {
+    const form = document.getElementById('return-sale-search');
+    const input = document.getElementById('sale-number-search');
+    if (!form || !input) return;
+    let timer;
+    input.addEventListener('input', function () {
+        window.clearTimeout(timer);
+        timer = window.setTimeout(function () {
+            const params = new URLSearchParams(new FormData(form));
+            params.delete('page');
+            window.location.assign(form.action + '?' + params.toString());
+        }, 350);
+    });
+})();
+</script>
+
+{# ── Requests ──────────────────────────────────────────────────── #}
+<div class="space-y-3 sm:space-y-4 return-request-list">
+    {% for rr in page_obj %}
+    <article class="card !p-0 relative overflow-hidden border border-ink-200/80 shadow-sm hover:shadow-md transition-all duration-200 rounded-xl">
+        <span class="absolute inset-y-0 left-0 w-1 {% if rr.status == 'PENDING' %}bg-amber-400{% elif rr.status == 'APPROVED' %}bg-emerald-500{% else %}bg-ink-300{% endif %}" aria-hidden="true"></span>
+
+        <div class="p-3 sm:p-4 pl-5 sm:pl-6">
+
+            {# Header: sale, type, status #}
+            <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                    <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <h2 class="text-base font-semibold text-ink-900">Sale #{{ rr.sale.sale_number|default:rr.sale_id }}</h2>
+                        {% if rr.is_full_void %}
+                        <span class="badge bg-red-50 text-red-700">Full void</span>
+                        {% else %}
+                        <span class="badge bg-ink-100 text-ink-700">Partial return</span>
+                        {% endif %}
+                    </div>
+                    <p class="text-xs text-ink-500 mt-1">Sold {% if rr.sale.is_late_entry %}{{ rr.sale.business_date|date:"d M Y" }} (late entry){% else %}{{ rr.sale.created_at|date:"d M Y, H:i" }}{% endif %} · {{ rr.sale.payment_summary }}</p>
+                </div>
+                <div class="shrink-0">
+                    {% if rr.status == 'PENDING' %}
+                    <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-50 text-amber-700 px-2.5 py-1 text-xs font-semibold"><span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>Pending</span>
+                    {% elif rr.status == 'APPROVED' %}
+                    <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 text-emerald-700 px-2.5 py-1 text-xs font-semibold"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Approved</span>
+                    {% else %}
+                    <span class="inline-flex items-center gap-1.5 rounded-full bg-ink-100 text-ink-600 px-2.5 py-1 text-xs font-semibold"><span class="w-1.5 h-1.5 rounded-full bg-ink-400"></span>Rejected</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            {# Who asked and when #}
+            <div class="flex items-center gap-2 mt-2.5">
+                <span class="w-8 h-8 rounded-full bg-brand-50 text-brand-700 text-xs font-bold flex items-center justify-center shrink-0">{{ rr.requested_by.get_full_name|default:rr.requested_by.username|default:"?"|slice:":1"|upper }}</span>
+                <p class="text-sm text-ink-600 min-w-0">
+                    <span class="font-medium text-ink-800">{% firstof rr.requested_by.get_full_name rr.requested_by.username "(removed user)" %}</span>
+                    <span class="text-ink-500">requested this on {{ rr.requested_at|date:"d M Y, H:i" }}</span>
+                    {% if rr.status == 'PENDING' %}<span class="text-amber-700 font-medium whitespace-nowrap">· waiting {{ rr.requested_at|timesince }}</span>{% endif %}
+                </p>
+            </div>
+
+            {# Items #}
+            <div class="mt-3 rounded-lg border border-ink-200/70 bg-ink-50/50 text-sm overflow-hidden">
+                <p class="px-4 pt-3 pb-2 text-[11px] font-semibold uppercase tracking-wide text-ink-400">Items being returned</p>
+                <ul class="divide-y divide-ink-100">
+                    {% for line in rr.lines.all %}
+                    <li class="flex items-start sm:items-center justify-between gap-3 px-3.5 py-2.5">
+                        <span class="min-w-0 text-ink-800 font-medium break-words">{{ line.sale_item.product.name }} <span class="text-ink-500 font-normal">× {{ line.quantity }}</span></span>
+                        <span class="text-ink-600 tabular-nums whitespace-nowrap">TZS {{ line.value|floatformat:0|intcomma }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                <div class="flex items-center justify-between gap-3 px-3.5 py-2.5 bg-white border-t border-ink-100 font-semibold text-ink-900">
+                    <span>Return value</span>
+                    <span class="tabular-nums whitespace-nowrap">TZS {{ rr.total_value|floatformat:0|intcomma }}</span>
+                </div>
+            </div>
+
+            {# Reason #}
+            <div class="mt-3 border-l-2 border-ink-200 pl-3">
+                <p class="text-[11px] font-semibold uppercase tracking-wide text-ink-400">Reason</p>
+                <p class="text-sm text-ink-700 mt-0.5 break-words">{{ rr.reason }}</p>
+            </div>
+        </div>
+
+        {# ── Outcome / actions ── #}
+        {% if rr.status == 'APPROVED' %}
+        <div class="border-t border-emerald-100 bg-emerald-50/60 px-3 sm:px-4 pl-5 sm:pl-6 py-2.5 text-sm">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <p class="text-emerald-800">
+                    <span class="font-semibold">Approved</span> by {% firstof rr.decided_by.get_full_name rr.decided_by.username "(removed user)" %}
+                    <span class="text-emerald-700/80">· {{ rr.decided_at|date:"d M Y, H:i" }} · {{ rr.get_disposition_display }}</span>
+                </p>
+                {% if rr.refund_due > 0 %}
+                <span class="inline-flex items-center self-start rounded-lg bg-amber-100 text-amber-800 px-2.5 py-1 text-xs font-semibold whitespace-nowrap">Refund to customer: TZS {{ rr.refund_due|floatformat:0|intcomma }}</span>
+                {% endif %}
+            </div>
+        </div>
+
+        {% elif rr.status == 'REJECTED' %}
+        <div class="border-t border-ink-100 bg-ink-50 px-3 sm:px-4 pl-5 sm:pl-6 py-2.5 text-sm text-ink-600">
+            <p><span class="font-semibold text-ink-800">Rejected</span> by {% firstof rr.decided_by.get_full_name rr.decided_by.username "(removed user)" %} <span class="text-ink-500">· {{ rr.decided_at|date:"d M Y, H:i" }}</span></p>
+            {% if rr.decision_note %}<p class="mt-1 text-ink-700 break-words">“{{ rr.decision_note }}”</p>{% endif %}
+        </div>
+
+        {% elif user.is_management_user %}
+        <div class="border-t border-ink-100 bg-ink-50/70 p-3 sm:p-4 pl-5 sm:pl-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <form method="post" action="{% url 'sales:return_decide' rr.pk %}" class="rounded-lg bg-white ring-1 ring-emerald-200 p-3 space-y-2"
+                      data-confirm="Approve this return?" data-confirm-detail="Stock and totals will be corrected right away. This cannot be undone.">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="approve">
+                    <label for="disposition-{{ rr.pk }}" class="block text-xs font-semibold text-ink-700">What happens to the items?</label>
+                    <select id="disposition-{{ rr.pk }}" name="disposition" class="form-input w-full text-sm">
+                        {% for value, label in disposition_choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+                    </select>
+                    <button type="submit" class="btn btn-success w-full text-sm">Approve return</button>
+                </form>
+                <form method="post" action="{% url 'sales:return_decide' rr.pk %}" class="rounded-lg bg-white ring-1 ring-ink-200 p-3 space-y-2">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="reject">
+                    <label for="note-{{ rr.pk }}" class="block text-xs font-semibold text-ink-700">Reason for rejecting</label>
+                    <input id="note-{{ rr.pk }}" type="text" name="note" required minlength="3" maxlength="500" placeholder="Tell the requester why" class="form-input w-full text-sm">
+                    <button type="submit" class="btn btn-secondary w-full text-sm text-red-600 hover:text-red-700">Reject request</button>
+                </form>
+            </div>
+        </div>
+
+        {% else %}
+        <div class="border-t border-amber-100 bg-amber-50/60 px-3 sm:px-4 pl-5 sm:pl-6 py-2.5 text-sm text-amber-800">
+            Waiting for the shop owner to review. Stock and totals change only after approval.
+        </div>
+        {% endif %}
+    </article>
+
+    {% empty %}
+    <div class="card text-center py-14">
+        <div class="mx-auto w-12 h-12 rounded-full bg-ink-100 text-ink-400 flex items-center justify-center mb-3">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3 8-8"/><path d="M20 12v6a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h9"/></svg>
+        </div>
+        <p class="font-semibold text-ink-800">{% if status_filter == 'pending' %}You're all caught up{% else %}No return requests here{% endif %}</p>
+        <p class="text-sm text-ink-500 mt-1">
+            {% if status_filter == 'pending' %}There are no requests waiting for approval.{% else %}Requests will appear here once they are created from Sales history.{% endif %}
+        </p>
+        {% if status_filter != 'all' %}<a href="?status=all" class="btn btn-nav btn-secondary text-sm mt-4"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>View all requests</a>{% endif %}
+    </div>
+    {% endfor %}
+</div>
+
+{% include "partials/pagination.html" with page_obj=page_obj %}
+{% endblock %}

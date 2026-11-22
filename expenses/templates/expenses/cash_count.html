@@ -1,0 +1,72 @@
+{% extends 'base.html' %}
+{% load humanize %}
+{% block title %}{% if correction_mode %}Correct Spot Check{% else %}Record Spot Check{% endif %}{% endblock %}
+{% block content %}
+<div class="max-w-xl mx-auto py-2 md:py-6">
+  <div class="text-center mb-6">
+    <p class="text-xs font-bold uppercase tracking-[0.14em] text-brand-700">Cash control · {{ day.date }}</p>
+    <h1 class="text-2xl md:text-3xl font-extrabold text-ink-900 mt-1">{% if correction_mode %}Correct Spot Check{% else %}Record Spot Check{% endif %}</h1>
+    <p class="text-sm text-ink-500 mt-2">{% if correction_mode %}The original count will remain unchanged in the audit trail. A new corrected count will become the current record.{% else %}This records the drawer balance at this exact time. It does <strong>not</strong> close the business day.{% endif %}</p>
+  </div>
+
+  {% if correction_mode %}
+  <div class="card p-4 mb-4 border border-amber-200 bg-amber-50 text-sm text-amber-950">
+    <p class="font-extrabold">Original spot check — preserved</p>
+    <div class="grid grid-cols-2 gap-3 mt-3 text-xs">
+      <div><span class="text-amber-700">Recorded</span><p class="font-bold mt-1">{{ latest_count.counted_at|date:"d M Y, H:i" }}</p></div>
+      <div><span class="text-amber-700">Physical</span><p class="font-bold mt-1">TZS {{ latest_count.physical_cash|floatformat:0|intcomma }}</p></div>
+      <div><span class="text-amber-700">Expected</span><p class="font-bold mt-1">TZS {{ latest_count.expected_cash|floatformat:0|intcomma }}</p></div>
+      <div><span class="text-amber-700">Difference</span><p class="font-bold mt-1">TZS {{ latest_count.variance_clean|floatformat:0|intcomma }}</p></div>
+    </div>
+    <p class="text-xs text-amber-800 mt-3">This record will never be overwritten or deleted. The correction creates a new audit record linked to this one.</p>
+  </div>
+  {% else %}
+  <div class="card p-5 md:p-6 mb-4 border border-brand-100 bg-brand-50/60">
+    <p class="text-xs font-bold uppercase tracking-wider text-brand-700">Expected at this moment</p>
+    <p class="text-2xl md:text-3xl font-extrabold text-brand-800 mt-1">TZS {{ day.expected_closing_cash|floatformat:0|intcomma }}</p>
+    <p class="text-xs text-brand-800 mt-2">The server recalculates this exact figure when you submit the count. It is what should physically be in the drawer after sales, refunds, meals and other cash expenses.</p>
+    {% include 'expenses/_expected_breakdown.html' %}
+  </div>
+  {% endif %}
+
+  {% if form.non_field_errors %}<div class="rounded-xl bg-red-50 border border-red-200 p-3 mb-4 text-sm text-red-700">{{ form.non_field_errors }}</div>{% endif %}
+  <form method="post" novalidate class="card p-5 md:p-6 space-y-5" {% if correction_mode %}data-confirm="Save this corrected spot check?" data-confirm-detail="The original count will remain permanently in the audit trail. A new corrected count will be recorded with your reason and current timestamp." data-confirm-accept="Save correction"{% endif %}>
+    {% csrf_token %}
+    <div>
+      <label for="id_physical_cash" class="block text-sm font-bold text-ink-900 mb-2">{% if correction_mode %}Correct physical cash counted{% else %}Physical cash counted{% endif %}</label>
+      <div class="relative"><span class="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-ink-400 pointer-events-none">TZS</span>{{ form.physical_cash }}</div>
+      {% if form.physical_cash.errors %}<p class="text-xs text-red-600 mt-2">{{ form.physical_cash.errors|striptags }}</p>{% endif %}
+    </div>
+
+    {% if correction_mode %}
+    <div>
+      <label for="id_correction_reason" class="block text-sm font-bold text-ink-900 mb-2">Reason for correction <span class="text-red-600">*</span></label>
+      {{ form.correction_reason }}
+      {% if form.correction_reason.errors %}<p class="text-xs text-red-600 mt-2">{{ form.correction_reason.errors|striptags }}</p>{% endif %}
+      <p class="text-xs text-ink-500 mt-1">At least 12 characters. Example: “First count was entered incorrectly; drawer recounted.”</p>
+    </div>
+    {% endif %}
+
+    <div>
+      <label for="id_note" class="block text-sm font-bold text-ink-900 mb-2">{% if correction_mode %}Recount note{% else %}Note{% endif %}</label>
+      {{ form.note }}
+      {% if form.note.errors %}<p class="text-xs text-red-600 mt-2">{{ form.note.errors|striptags }}</p>{% endif %}
+    </div>
+
+    <label class="flex items-start gap-3 rounded-xl border border-ink-200 p-4 cursor-pointer hover:bg-ink-50">
+      {{ form.physical_count_confirmed }}
+      <span><span class="block text-sm font-bold text-ink-900">I physically {% if correction_mode %}recounted and verified{% else %}counted and verified{% endif %} this amount.</span><span class="block text-xs text-ink-500 mt-1">The server stores the expected amount, physical amount, timestamp and variance as an immutable audit record.</span></span>
+    </label>
+    {% if form.physical_count_confirmed.errors %}<p class="text-xs text-red-600">{{ form.physical_count_confirmed.errors|striptags }}</p>{% endif %}
+
+    <div class="flex flex-col sm:flex-row gap-3">
+      <button class="btn btn-primary flex-1 py-3" type="submit">{% if correction_mode %}Save Corrected Count{% else %}Save Spot Check{% endif %}</button>
+      {% if correction_mode %}
+      <a href="{% url 'expenses:cash_count' day.pk %}" class="btn btn-secondary flex-1 py-3 text-center">Cancel correction</a>
+      {% else %}
+      <a href="{% url 'expenses:cash' %}" class="btn btn-secondary flex-1 py-3 text-center">Cancel</a>
+      {% endif %}
+    </div>
+  </form>
+</div>
+{% endblock %}

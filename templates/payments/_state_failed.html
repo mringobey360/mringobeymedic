@@ -1,0 +1,18 @@
+<div class="w-16 h-16 mx-auto rounded-full bg-red-50 text-red-600 flex items-center justify-center">
+  <svg class="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+</div>
+<h1 class="mt-5 text-lg font-bold text-ink-900">
+  {% if txn.status == 'CANCELLED' %}Payment cancelled{% elif txn.status == 'REVERSED' %}Payment reversed{% elif txn.status == 'INVALID' %}Payment could not be verified{% else %}Payment failed{% endif %}
+</h1>
+<p class="mt-2 text-sm text-ink-500 leading-6">
+  {{ txn.status_description|default:"This payment did not go through. No money has been deducted for this attempt." }}
+</p>
+{% if txn.redirect_url %}
+<form method="post" action="{% url 'payments:retry' txn.merchant_reference %}" class="mt-5">
+  {% csrf_token %}
+  <button type="submit" class="w-full rounded-2xl bg-brand-700 hover:bg-brand-800 text-white text-sm font-bold py-3 transition">Try again</button>
+</form>
+{% endif %}
+{% if manual_url %}
+<a href="{{ manual_url }}" class="mt-3 block rounded-2xl border border-ink-200 bg-white hover:bg-ink-50 text-sm font-semibold text-ink-700 py-3 transition">Use manual mobile-money payment instead</a>
+{% endif %}

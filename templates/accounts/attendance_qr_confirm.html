@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% block title %}Confirm Attendance{% endblock %}
+{% block content %}
+<div class="max-w-md mx-auto">
+  <div class="card p-0 overflow-hidden">
+    {# Header band #}
+    <div class="bg-brand-700 text-white px-6 py-5">
+      <p class="text-[11px] uppercase tracking-[.14em] font-bold text-white/70">Branch verification</p>
+      <h1 class="text-xl font-bold mt-1">
+        {% if mode == 'START' %}Check in &amp; start workday
+        {% elif mode == 'BREAKFAST' or mode == 'LUNCH' or mode == 'DINNER' %}Claim {{ mode_label }}
+        {% elif mode == 'CHECKOUT' %}Confirm check-out
+        {% elif mode == 'WAIT' %}No checkpoint due
+        {% else %}Attendance complete{% endif %}
+      </h1>
+      <p class="mt-2 inline-flex items-center gap-2 text-xs bg-white/15 rounded-full px-3 py-1">
+        <span class="w-2 h-2 rounded-full bg-emerald-300"></span>Live branch QR verified · {{ branch.name }}
+      </p>
+    </div>
+
+    <div class="p-6">
+      {% if mode != 'WAIT' and mode != 'ALREADY' %}
+      <dl class="divide-y divide-ink-100 text-sm">
+        <div class="flex justify-between py-2.5"><dt class="text-ink-500">Employee</dt><dd class="font-semibold text-right">{{ employee_name }}</dd></div>
+        <div class="flex justify-between py-2.5"><dt class="text-ink-500">Branch</dt><dd class="font-semibold text-right">{{ branch.name }}</dd></div>
+        <div class="flex justify-between py-2.5"><dt class="text-ink-500">Date</dt><dd class="font-semibold text-right">{{ now|date:'D, d M Y' }}</dd></div>
+        <div class="flex justify-between py-2.5"><dt class="text-ink-500">Time</dt><dd class="font-semibold text-right" id="live-clock">{{ now|date:'H:i:s' }}</dd></div>
+        <div class="flex justify-between py-2.5"><dt class="text-ink-500">Action</dt><dd class="font-semibold text-right">{{ mode_label }}</dd></div>
+        {% if meal %}
+        <div class="flex justify-between py-2.5"><dt class="text-ink-500">Meal window</dt><dd class="font-semibold text-right">{{ meal.start|date:'H:i' }} – {{ meal.end|date:'H:i' }}</dd></div>
+        <div class="flex justify-between py-2.5"><dt class="text-ink-500">Meal allowance</dt><dd class="font-semibold text-right">TZS {{ meal.amount|floatformat:0 }}</dd></div>
+        {% endif %}
+        {% if mode == 'CHECKOUT' and attendance.check_in_at %}
+        <div class="flex justify-between py-2.5"><dt class="text-ink-500">Checked in at</dt><dd class="font-semibold text-right">{{ attendance.check_in_at|date:'H:i' }}</dd></div>
+        {% endif %}
+      </dl>
+
+      <div class="mt-4 rounded-xl bg-ink-50 border border-ink-100 p-3 text-xs text-ink-600 leading-5">
+        {% if mode == 'START' %}This verifies your arrival and opens today's workday.
+        {% elif meal %}Your scan is the proof that records this meal. If your manager reopened a missed meal, you must still complete this scan yourself. Meal funding is reconciled against the branch business date, including sales entered later in the day.
+        {% elif mode == 'CHECKOUT' %}This closes today's verified workday and finalises eligible meal accounting against the branch sales.{% endif %}
+      </div>
+
+      {% if seconds_left is not None %}
+      <div class="mt-4" id="timer-wrap">
+        <div class="flex justify-between text-xs text-ink-500 mb-1"><span>Secure code valid for</span><span class="font-semibold text-ink-700"><span id="secs">{{ seconds_left }}</span>s</span></div>
+        <div class="h-1.5 rounded-full bg-ink-100 overflow-hidden"><div id="bar" class="h-full bg-brand-600 transition-all duration-1000" style="width:100%"></div></div>
+      </div>
+      {% endif %}
+      <div id="expired" class="hidden mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">This code has expired. Scan the live QR at the branch again.</div>
+
+      {% if needs_gps %}
+      <div id="loc-card" class="mt-4 rounded-xl border border-ink-100 bg-ink-50 p-3 text-sm" aria-live="polite" data-state="searching">
+        <div class="flex items-center justify-between gap-2">
+          <strong id="loc-title" class="text-ink-800">Checking your location&hellip;</strong>
+          <span id="loc-badge" class="badge bg-ink-100 text-ink-600">Searching</span>
+        </div>
+        <p id="loc-text" class="text-xs text-ink-500 mt-1 leading-5">Allow Location when your browser asks. Your attendance and meals are only recorded while you are at the workplace.</p>
+        <button type="button" id="loc-retry" class="hidden mt-2 btn btn-secondary text-xs px-3 py-1.5">Check again</button>
+      </div>
+      {% endif %}
+      <form method="post" action="{% url 'accounts:attendance_qr_verify' %}" class="mt-5" id="confirm-form" data-needs-gps="{% if needs_gps %}1{% else %}0{% endif %}" data-check-url="{% url 'accounts:attendance_qr_location_check' %}">
+        {% csrf_token %}<input type="hidden" name="t" value="{{ token }}">
+        {% if needs_gps %}<input type="hidden" name="latitude" id="f-lat"><input type="hidden" name="longitude" id="f-lon"><input type="hidden" name="accuracy" id="f-acc">{% endif %}
+        <button class="btn btn-primary w-full" id="confirm-btn"{% if needs_gps %} disabled{% endif %}>Confirm &amp; record {{ mode_label }}</button>
+      </form>
+      <a href="{% url 'dashboard:home' %}" class="btn btn-secondary w-full text-center mt-2" id="cancel-link">Cancel</a>
+
+      {% elif mode == 'WAIT' %}
+      <div class="w-12 h-12 rounded-2xl bg-slate-100 text-slate-700 grid place-items-center text-xl">⏱</div>
+      <p class="text-sm text-ink-600 mt-4 leading-6">{{ wait_message|default:"Your next meal or end-of-shift checkpoint is not open yet." }}</p>
+      <a href="{% url 'dashboard:home' %}" class="btn btn-nav btn-primary w-full text-center mt-5"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>Back to Dashboard</a>
+
+      {% else %}
+      <div class="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-700 grid place-items-center text-xl font-bold">✓</div>
+      <p class="text-sm text-ink-600 mt-4 leading-6">Today's workday has already been closed. No further scan is needed.</p>
+      <a href="{% url 'accounts:meal_history' %}" class="btn btn-nav btn-primary w-full text-center mt-5"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>View Meal History</a>
+      <a href="{% url 'dashboard:home' %}" class="btn btn-nav btn-secondary btn-nav w-full text-center mt-2">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg><span>Back to Dashboard</span>
+    </a>
+      {% endif %}
+    </div>
+  </div>
+  <p class="text-[11px] text-ink-400 text-center mt-4">The QR token is short-lived and tied to your assigned branch.</p>
+</div>
+<script>
+(function(){
+  var form=document.getElementById('confirm-form'); if(!form) return;
+  var btn=document.getElementById('confirm-btn'), secsEl=document.getElementById('secs'), bar=document.getElementById('bar'),
+      expired=document.getElementById('expired'), clock=document.getElementById('live-clock');
+  var total=parseInt(secsEl?secsEl.textContent:'0',10)||0, left=total, submitted=false;
+  var t0=Date.now(), clock0=clock?clock.textContent:'';
+  var needsGps=form.getAttribute('data-needs-gps')==='1', gpsReady=!needsGps;
+  form.addEventListener('submit',function(e){
+    if(!gpsReady){e.preventDefault();return;}
+    if(submitted){e.preventDefault();return;}
+    submitted=true; btn.disabled=true; btn.textContent='Recording…';
+  });
+  function tick(){
+    if(clock && clock0){var p=clock0.split(':').map(Number);var d=new Date();d.setHours(p[0],p[1],p[2]+Math.round((Date.now()-t0)/1000));
+      clock.textContent=[d.getHours(),d.getMinutes(),d.getSeconds()].map(function(n){return String(n).padStart(2,'0');}).join(':');}
+    if(secsEl && total){
+      left=Math.max(0,total-Math.round((Date.now()-t0)/1000));
+      secsEl.textContent=left; if(bar) bar.style.width=(left/total*100)+'%';
+      if(left<=0 && !submitted){ gpsReady=false; btn.disabled=true; btn.textContent='Code expired'; expired.classList.remove('hidden'); return; }
+    }
+    setTimeout(tick,1000);
+  }
+  tick();
+
+  // ---- Workplace location gate (only when the branch requires GPS at scan time) ----
+  if(!needsGps) return;
+  var card=document.getElementById('loc-card'), title=document.getElementById('loc-title'), badge=document.getElementById('loc-badge'),
+      text=document.getElementById('loc-text'), retry=document.getElementById('loc-retry'),
+      fLat=document.getElementById('f-lat'), fLon=document.getElementById('f-lon'), fAcc=document.getElementById('f-acc');
+  var csrf=(form.querySelector('input[name=csrfmiddlewaretoken]')||{}).value||'';
+  var watchId=null, best=null, started=0, timer=null, finished=false;
+  function show(kind,t,msg,b){
+    var tone={searching:'bg-ink-100 text-ink-600',ok:'bg-emerald-100 text-emerald-700',bad:'bg-red-100 text-red-700',warn:'bg-amber-100 text-amber-700'}[kind];
+    card.className='mt-4 rounded-xl border p-3 text-sm '+({ok:'border-emerald-200 bg-emerald-50',bad:'border-red-200 bg-red-50',warn:'border-amber-200 bg-amber-50',searching:'border-ink-100 bg-ink-50'}[kind]);
+    title.textContent=t; text.textContent=msg; badge.textContent=b; badge.className='badge '+tone;
+    retry.classList.toggle('hidden', kind==='searching'||kind==='ok');
+  }
+  function stop(){ if(watchId!==null){try{navigator.geolocation.clearWatch(watchId);}catch(e){} watchId=null;} if(timer){clearInterval(timer);timer=null;} }
+  function evaluate(){
+    if(finished) return; finished=true; stop();
+    if(!best){ show('warn','Location not received','No position came from your device. Turn on Location (GPS) and Precise Location, allow it for this site, stay in the open and try again.','No fix'); return; }
+    var body=new URLSearchParams({latitude:best.lat,longitude:best.lon,accuracy:best.acc});
+    fetch(form.getAttribute('data-check-url'),{method:'POST',credentials:'same-origin',headers:{'X-CSRFToken':csrf,'X-Requested-With':'XMLHttpRequest'},body:body})
+      .then(function(r){return r.json();})
+      .then(function(d){
+        if(d.state==='inside'){
+          fLat.value=best.lat; fLon.value=best.lon; fAcc.value=best.acc; gpsReady=true; if(left>0||!total){btn.disabled=false;}
+          show('ok','You are at the workplace','Location confirmed ('+d.distance+' m from the branch, accuracy \u00b1'+d.accuracy+' m). You can confirm now.','At work');
+        } else if(d.state==='outside'){
+          show('bad','You are not at the workplace','You are about '+d.distance+' m away (allowed '+d.allowed+' m). Scanning only works at the workplace. Go to the branch and check again; a scan from here will be refused and recorded.','Outside');
+        } else if(d.state==='weak'){
+          show('warn','GPS signal too weak','Accuracy is about '+d.accuracy+' m. Move near an open door or window, keep Precise Location on and check again.','Weak GPS');
+        } else { show('warn','Location problem',d.message||'Could not verify your location. Try again.','Retry'); }
+      })
+      .catch(function(){ show('warn','Connection problem','Could not reach the server to check your location. Check your internet and try again.','Retry'); });
+  }
+  function start(){
+    finished=false; best=null; gpsReady=false; btn.disabled=true; started=Date.now();
+    show('searching','Checking your location\u2026','Keep this page open. Your phone is locking onto GPS (up to 25 seconds).','Searching');
+    if(!navigator.geolocation){ show('warn','Location not supported','This browser cannot read your location. Open the page in Chrome or Safari.','Unsupported'); return; }
+    try{
+      watchId=navigator.geolocation.watchPosition(function(p){
+        var a=Number(p.coords.accuracy); if(!isFinite(a)||a<=0) return;
+        if(!best||a<best.acc) best={lat:p.coords.latitude,lon:p.coords.longitude,acc:a};
+        text.textContent='Best accuracy so far: \u00b1'+Math.round(best.acc)+' m. Keep still\u2026';
+        if(best.acc<=30||(best.acc<=100&&Date.now()-started>8000)) evaluate();
+      },function(err){
+        if(err&&err.code===1){ finished=true; stop(); show('bad','Location permission blocked','Allow Location for this site (icon beside the address bar), enable Precise Location, then check again.','Blocked'); }
+      },{enableHighAccuracy:true,maximumAge:0,timeout:30000});
+    }catch(e){}
+    timer=setInterval(function(){ if(Date.now()-started>=25000) evaluate(); },1000);
+  }
+  retry.addEventListener('click',start);
+  window.addEventListener('pagehide',stop);
+  start();
+})();
+</script>
+{% endblock %}

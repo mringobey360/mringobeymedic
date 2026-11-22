@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}Choose Workspace{% endblock %}
+{% block content %}
+<div class="max-w-5xl mx-auto space-y-6">
+  <div>
+    <p class="text-[11px] uppercase tracking-wider text-ink-400 font-semibold">Platform owner</p>
+    <h1 class="text-2xl font-bold text-ink-900 tracking-tight">Where do you want to work?</h1>
+    <p class="text-sm text-ink-500 mt-1">Open your own dashboard, or enter a customer's branch to inspect it. No customer password is needed; every visit is recorded.</p>
+  </div>
+
+  <a href="{% url 'hq:dashboard' %}" class="card flex items-center justify-between gap-4 hover:ring-brand-300 transition">
+    <div>
+      <p class="font-bold text-ink-900">My workspace — Platform HQ</p>
+      <p class="text-sm text-ink-500 mt-0.5">Customers, subscriptions, billing and SMS services.</p>
+    </div>
+    <span class="btn btn-primary whitespace-nowrap">Open my dashboard</span>
+  </a>
+
+  <section class="card !p-0">
+    <div class="p-4 sm:p-5 border-b border-ink-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div>
+        <h2 class="font-bold text-ink-900">Customer branches</h2>
+        <p class="text-xs text-ink-500 mt-0.5">{{ rows|length }} branch{{ rows|length|pluralize:"es" }}</p>
+      </div>
+      <input id="branch-search" type="search" placeholder="Search branch, owner or phone…" class="form-input sm:w-72" autocomplete="off">
+    </div>
+    <ul id="branch-list" class="divide-y divide-ink-100">
+      {% for r in rows %}
+      <li class="branch-row flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 sm:px-5 py-3.5"
+          data-search="{{ r.pharmacy.name|lower }} {{ r.owner.username|lower }} {{ r.owner.get_full_name|lower }} {{ r.pharmacy.phone_number }}">
+        <div class="min-w-0">
+          <p class="font-semibold text-ink-900 truncate">{{ r.pharmacy.name }}
+            {% if not r.pharmacy.is_active %}<span class="ml-1 px-2 py-0.5 rounded-full bg-ink-100 text-ink-500 text-[11px] font-bold">Inactive</span>{% endif %}</p>
+          <p class="text-xs text-ink-500 truncate">
+            {% if r.owner %}Owner: {% firstof r.owner.get_full_name r.owner.username %} · @{{ r.owner.username }}{% else %}No active owner account{% endif %}
+            {% if r.pharmacy.location %} · {{ r.pharmacy.location }}{% endif %}</p>
+          {% if r.subscription %}
+            <p class="mt-1"><span class="px-2 py-0.5 rounded-full text-[11px] font-bold {% if r.subscription.status == 'ACTIVE' %}bg-emerald-50 text-emerald-700{% else %}bg-amber-50 text-amber-800{% endif %}">{{ r.subscription.get_status_display }} · until {{ r.subscription.end_date|date:"d M Y" }}</span></p>
+          {% endif %}
+        </div>
+        {% if r.enterable %}
+        <button type="button" class="btn btn-secondary whitespace-nowrap js-enter" data-id="{{ r.pharmacy.pk }}" data-name="{{ r.pharmacy.name }}">Enter branch</button>
+        {% else %}
+        <span class="text-xs text-ink-400">Cannot enter</span>
+        {% endif %}
+      </li>
+      {% empty %}
+      <li class="p-6 text-sm text-ink-500">No branches yet.</li>
+      {% endfor %}
+    </ul>
+    <p id="no-match" class="p-6 text-sm text-ink-500" hidden>No branch matches your search.</p>
+  </section>
+
+  {% if recent %}
+  <section class="card">
+    <div class="flex items-center justify-between">
+      <h2 class="font-bold text-ink-900">Your recent visits</h2>
+      <a href="{% url 'hq:workspace_log' %}" class="text-sm font-semibold text-brand-700">Full audit log</a>
+    </div>
+    <ul class="mt-3 text-sm text-ink-700 divide-y divide-ink-100">
+      {% for l in recent %}<li class="py-2 flex justify-between gap-3"><span>{{ l.pharmacy_name }} · {{ l.get_mode_display }}</span><span class="text-ink-400">{{ l.started_at|date:"d M, H:i" }}</span></li>{% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+</div>
+
+<dialog id="enter-dialog" class="rounded-2xl p-0 w-[min(30rem,calc(100vw-2rem))] backdrop:bg-black/40">
+  <form method="post" action="{% url 'hq:workspace_enter' %}" class="p-5 sm:p-6 space-y-4">
+    {% csrf_token %}
+    <input type="hidden" name="pharmacy" id="enter-pharmacy">
+    <div>
+      <h3 class="text-lg font-bold text-ink-900">Enter <span id="enter-name"></span></h3>
+      <p class="text-sm text-ink-500 mt-1">You will see exactly what the shop owner sees. Ends automatically after {{ minutes }} minutes.</p>
+    </div>
+    <fieldset class="space-y-2">
+      <legend class="text-xs font-bold uppercase tracking-wider text-ink-500 mb-1">Access level</legend>
+      <label class="flex gap-3 rounded-xl border border-ink-200 p-3 cursor-pointer"><input type="radio" name="mode" value="VIEW" checked class="mt-1"><span><b class="text-sm">View only (recommended)</b><span class="block text-xs text-ink-500">Browse reports, sales, stock and cash. Anything that would change data is blocked.</span></span></label>
+      <label class="flex gap-3 rounded-xl border border-ink-200 p-3 cursor-pointer"><input type="radio" name="mode" value="FULL" class="mt-1"><span><b class="text-sm">Full access</b><span class="block text-xs text-ink-500">Can make changes as the owner. Use only to fix a problem for the customer.</span></span></label>
+    </fieldset>
+    <div>
+      <label class="text-xs font-bold uppercase tracking-wider text-ink-500" for="enter-reason">Reason</label>
+      <select name="reason" id="enter-reason" class="form-input mt-1 w-full">{% for v, label in reasons %}<option value="{{ v }}">{{ label }}</option>{% endfor %}</select>
+    </div>
+    <div>
+      <label class="text-xs font-bold uppercase tracking-wider text-ink-500" for="enter-note">Note (optional)</label>
+      <input name="note" id="enter-note" maxlength="300" class="form-input mt-1 w-full" placeholder="e.g. Customer reported missing sales">
+    </div>
+    <p class="text-xs text-ink-400">Your visit is recorded with the time, reason and your IP address. The customer's password and PIN are never shown or changed.</p>
+    <div class="flex justify-end gap-2">
+      <button type="button" class="btn btn-secondary" id="enter-cancel">Cancel</button>
+      <button type="submit" class="btn btn-primary">Enter workspace</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+(function(){
+  var dlg=document.getElementById('enter-dialog');
+  document.querySelectorAll('.js-enter').forEach(function(b){
+    b.addEventListener('click',function(){
+      document.getElementById('enter-pharmacy').value=b.dataset.id;
+      document.getElementById('enter-name').textContent=b.dataset.name;
+      if(dlg.showModal){dlg.showModal();}else{dlg.setAttribute('open','');}
+    });
+  });
+  document.getElementById('enter-cancel').addEventListener('click',function(){dlg.close?dlg.close():dlg.removeAttribute('open');});
+  var q=document.getElementById('branch-search'),rows=document.querySelectorAll('.branch-row'),none=document.getElementById('no-match');
+  q.addEventListener('input',function(){
+    var v=q.value.trim().toLowerCase(),shown=0;
+    rows.forEach(function(r){var ok=!v||r.dataset.search.indexOf(v)!==-1;r.style.display=ok?'':'none';if(ok)shown++;});
+    none.hidden=shown!==0;
+  });
+})();
+</script>
+{% endblock %}

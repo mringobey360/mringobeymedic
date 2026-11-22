@@ -1,0 +1,309 @@
+{% load layaway_extras %}
+<div class="spx-modal" id="spx-modal-layaway-new" role="dialog" aria-modal="true" aria-labelledby="ly-new-title" data-touch-nofocus hidden>
+  <div class="spx-modal-card ly-modal">
+    <form method="post" action="{% url 'layaway:create' %}" id="layaway-form" class="ly-mform" novalidate>
+      {% csrf_token %}
+      <div class="spx-modal-head">
+        <span class="spx-modal-ico spx-modal-ico--brand">{% ly_icon 'package' 20 %}</span>
+        <div><h2 id="ly-new-title">New Layaway plan</h2><p>Reserve a product for a customer and record the first payment.</p></div>
+        <button type="button" class="spx-modal-x" data-spx-close aria-label="Close">{% ly_icon 'x' 16 %}</button>
+      </div>
+
+      <div class="spx-modal-body">
+        {% if form.non_field_errors %}<div class="spx-alert" style="margin-bottom:.6rem">{{ form.non_field_errors|join:' ' }}</div>{% endif %}
+
+        {# ── Product ── #}
+        <fieldset class="ly-sec">
+          <legend>Product</legend>
+          <div class="ly-mgrid">
+            <div class="ly-f span2">
+              <label class="spx-label" for="lp-search">Product</label>
+              <div class="lp-combo">
+                <input type="search" id="lp-search" class="spx-input" placeholder="Search by name or barcode" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="lp-menu" aria-autocomplete="list" enterkeyhint="search">
+                <div class="lp-menu" id="lp-menu" role="listbox" hidden></div>
+              </div>
+              {{ form.product }}
+              <div class="lp-chip" id="lp-chip" aria-live="polite"><span><strong id="lp-chip-name"></strong> <span id="lp-chip-meta"></span></span><button type="button" id="lp-change">Change</button></div>
+              {% if form.product.errors %}<p class="spx-err">{{ form.product.errors|join:', ' }}</p>{% endif %}
+            </div>
+            <div class="ly-f"><label class="spx-label" for="id_quantity">Quantity</label>{{ form.quantity }}{% if form.quantity.errors %}<p class="spx-err">{{ form.quantity.errors|join:', ' }}</p>{% endif %}</div>
+            <div class="ly-f"><label class="spx-label" for="id_unit_price">Unit price (TZS)</label>{{ form.unit_price }}{% if form.unit_price.errors %}<p class="spx-err">{{ form.unit_price.errors|join:', ' }}</p>{% endif %}</div>
+          </div>
+        </fieldset>
+
+        {# ── Customer ── #}
+        <fieldset class="ly-sec">
+          <legend>Customer</legend>
+          <div class="ly-mgrid">
+            <div class="ly-f m-full"><label class="spx-label" for="{{ form.customer_name.id_for_label }}">Customer name</label>{{ form.customer_name }}{% if form.customer_name.errors %}<p class="spx-err">{{ form.customer_name.errors|join:', ' }}</p>{% endif %}</div>
+            <div class="ly-f m-full"><label class="spx-label" for="{{ form.customer_phone.id_for_label }}">Phone number</label>{{ form.customer_phone }}{% if form.customer_phone.errors %}<p class="spx-err">{{ form.customer_phone.errors|join:', ' }}</p>{% endif %}</div>
+          </div>
+        </fieldset>
+
+        {# ── Deposit & schedule ── #}
+        <fieldset class="ly-sec">
+          <legend>Deposit &amp; schedule</legend>
+          <div class="ly-mgrid">
+            <div class="ly-f"><label class="spx-label" for="id_deposit">Initial deposit (TZS)</label>{{ form.deposit }}{% if form.deposit.errors %}<p class="spx-err">{{ form.deposit.errors|join:', ' }}</p>{% endif %}</div>
+            <div class="ly-f"><label class="spx-label" for="{{ form.deposit_method.id_for_label }}">Deposit paid by</label>{{ form.deposit_method }}</div>
+            <div class="ly-f span2"><label class="spx-label" for="{{ form.deposit_reference.id_for_label }}">Deposit reference <span class="ly-opt">(optional)</span></label>{{ form.deposit_reference }}</div>
+            <div class="ly-f m-full"><label class="spx-label" for="{{ form.due_date.id_for_label }}">Final payment date</label>{{ form.due_date }}{% if form.due_date.errors %}<p class="spx-err">{{ form.due_date.errors|join:', ' }}</p>{% endif %}</div>
+            <div class="ly-f m-full"><label class="spx-label" for="{{ form.notes.id_for_label }}">Notes <span class="ly-opt">(optional)</span></label>{{ form.notes }}</div>
+          </div>
+        </fieldset>
+
+        <details class="ly-prev">
+          <summary>Customer SMS preview <small id="sms-seg"></small></summary>
+          <div class="ly-sms"><div class="bubble" id="sms-text"></div><div class="meta"><span id="sms-count"></span><span>Stock is reserved, not locked</span></div></div>
+        </details>
+      </div>
+
+      {# Always-visible totals, outside the scrolling area #}
+      <div class="ly-summary">
+        <div class="ly-sumbar" aria-live="polite">
+          <div><span>Plan total</span><b id="sum-total">TZS 0</b></div>
+          <div><span>Deposit</span><b id="sum-deposit">TZS 0</b></div>
+          <div><span>Balance</span><b id="sum-balance">TZS 0</b></div>
+          <div class="trk"><i id="sum-bar"></i></div>
+        </div>
+        <p class="ly-merr" id="sum-warn" role="alert" hidden></p>
+      </div>
+      <div class="spx-modal-foot">
+        <button type="button" class="spx-btn spx-btn--ghost" data-spx-close>Cancel</button>
+        <button type="submit" class="spx-btn spx-btn--primary" id="ly-submit">Create plan</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<style>
+/* ───── Layaway "New plan" modal: professional on desktop and mobile ───── */
+.ly-modal{--m-surface:#fff;--m-soft:#f8fafc;--m-line:#e2e8f0;--m-ink:#0f172a;--m-mute:#64748b;--m-accent:#0f766e;--m-accent-s:#f0fdfa;--m-accent-b:#ccfbf1;--m-danger:#dc2626}
+html[data-theme="dark"] .ly-modal{--m-surface:#0d1b28;--m-soft:#122536;--m-line:#294052;--m-ink:#edf5fb;--m-mute:#a7b8c9;--m-accent:#2dd4bf;--m-accent-s:#123d3b;--m-accent-b:#1b5a56;--m-danger:#fca5a5}
+
+/* Frame: header and footer stay put, only the form scrolls */
+/* Give the flex layout a REAL bounded height. max-height alone is not enough
+   for every browser to size the scrolling form body reliably. */
+.spx-modal-card.ly-modal{
+  box-sizing:border-box;
+  width:min(100%,40rem);
+  height:min(90dvh,50rem);
+  max-height:min(90dvh,50rem);
+  min-height:min(32rem,82dvh);
+  background:var(--m-surface);
+  color:var(--m-ink);
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+}
+.ly-modal .ly-mform{display:flex;flex-direction:column;min-height:0;height:100%;flex:1 1 auto;overflow:hidden}
+.ly-modal .spx-modal-head{flex:none;padding:1.1rem 1.25rem;border-bottom:1px solid var(--m-line);align-items:center}
+.ly-modal .spx-modal-head h2{color:var(--m-ink)}
+.ly-modal .spx-modal-head p{color:var(--m-mute);margin-top:.1rem}
+.ly-modal .spx-modal-ico--brand{background:var(--m-accent-s);color:var(--m-accent)}
+.ly-modal .spx-modal-x{width:2.25rem;height:2.25rem;color:var(--m-mute)}
+.ly-modal .spx-modal-x:hover{background:var(--m-soft);color:var(--m-ink)}
+.ly-modal .spx-modal-body{display:block;flex:1 1 auto;min-height:0;max-height:none;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:.25rem 1.25rem 1.25rem}
+.ly-modal .ly-summary{flex:none;padding:.75rem 1.25rem 0;border-top:1px solid var(--m-line);background:var(--m-soft)}
+.ly-modal .spx-modal-foot{flex:none;background:var(--m-soft);border-top:0;padding:.75rem 1.25rem 1rem;border-radius:0}
+.ly-modal .spx-btn{min-height:2.625rem!important}
+.ly-modal .spx-btn--ghost{background:var(--m-surface);border-color:var(--m-line);color:var(--m-ink)}
+.ly-modal .spx-btn--ghost:hover:not(:disabled){background:var(--m-soft)}
+
+/* Sections */
+.ly-modal .ly-sec{border:0;margin:0;padding:0;min-width:0}
+.ly-modal .ly-sec+.ly-sec{margin-top:1.1rem}
+.ly-modal .ly-sec legend{display:flex;align-items:center;gap:.6rem;width:100%;padding:.9rem 0 .15rem;font-size:.8125rem;font-weight:700;color:var(--m-ink)}
+.ly-modal .ly-sec:first-of-type legend{padding-top:.75rem}
+.ly-modal .ly-sec legend::after{content:"";flex:1;height:1px;background:var(--m-line)}
+.ly-modal .ly-opt{font-weight:500;color:var(--m-mute)}
+
+/* Fields */
+.ly-modal .ly-mgrid{gap:.85rem 1rem;margin-top:.4rem}
+.ly-modal .spx-label{color:var(--m-ink);font-size:.8125rem;font-weight:600;margin:0 0 .35rem}
+.ly-modal .spx-input{min-height:2.625rem;padding:.6rem .8rem;border-color:var(--m-line);background:var(--m-surface);color:var(--m-ink);border-radius:.65rem;scroll-margin:4rem 0}
+.ly-modal .spx-input::placeholder{color:var(--m-mute);opacity:.8}
+.ly-modal .spx-input:focus{border-color:var(--m-accent);box-shadow:0 0 0 3px rgba(13,148,136,.18)}
+.ly-modal input[type=date].spx-input{-webkit-appearance:none;appearance:none;display:block;min-width:0}
+.ly-modal input[type=number].spx-input{-moz-appearance:textfield;font-variant-numeric:tabular-nums}
+.ly-modal input[type=number]::-webkit-outer-spin-button,.ly-modal input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.ly-modal .spx-err{color:var(--m-danger)}
+
+/* Branded dropdown: fixes the double border (wrapper used to inherit .spx-input) and shows every option */
+.ly-modal .custom-select,.ly-modal .custom-select.spx-input{border:0!important;padding:0!important;background:transparent!important;box-shadow:none!important;min-height:0!important;border-radius:0!important}
+.ly-modal .custom-select-trigger{min-height:2.625rem;padding:.6rem .8rem;border:1px solid var(--m-line);border-radius:.65rem;background:var(--m-surface);color:var(--m-ink);font-size:.875rem}
+.ly-modal .custom-select-trigger:hover{background:var(--m-soft)}
+.ly-modal .custom-select.open .custom-select-trigger,.ly-modal .custom-select-trigger:focus-visible{border-color:var(--m-accent);box-shadow:0 0 0 3px rgba(13,148,136,.18)}
+.ly-modal .custom-select-menu{max-height:none;overflow:visible;background:var(--m-surface);border-color:var(--m-line);z-index:40}
+.ly-modal .custom-option{color:var(--m-ink)}
+.ly-modal .custom-option:hover,.ly-modal .custom-option:focus-visible,.ly-modal .custom-option.selected{background:var(--m-accent-s);color:var(--m-accent)}
+
+/* Product search menu */
+.ly-modal .lp-menu{background:var(--m-surface);border-color:var(--m-line);max-height:min(16rem,40dvh);z-index:40}
+.ly-modal .lp-opt{color:var(--m-ink)}.ly-modal .lp-opt:hover,.ly-modal .lp-opt.is-active{background:var(--m-accent-s)}
+.ly-modal .lp-opt-meta,.ly-modal .lp-empty{color:var(--m-mute)}
+.ly-modal .lp-chip{background:var(--m-accent-s);border-color:var(--m-accent-b);color:var(--m-accent)}
+
+/* Totals + SMS preview */
+.ly-modal .ly-sumbar{margin:0;padding:0;border:0;background:transparent;gap:.35rem .75rem}
+.ly-modal .ly-sumbar span{color:var(--m-mute);font-weight:600}
+.ly-modal .ly-sumbar b{color:var(--m-ink);font-size:1rem}
+.ly-modal .ly-sumbar>div:nth-child(3) b{color:var(--m-accent)}
+.ly-modal .ly-sumbar .trk{background:var(--m-line)}.ly-modal .ly-sumbar .trk i{background:var(--m-accent)}
+.ly-modal .ly-merr{margin:.45rem 0 0;color:var(--m-danger);font-weight:600}
+.ly-modal .ly-prev{margin-top:1.1rem;background:var(--m-surface);border-color:var(--m-line)}
+.ly-modal .ly-prev summary{color:var(--m-ink)}.ly-modal .ly-prev summary small{color:var(--m-mute)}
+.ly-modal .ly-sms{background:var(--m-soft);border:1px solid var(--m-line)}
+.ly-modal .ly-sms .bubble{background:var(--m-surface);border-color:var(--m-line);color:var(--m-ink)}
+.ly-modal .ly-sms .meta{color:var(--m-mute)}
+
+/* Opening motion (desktop): fade + gentle rise */
+@keyframes ly-pop{from{opacity:0;transform:translateY(12px) scale(.985)}to{opacity:1;transform:none}}
+@keyframes ly-sheet{from{transform:translateY(100%)}to{transform:none}}
+.ly-modal{animation:ly-pop .2s cubic-bezier(.2,.8,.2,1)}
+
+/* Tablet/phone: bottom sheet */
+@media (max-width:640px){
+  #spx-modal-layaway-new{align-items:flex-end;padding:0}
+  .spx-modal-card.ly-modal{width:100%;max-width:none;height:94dvh;max-height:94dvh;min-height:min(70dvh,34rem);border-radius:1.25rem 1.25rem 0 0;animation:ly-sheet .28s cubic-bezier(.2,.8,.2,1)}
+  .ly-modal .spx-modal-head{position:relative;padding:1.35rem 1rem .9rem}
+  .ly-modal .spx-modal-head::before{content:"";position:absolute;top:.5rem;left:50%;width:2.5rem;height:.25rem;margin-left:-1.25rem;border-radius:999px;background:var(--m-line)}
+  .ly-modal .spx-modal-head p{display:none}
+  .ly-modal .spx-modal-body{padding:.1rem 1rem 1rem}
+  .ly-modal .ly-summary{padding:.65rem 1rem 0}
+  .ly-modal .spx-modal-foot{padding:.65rem 1rem calc(.85rem + env(safe-area-inset-bottom,0px));gap:.6rem}
+  .ly-modal .spx-modal-foot .spx-btn{flex:1 1 0}.ly-modal .spx-modal-foot .spx-btn--primary{flex:2 1 0}
+  .ly-modal .ly-mgrid .m-full{grid-column:1/-1}
+  .ly-modal .spx-input,.ly-modal .custom-select-trigger{font-size:16px}
+  .ly-modal .custom-option{min-height:2.75rem}
+  .ly-modal .ly-sumbar b{font-size:.9375rem}
+}
+@media (prefers-reduced-motion:reduce){.ly-modal,.spx-modal-card.ly-modal{animation:none}}
+.lp-native{position:absolute!important;width:1px;height:1px;opacity:0;pointer-events:none;overflow:hidden}
+.lp-combo{position:relative}
+.lp-menu{position:absolute;left:0;right:0;top:calc(100% + .3rem);z-index:20;max-height:13rem;overflow-y:auto;background:#fff;border:1px solid #e2e8f0;border-radius:.75rem;box-shadow:0 14px 35px rgba(15,23,42,.16),0 3px 10px rgba(15,23,42,.08);padding:.3rem}
+.lp-menu[hidden]{display:none}
+.lp-opt{display:flex;align-items:center;justify-content:space-between;gap:.75rem;width:100%;text-align:left;background:transparent;border:0;border-radius:.5rem;padding:.5rem .65rem;cursor:pointer;min-height:2.5rem;color:#0f172a;font:inherit}
+.lp-opt-name{font-size:.8125rem;font-weight:650;overflow-wrap:anywhere}
+.lp-opt-meta{font-size:.6875rem;color:#64748b;white-space:nowrap;text-align:right;line-height:1.35}
+.lp-empty{padding:.8rem .65rem;font-size:.8125rem;color:#64748b}
+.lp-chip{display:none;align-items:center;justify-content:space-between;gap:.75rem;margin-top:.5rem;padding:.5rem .7rem;border-radius:.6rem;background:#f0fdfa;border:1px solid #ccfbf1;font-size:.75rem;color:#0f766e}
+.lp-chip.is-on{display:flex}.lp-chip button{background:none;border:0;color:inherit;font:inherit;font-weight:700;cursor:pointer;text-decoration:underline}
+</style>
+
+<script>
+(function () {
+  const SEARCH_URL = "{{ search_url }}";
+  const SHOP = "{{ sms_shop|escapejs }}", FOOT = "{{ sms_footer|escapejs }}";
+  const $ = (id) => document.getElementById(id);
+  const search = $('lp-search'); if (!search) return;
+  const menu = $('lp-menu'), select = $('id_product');
+  const qty = $('id_quantity'), price = $('id_unit_price'), deposit = $('id_deposit');
+  const nameEl = $('id_customer_name'), dueEl = $('id_due_date'), chip = $('lp-chip');
+  const fmt = (n) => 'TZS ' + Math.round(n || 0).toLocaleString('en-US');
+  const num = (n) => Math.round(n || 0).toLocaleString('en-US');
+  let items = [], active = -1, timer = null, picked = null, priceAuto = true, seq = 0;
+
+  const cleanLabel = (t) => (t || '').replace(/\s\([^()]*\(\d+\)\)$/, '');
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const ascii = (s) => String(s || '').normalize('NFKD').replace(/[^\x00-\x7F]/g, '').replace(/\s+/g, ' ').trim();
+
+  function openMenu(open) { menu.hidden = !open; search.setAttribute('aria-expanded', open ? 'true' : 'false'); }
+  function renderMenu(msg) {
+    if (msg) { menu.innerHTML = '<div class="lp-empty">' + esc(msg) + '</div>'; openMenu(true); return; }
+    if (!items.length) { renderMenu('No products in stock match this search.'); return; }
+    menu.innerHTML = items.map((p, i) =>
+      '<button type="button" class="lp-opt" role="option" data-i="' + i + '">' +
+      '<span class="lp-opt-name">' + esc(p.name) + '</span>' +
+      '<span class="lp-opt-meta">' + (p.selling_price && p.selling_price !== 'None' ? fmt(parseFloat(p.selling_price)) : 'No price') +
+      '<br>' + p.quantity_available + ' in stock</span></button>').join('');
+    active = -1; openMenu(true);
+  }
+  async function load(q) {
+    const mine = ++seq;
+    try {
+      const r = await fetch(SEARCH_URL + '?q=' + encodeURIComponent(q), { credentials: 'same-origin', headers: { 'Accept': 'application/json' } });
+      if (!r.ok) throw new Error();
+      const data = await r.json();
+      if (mine !== seq) return;
+      items = data.results || []; renderMenu();
+    } catch (e) { if (mine === seq) renderMenu('Could not load products. Check your connection and try again.'); }
+  }
+  function pick(p) {
+    picked = p; select.value = String(p.id); search.value = p.name; openMenu(false);
+    const sp = parseFloat(p.selling_price);
+    if (!isNaN(sp) && (priceAuto || !price.value)) { price.value = sp; priceAuto = true; }
+    qty.max = p.quantity_available;
+    if (!qty.value || +qty.value < 1) qty.value = 1;
+    if (+qty.value > p.quantity_available) qty.value = p.quantity_available;
+    chip.classList.add('is-on');
+    $('lp-chip-name').textContent = p.name;
+    $('lp-chip-meta').textContent = '\u00b7 ' + p.quantity_available + ' ' + (p.unit || 'units').toLowerCase() + ' in stock';
+    update();
+  }
+  function clearPick() { picked = null; select.value = ''; chip.classList.remove('is-on'); update(); }
+
+  search.addEventListener('input', () => {
+    if (picked && search.value !== picked.name) clearPick();
+    clearTimeout(timer); timer = setTimeout(() => load(search.value.trim()), 180);
+  });
+  search.addEventListener('focus', () => { if (!picked) load(search.value.trim()); else search.select(); });
+  $('lp-change').addEventListener('click', () => { clearPick(); search.value = ''; search.focus(); });
+  search.addEventListener('keydown', (e) => {
+    const opts = menu.querySelectorAll('.lp-opt');
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      if (menu.hidden) { load(search.value.trim()); return; }
+      e.preventDefault();
+      active = (active + (e.key === 'ArrowDown' ? 1 : -1) + opts.length) % (opts.length || 1);
+      opts.forEach((o, i) => o.classList.toggle('is-active', i === active));
+      if (opts[active]) opts[active].scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'Enter') {
+      if (!menu.hidden && items.length) { e.preventDefault(); pick(items[active >= 0 ? active : 0]); }
+    } else if (e.key === 'Escape' && !menu.hidden) { e.stopPropagation(); openMenu(false); }
+  }, true);
+  menu.addEventListener('mousedown', (e) => { const b = e.target.closest('.lp-opt'); if (!b) return; e.preventDefault(); pick(items[+b.dataset.i]); });
+  document.addEventListener('click', (e) => { if (!e.target.closest('.lp-combo')) openMenu(false); });
+
+  price.addEventListener('input', (e) => { if (e.isTrusted) priceAuto = false; update(); });
+  [qty, deposit, nameEl, dueEl].forEach((el) => el.addEventListener('input', update));
+
+  function smsPreview(q, d, bal, total) {
+    const first = ((nameEl.value || '').trim().split(/\s+/)[0] || 'Mteja');
+    const first2 = first.charAt(0).toUpperCase() + first.slice(1).toLowerCase();
+    const prod = ascii(picked ? picked.name : 'Product name').slice(0, 28);
+    let due = '';
+    if (dueEl.value) { const dt = new Date(dueEl.value + 'T00:00:00'); due = 'Mwisho wa malipo: ' + dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }); }
+    const text = [SHOP, 'Habari ' + first2 + ', mpango wako wa Layaway LAY-XXXXXXXX-XXXXXX umesajiliwa.',
+      prod + ' x' + (q || 1), 'Jumla: TZS ' + num(total), 'Umelipa: TZS ' + num(d), 'Salio: TZS ' + num(bal), due, FOOT].filter(Boolean).join('\n');
+    $('sms-text').textContent = text;
+    $('sms-count').textContent = text.length + ' characters';
+    const seg = text.length <= 160 ? 1 : Math.ceil(text.length / 153);
+    $('sms-seg').textContent = seg + (seg === 1 ? ' SMS credit' : ' SMS credits');
+  }
+  function update() {
+    const q = parseInt(qty.value, 10) || 0, p = parseFloat(price.value) || 0, d = parseFloat(deposit.value) || 0;
+    const total = q * p, bal = Math.max(total - d, 0), pct = total > 0 ? Math.min(d / total * 100, 100) : 0;
+    $('sum-total').textContent = fmt(total); $('sum-deposit').textContent = fmt(d); $('sum-balance').textContent = fmt(bal);
+    $('sum-bar').style.width = pct + '%';
+    const warn = $('sum-warn'); let m = '';
+    if (d > total && total > 0) m = 'The deposit is higher than the plan total.';
+    else if (picked && q > picked.quantity_available) m = 'Only ' + picked.quantity_available + ' in stock.';
+    warn.textContent = m; warn.hidden = !m;
+    smsPreview(q, d, bal, total);
+  }
+  if (select.value) {
+    const opt = select.options[select.selectedIndex];
+    search.value = cleanLabel(opt ? opt.text : '');
+    chip.classList.add('is-on'); $('lp-chip-name').textContent = search.value; $('lp-chip-meta').textContent = '';
+    picked = { id: select.value, name: search.value, quantity_available: Infinity }; priceAuto = false;
+  }
+  update();
+  // Keep an opened dropdown (e.g. "Deposit paid by") fully visible inside the scrolling form.
+  document.getElementById('layaway-form').addEventListener('click', (e) => {
+    const t = e.target.closest('.custom-select-trigger'); if (!t) return;
+    setTimeout(() => { const m = t.parentNode.querySelector('.custom-select-menu'); if (m && t.parentNode.classList.contains('open')) m.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }, 40);
+  });
+  $('layaway-form').addEventListener('submit', () => { const b = $('ly-submit'); b.disabled = true; b.innerHTML = '<span class="spx-spin"></span> Saving\u2026'; });
+  {% if open_create %}window.addEventListener('load', () => { const b = document.querySelector('[data-spx-open="layaway-new"]'); if (b) b.click(); });{% endif %}
+})();
+</script>

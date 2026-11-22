@@ -1,0 +1,1 @@
+{% load cart_tags %}<a class="mk-rate-line" href="#reviews" data-rate-line>{% if product.rating_count %}<b>{{ product.rating_avg|floatformat:1 }}</b> {% stars product.rating_avg %} <span>{{ product.rating_count }} review{{ product.rating_count|pluralize }}</span>{% else %}{% stars 0 %} <span>No reviews yet</span>{% endif %}</a>

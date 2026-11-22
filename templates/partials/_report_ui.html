@@ -1,0 +1,60 @@
+{# Shared look for report / history pages (Restock History, Cash Transfers). Self-contained: does not depend on compiled Tailwind utilities. #}
+<style>
+.rp{--rp-ink:#0f172a;--rp-mute:#64748b;--rp-line:#e2e8f0;--rp-soft:#f8fafc;--rp-surf:#fff;--rp-brand:var(--sp-b-primary,#0f766e);--rp-brand-soft:var(--sp-b-soft,#e3f4f1);--rp-brand-tx:var(--sp-b-soft-tx,#0b5d56);color:var(--rp-ink)}
+html[data-theme="dark"] .rp{--rp-ink:#e6edf5;--rp-mute:#94a3b8;--rp-line:rgba(148,163,184,.22);--rp-soft:rgba(148,163,184,.08);--rp-surf:transparent;--rp-brand-soft:rgba(45,212,191,.12);--rp-brand-tx:#5eead4}
+.rp *{box-sizing:border-box}
+.rp-head{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:20px}
+.rp-eyebrow{font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:800;color:var(--rp-brand);margin:0 0 4px}
+.rp-title{font-size:24px;line-height:1.2;font-weight:800;letter-spacing:-.01em;margin:0}
+.rp-sub{font-size:13.5px;color:var(--rp-mute);margin:6px 0 0;max-width:62ch;line-height:1.5}
+.rp-actions{display:flex;flex-wrap:wrap;gap:8px}
+.rp-banner{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;border:1px solid var(--rp-brand);background:var(--rp-brand-soft);color:var(--rp-brand-tx);border-radius:14px;padding:12px 16px;margin-bottom:16px;font-size:13px}
+.rp-banner a{font-weight:700;text-decoration:underline;margin-left:auto}
+.rp-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:16px}
+.rp-stat{display:flex;gap:14px;align-items:center;border:1px solid var(--rp-line);border-radius:16px;padding:16px;background:var(--rp-surf)}
+.rp-ico{flex:0 0 42px;height:42px;border-radius:12px;display:grid;place-items:center;background:var(--rp-brand-soft);color:var(--rp-brand-tx)}
+.rp-ico.amber{background:#fef3c7;color:#b45309}.rp-ico.slate{background:#e2e8f0;color:#334155}
+html[data-theme="dark"] .rp-ico.amber{background:rgba(245,158,11,.16);color:#fcd34d}html[data-theme="dark"] .rp-ico.slate{background:rgba(148,163,184,.16);color:#cbd5e1}
+.rp-ico svg{width:20px;height:20px}
+.rp-stat small{display:block;font-size:11px;letter-spacing:.06em;text-transform:uppercase;font-weight:700;color:var(--rp-mute)}
+.rp-stat b{display:block;font-size:22px;font-weight:800;line-height:1.25;font-variant-numeric:tabular-nums}
+.rp-panel{border:1px solid var(--rp-line);border-radius:16px;background:var(--rp-surf);margin-bottom:16px;overflow:hidden}
+.rp-panel-h{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--rp-line)}
+.rp-panel-h h2{font-size:14px;font-weight:800;margin:0}
+.rp-panel-h span{font-size:12px;color:var(--rp-mute)}
+.rp-filters{padding:14px 18px}
+.rp-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.rp-chip{display:inline-flex;align-items:center;border:1px solid var(--rp-line);border-radius:999px;padding:5px 12px;font-size:12px;font-weight:700;color:var(--rp-mute);text-decoration:none;background:var(--rp-surf)}
+.rp-chip:hover{border-color:var(--rp-brand);color:var(--rp-brand-tx)}
+.rp-chip.on{background:var(--rp-brand);border-color:var(--rp-brand);color:#fff}
+.rp-fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;align-items:end}
+.rp-fgrid .wide{grid-column:span 2}
+@media(max-width:560px){.rp-fgrid .wide{grid-column:span 1}}
+.rp-fgrid label{display:block;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--rp-mute);margin-bottom:4px}
+.rp-fgrid .form-input{width:100%}
+.rp-fbtns{display:flex;gap:8px}
+.rp-fbtns .btn{flex:1}
+.rp-scroll{overflow:auto;max-height:640px}
+.rp-table{width:100%;border-collapse:separate;border-spacing:0;font-size:13.5px}
+.rp-table thead th{position:sticky;top:0;z-index:1;background:var(--rp-soft);color:var(--rp-mute);font-size:11px;letter-spacing:.06em;text-transform:uppercase;font-weight:800;text-align:left;padding:11px 14px;border-bottom:1px solid var(--rp-line);white-space:nowrap}
+html[data-theme="dark"] .rp-table thead th{background:#14202e}
+.rp-table td{padding:12px 14px;border-bottom:1px solid var(--rp-line);vertical-align:middle}
+.rp-table tbody tr:hover td{background:var(--rp-soft)}
+.rp-table tbody tr:last-child td{border-bottom:0}
+.rp-num{text-align:right!important;font-variant-numeric:tabular-nums;white-space:nowrap}
+.rp-date{font-weight:800;white-space:nowrap}.rp-time{font-size:11.5px;color:var(--rp-mute);font-variant-numeric:tabular-nums;margin-top:1px}
+.rp-name{font-weight:700}.rp-meta{font-size:11.5px;color:var(--rp-mute);margin-top:1px}
+.rp-pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:3px 10px;font-size:11.5px;font-weight:700;white-space:nowrap}
+.rp-pill:before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.rp-pill.green{background:#d1fae5;color:#047857}.rp-pill.amber{background:#fef3c7;color:#b45309}.rp-pill.blue{background:#dbeafe;color:#1d4ed8}.rp-pill.slate{background:#e2e8f0;color:#334155}
+html[data-theme="dark"] .rp-pill.green{background:rgba(16,185,129,.16);color:#6ee7b7}html[data-theme="dark"] .rp-pill.amber{background:rgba(245,158,11,.16);color:#fcd34d}html[data-theme="dark"] .rp-pill.blue{background:rgba(59,130,246,.18);color:#93c5fd}html[data-theme="dark"] .rp-pill.slate{background:rgba(148,163,184,.16);color:#cbd5e1}
+.rp-link{font-weight:700;font-size:12.5px;color:var(--rp-brand);text-decoration:none}.rp-link:hover{text-decoration:underline}
+.rp-empty{padding:48px 16px;text-align:center;color:var(--rp-mute)}
+.rp-empty svg{width:34px;height:34px;margin:0 auto 10px;display:block;opacity:.6}
+.rp-ref{white-space:nowrap;font-size:12.5px}.rp-prod{min-width:170px}
+.rp-foot{font-size:11.5px;color:var(--rp-mute);margin-top:12px}
+@media(max-width:560px){.rp-stat{padding:12px;gap:10px}.rp-ico{flex-basis:34px;height:34px;border-radius:10px}.rp-ico svg{width:17px;height:17px}.rp-stat b{font-size:17px}}
+.rp-show-sm{display:none}
+@media(max-width:760px){.rp-ref{white-space:normal;word-break:break-all;font-size:11.5px}.rp-prod{min-width:0}.rp-actcell a{display:block;line-height:1.9}.rp-table{font-size:12.5px}.rp-hide-sm{display:none!important}.rp-show-sm{display:block}.rp-title{font-size:21px}.rp-table td,.rp-table thead th{padding:10px}}
+@media print{.rp-actions,.rp-filters,.rp-chips{display:none}}
+</style>

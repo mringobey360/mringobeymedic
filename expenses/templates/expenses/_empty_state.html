@@ -1,0 +1,15 @@
+{# Shared empty state for the expense register (filtered vs. truly empty) #}
+<div class="xp-empty">
+  <span class="xp-empty-ico">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h9l3 3v15H6z"/><path d="M9 12h6M9 16h6"/></svg>
+  </span>
+  {% if has_filters %}
+  <h3>No expenses match your filters</h3>
+  <p>Try a different search term or widen the date range.</p>
+  <a href="{% url 'expenses:list' %}" class="btn btn-secondary">Clear filters</a>
+  {% else %}
+  <h3>No expenses recorded yet</h3>
+  <p>Record LUKU, water, transport, repairs and other shop expenses here. Each one is tracked from submission to approval.</p>
+  <a href="{% url 'expenses:create' %}" class="btn btn-primary">Record expense</a>
+  {% endif %}
+</div>

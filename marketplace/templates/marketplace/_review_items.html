@@ -1,0 +1,5 @@
+{% load cart_tags %}{% for r in reviews %}<article class="mk-rv{% if just_posted == r.pk %} mk-rv-new{% endif %}" data-review-id="{{ r.pk }}">
+  <div class="mk-rv-top"><span class="sp-avatar" aria-hidden="true">{{ r.customer_name|slice:":1"|upper }}</span><div><b>{{ r.display_name }}</b><span class="mk-rv-badge"><svg class="i"><use href="#i-check"/></svg> Verified purchase</span></div><time datetime="{{ r.created_at|date:'c' }}">{{ r.created_at|date:'j M Y' }}</time></div>
+  <div class="mk-rv-stars">{% stars r.rating %}</div>
+  {% if r.comment %}<p>{{ r.comment|linebreaksbr }}</p>{% endif %}
+</article>{% endfor %}

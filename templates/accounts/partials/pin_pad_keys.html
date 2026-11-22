@@ -1,0 +1,81 @@
+<div class="pin-pad" role="group" aria-label="PIN keypad">
+    {% for n in "123456789" %}<button type="button" class="pin-key" data-digit="{{ n }}" aria-label="{{ n }}">{{ n }}</button>{% endfor %}
+    <span aria-hidden="true"></span>
+    <button type="button" class="pin-key" data-digit="0" aria-label="0">0</button>
+    <button type="button" id="pin-back" class="pin-key pin-ghost" aria-label="Delete last digit">
+        <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 5H9l-6 7 6 7h12a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1z"/><path d="m17 9-5 5"/><path d="m12 9 5 5"/></svg>
+    </button>
+</div>
+<button type="button" id="pin-confirm" class="pin-confirm" disabled>
+    <span class="pin-spin" aria-hidden="true"></span>
+    <svg class="pin-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle class="pc-ring" cx="12" cy="12" r="9.5"/><path class="pc-tick" d="M7.8 12.4l2.9 2.9 5.6-6"/></svg>
+    <span id="pin-confirm-text">Enter PIN</span>
+</button>
+<script>
+/* Shared PIN pad UI helper (dots, reveal toggle, confirm button states, ripple, haptics). */
+window.PinUI=(function(){
+  var root=document.querySelector('.pin-root'); if(!root) return {render:function(){},state:function(){},onConfirm:function(){},setLabel:function(){},leave:function(go){go();}};
+  var wrap=root.querySelector('.pin-dots'), dots=wrap.querySelectorAll('.pin-dot'), btn=document.getElementById('pin-confirm'), txt=document.getElementById('pin-confirm-text');
+  var len=dots.length, labels={idle:'Enter PIN',ready:'Confirm',busy:'Verifying…',success:'Success'}, cur='idle', handler=null, timers=[];
+  dots.forEach(function(d){var c=document.createElement('span');c.className='pin-dot-char';d.appendChild(c);});
+  var eye=document.createElement('button');eye.type='button';eye.className='pin-eye';eye.setAttribute('aria-pressed','false');
+  var ICON_ON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+  var ICON_OFF='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.9 17.9A10.9 10.9 0 0 1 12 19c-6.4 0-10-7-10-7a18 18 0 0 1 5.1-5.9"/><path d="M9.9 5.2A10 10 0 0 1 12 5c6.4 0 10 7 10 7a18 18 0 0 1-2.2 3.2"/><path d="M1 1l22 22"/></svg>';
+  function eyeUI(){var on=wrap.classList.contains('is-revealed');eye.innerHTML=(on?ICON_OFF:ICON_ON)+'<span>'+(on?'Hide PIN':'Show PIN')+'</span>';eye.setAttribute('aria-pressed',on?'true':'false');}
+  eye.addEventListener('click',function(){wrap.classList.toggle('is-revealed');eyeUI();});
+  eyeUI(); wrap.parentNode.insertBefore(eye,wrap.nextSibling);
+  function clearT(){timers.forEach(clearTimeout);timers=[];}
+  function paint(){
+    btn.classList.toggle('is-ready',cur==='ready');btn.classList.toggle('is-busy',cur==='busy');btn.classList.toggle('is-success',cur==='success');
+    btn.disabled=(cur!=='ready');
+    wrap.classList.toggle('is-busy-wave',cur==='busy');wrap.classList.toggle('is-ok',cur==='success');
+    txt.textContent=labels[cur]||labels.idle;
+    if(cur==='ready'||cur==='idle')btn.setAttribute('aria-live','polite');
+  }
+  function state(s){var prev=cur;cur=s;paint();if(s==='success'&&prev!=='success')sfx.ok();else if(s==='ready'&&prev!=='ready')sfx.ready();}
+  function render(pin){
+    dots.forEach(function(d,i){d.classList.toggle('is-filled',i<pin.length);d.lastChild.textContent=pin.charAt(i);});
+    if(cur==='busy'||cur==='success')return;
+    state(pin.length===len?'ready':'idle');
+  }
+  function setLabel(m){for(var k in m)labels[k]=m[k];paint();}
+  var ac=null,muted=false;
+  function ctx(){try{if(!ac){var C=window.AudioContext||window.webkitAudioContext;if(C)ac=new C();}if(ac&&ac.state==='suspended')ac.resume();}catch(e){}return ac;}
+  function tone(f,t0,dur,vol,type,f2){var a=ctx();if(!a||muted)return;var o=a.createOscillator(),g=a.createGain(),t=a.currentTime+t0;
+    o.type=type||'sine';o.frequency.setValueAtTime(f,t);if(f2)o.frequency.exponentialRampToValueAtTime(f2,t+dur);
+    g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(vol,t+0.008);g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    o.connect(g);g.connect(a.destination);o.start(t);o.stop(t+dur+0.02);}
+  function echo(fn){var a=ctx();if(!a||muted)return;fn();}
+  var sfx={
+    key:function(){tone(1900,0,0.03,0.05,'triangle',1300);tone(620,0,0.06,0.035,'sine',480);},
+    del:function(){tone(700,0,0.05,0.04,'triangle',480);tone(380,0,0.07,0.03,'sine',300);},
+    ready:function(){tone(988,0,0.08,0.03,'sine');},
+    ok:function(){ /* professional welcome chime: soft rising major arpeggio with gentle harmonics */
+      var n=[523.25,659.25,783.99,1046.5],i;
+      for(i=0;i<n.length;i++){tone(n[i],i*0.11,0.55,0.07,'sine');tone(n[i]*2,i*0.11,0.35,0.012,'sine');}
+      tone(1318.5,0.46,0.9,0.05,'sine');tone(1046.5,0.46,0.9,0.03,'sine');
+    },
+    bad:function(){tone(300,0,0.14,0.06,'sine',240);tone(240,0.15,0.2,0.06,'sine',190);}
+  };
+  function vibrate(){try{if(navigator.vibrate)navigator.vibrate(8);}catch(e){}}
+  root.addEventListener('pointerdown',function(e){
+    var k=e.target.closest&&e.target.closest('.pin-key'); if(!k||k.disabled)return;
+    var r=k.getBoundingClientRect(),s=Math.max(r.width,r.height),sp=document.createElement('span');
+    sp.className='pin-ripple';sp.style.width=sp.style.height=s+'px';sp.style.left=(e.clientX-r.left-s/2)+'px';sp.style.top=(e.clientY-r.top-s/2)+'px';
+    k.appendChild(sp);setTimeout(function(){sp.remove();},600);vibrate();(k.id==='pin-back'?sfx.del:sfx.key)();
+  });
+  btn.addEventListener('click',function(){if(cur==='ready'&&handler)handler();});
+  document.addEventListener('keydown',function(e){if(e.key==='Enter'&&cur==='ready'&&handler&&!e.target.closest('a,input,textarea,select')){e.preventDefault();handler();}});
+  new MutationObserver(function(){if(wrap.classList.contains('is-shake'))sfx.bad();}).observe(wrap,{attributes:true,attributeFilter:['class']});
+  paint();
+  function leave(go){
+    state('success');
+    timers.push(setTimeout(function(){
+      var sp=window.SignInSplash&&SignInSplash.show();
+      root.classList.add('is-leaving');
+      timers.push(setTimeout(function(){if(sp)sp.finish();setTimeout(go,350);},1100));
+    },600));
+  }
+  return {leave:leave,render:render,state:state,setLabel:setLabel,onConfirm:function(fn){handler=fn;}};
+})();
+</script>

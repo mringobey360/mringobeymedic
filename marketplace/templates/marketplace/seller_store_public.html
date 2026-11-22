@@ -1,0 +1,87 @@
+{% extends 'marketplace/base.html' %}{% load humanize cart_tags social_tags %}{% block title %}{{ store.public_name }}{% endblock %}{% block head_extra %}{% if store_listings %}{% include 'marketplace/_ls_styles.html' %}{% endif %}{% endblock %}
+{% block body %}
+{% include 'marketplace/_ls_sprite.html' %}
+<div class="sp-page">
+  <nav class="sp-crumbs" aria-label="Breadcrumb"><a class="sp-back" href="{% url 'marketplace:catalog' %}" aria-label="Back to marketplace"><svg class="i"><use href="#i-back"/></svg></a><a href="{% url 'marketplace:catalog' %}">Marketplace</a><span class="sep">/</span><b>{{ store.public_name }}</b></nav>
+
+  <section class="sp-box sp-shop-head">
+    <div class="sp-shop-logo">{% if store.logo %}<img src="{{ store.logo.url }}" alt="{{ store.public_name }}">{% else %}{{ store.public_name|slice:":1"|upper }}{% endif %}</div>
+    <div style="flex:1;min-width:0">
+      <h1>{{ store.public_name }} <svg class="i sp-ver" aria-label="Verified seller"><use href="#i-verified"/></svg></h1>
+      <p>{{ store.description|default:'Shop products from this SmartPOS seller.' }}</p>
+      {% social_links store caption='Follow us' %}
+      {% if contact_phone %}{% with phone=contact_phone|intl_phone %}<div class="sp-contact" style="margin-top:10px"><span class="lbl">Questions?</span><a class="sp-chip" href="tel:+{{ phone }}"><svg class="i"><use href="#i-phone"/></svg> Call</a><a class="sp-chip wa" href="{% if contact_wa %}{{ contact_wa }}{% else %}https://wa.me/{{ phone }}{% endif %}" target="_blank" rel="noopener"><svg class="i"><use href="#i-whatsapp"/></svg> WhatsApp</a></div>{% endwith %}{% endif %}
+    </div>
+    <button class="sp-chip" type="button" data-share><svg class="i"><use href="#i-share"/></svg> Share</button>
+  </section>
+
+  {% if trending %}
+  <section class="sp-st-trend" aria-labelledby="st-trend-h">
+    <div class="sp-sec-head">
+      <div class="sp-st-title"><h2 id="st-trend-h"><svg class="i"><use href="#i-flame"/></svg> {% if trending_mode == 'sales' %}Trending in {{ store.public_name }}{% else %}Top picks from {{ store.public_name }}{% endif %}</h2>
+        <p>{% if trending_mode == 'sales' %}Most ordered by customers in the last {{ trending_days }} days{% else %}Hand-picked and best-rated products from this shop{% endif %}</p></div>
+      <div class="sp-st-ctrl">{% if trending|length > 3 %}<button type="button" class="sp-st-arrow sp-st-play" data-trend-play aria-pressed="false" aria-label="Pause automatic sliding"><svg viewBox="0 0 24 24" aria-hidden="true"><g class="ic-pause"><path d="M8 5v14M16 5v14"/></g><path class="ic-play" d="m8 5 11 7-11 7z"/></svg></button><button type="button" class="sp-st-arrow" data-trend-dir="-1" aria-label="Previous products">&#8249;</button><button type="button" class="sp-st-arrow" data-trend-dir="1" aria-label="Next products">&#8250;</button>{% endif %}<a class="sp-pill-btn" href="#shop-products">All products</a></div>
+    </div>
+    <div class="sp-st-wrap"><div class="sp-trend sp-st-rail{% if trending|length < 4 %} is-few{% endif %}" id="st-trend-rail" tabindex="0" role="region" aria-roledescription="carousel" aria-label="Trending products from {{ store.public_name }}">{% for p in trending %}{% include 'marketplace/_product_card.html' with product=p rank=forloop.counter hide_seller=True %}{% endfor %}</div></div>
+    {% if trending|length > 3 %}<div class="sp-st-dots" id="st-trend-dots" role="group" aria-label="Choose slide"></div>{% endif %}
+  </section>
+  {% endif %}
+  {% if store_listings %}
+  <div class="sp-sec-head"><h2>Properties &amp; listings</h2><a class="sub" href="{% url 'marketplace:listings' %}?q={{ store.public_name|urlencode }}">Browse all</a></div>
+  <div class="ls-grid" style="margin-bottom:22px">{% for l in store_listings %}{% include 'marketplace/_listing_card.html' %}{% endfor %}</div>
+  {% endif %}
+
+
+  {% if selling %}
+  <div class="sp-trust" style="margin:0 0 18px"><div><svg class="i"><use href="#i-shield"/></svg><b>Secure payment</b>Mobile money checkout</div><div><svg class="i"><use href="#i-truck"/></svg><b>Delivery by {{ store.public_name }}</b>Enter your details at checkout</div><div><svg class="i"><use href="#i-box"/></svg><b>Track your order</b>Using your Ticket ID</div></div>
+
+  {% if other_shop_in_cart %}<div class="sp-filter-note" role="status" style="display:flex;flex-wrap:wrap;gap:8px">Your cart has items from a different shop. Each order is delivered by one shop — <a href="{% url 'marketplace:cart' %}" style="width:auto;height:auto;background:none;text-decoration:underline">review your cart</a> before adding from {{ store.public_name }}.</div>{% endif %}
+
+  <div class="sp-sec-head" id="shop-products"><h2>Products from this shop</h2><span class="sub">{{ products.paginator.count }} available</span></div>
+
+  <form method="get" class="sp-search" style="max-width:none;margin:0 0 12px" role="search">
+    {% if selected_category %}<input type="hidden" name="category" value="{{ selected_category }}">{% endif %}
+    <svg class="i"><use href="#i-search"/></svg><input type="search" name="q" value="{{ q }}" placeholder="Search in {{ store.public_name }}" maxlength="100" aria-label="Search this shop"><button type="submit">Search</button>
+  </form>
+
+  {% if store_categories %}<div class="sp-cats"><a class="sp-chip-link {% if not selected_category %}active{% endif %}" href="?q={{ q|urlencode }}">All</a>{% for c in store_categories %}<a class="sp-chip-link {% if selected_category == c.slug %}active{% endif %}" href="?category={{ c.slug|urlencode }}&q={{ q|urlencode }}">{{ c.name }}</a>{% endfor %}</div>{% endif %}
+  {% if q %}<div class="sp-filter-note">Results for “{{ q }}” <a href="?category={{ selected_category|urlencode }}" aria-label="Clear search"><svg class="i"><use href="#i-x"/></svg></a></div>{% endif %}
+
+  <div class="sp-grid">{% for product in products %}{% include 'marketplace/_product_card.html' %}{% empty %}<div class="sp-empty"><h3>No products found</h3><p>{% if q or selected_category %}Try another search or category.{% else %}This shop has not published any in-stock products yet.{% endif %}</p></div>{% endfor %}</div>
+  {% if products.has_other_pages %}<nav class="sp-pager">{% if products.has_previous %}<a class="sp-pill-btn" href="?q={{ q|urlencode }}&category={{ selected_category|urlencode }}&page={{ products.previous_page_number }}">← Previous</a>{% endif %}<span>Page {{ products.number }} of {{ products.paginator.num_pages }}</span>{% if products.has_next %}<a class="sp-pill-btn" href="?q={{ q|urlencode }}&category={{ selected_category|urlencode }}&page={{ products.next_page_number }}">Next →</a>{% endif %}</nav>{% endif %}
+  {% endif %}
+<script>(function(){
+var r=document.getElementById('st-trend-rail');if(!r||r.classList.contains('is-few'))return;
+var dotsBox=document.getElementById('st-trend-dots'),playBtn=document.querySelector('[data-trend-play]'),
+ reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches,
+ DELAY=4500,RESUME=7000,timer=null,idleTimer=null,userPaused=reduce,inView=true,hover=false,dots=[],pages=1;
+function step(){var c=r.querySelector('.sp-card');return c?c.getBoundingClientRect().width+parseFloat(getComputedStyle(r).columnGap||16):260;}
+function perPage(){return Math.max(1,Math.floor((r.clientWidth+16)/step()));}
+function maxScroll(){return r.scrollWidth-r.clientWidth;}
+function buildDots(){if(!dotsBox)return;var n=Math.max(1,Math.ceil(maxScroll()/(step()*perPage()))+1);if(n===pages&&dots.length)return;pages=n;dotsBox.innerHTML='';dots=[];
+ if(n<2){dotsBox.hidden=true;return;}dotsBox.hidden=false;
+ for(var i=0;i<n;i++){(function(i){var b=document.createElement('button');b.type='button';b.setAttribute('aria-label','Go to slide '+(i+1)+' of '+n);
+  b.addEventListener('click',function(){userAction();r.scrollTo({left:Math.min(maxScroll(),i*step()*perPage()),behavior:'smooth'});});dotsBox.appendChild(b);dots.push(b);})(i);}
+ syncDots();}
+function syncDots(){if(!dots.length)return;var i=maxScroll()-r.scrollLeft<4?dots.length-1:Math.round(r.scrollLeft/(step()*perPage()));i=Math.max(0,Math.min(dots.length-1,i));
+ dots.forEach(function(d,k){d.classList.toggle('on',k===i);if(k===i)d.setAttribute('aria-current','true');else d.removeAttribute('aria-current');});}
+function next(){if(maxScroll()-r.scrollLeft<6)r.scrollTo({left:0,behavior:'smooth'});else r.scrollBy({left:step()*perPage(),behavior:'smooth'});}
+function prev(){if(r.scrollLeft<6)r.scrollTo({left:maxScroll(),behavior:'smooth'});else r.scrollBy({left:-step()*perPage(),behavior:'smooth'});}
+function stop(){clearInterval(timer);timer=null;}
+function start(){stop();if(userPaused||hover||!inView||document.hidden)return;timer=setInterval(next,DELAY);}
+function userAction(){stop();clearTimeout(idleTimer);if(!userPaused)idleTimer=setTimeout(start,RESUME);}
+function setPaused(v){userPaused=v;if(playBtn){playBtn.setAttribute('aria-pressed',String(v));playBtn.classList.toggle('is-paused',v);playBtn.setAttribute('aria-label',v?'Resume automatic sliding':'Pause automatic sliding');}v?stop():start();}
+document.querySelectorAll('[data-trend-dir]').forEach(function(b){b.addEventListener('click',function(){userAction();+b.dataset.trendDir>0?next():prev();});});
+if(playBtn)playBtn.addEventListener('click',function(){setPaused(!userPaused);});
+r.addEventListener('mouseenter',function(){hover=true;stop();});r.addEventListener('mouseleave',function(){hover=false;start();});
+r.addEventListener('focusin',stop);r.addEventListener('focusout',start);
+['touchstart','pointerdown','wheel'].forEach(function(e){r.addEventListener(e,userAction,{passive:true});});
+r.addEventListener('keydown',function(e){if(e.key==='ArrowRight'){e.preventDefault();userAction();next();}else if(e.key==='ArrowLeft'){e.preventDefault();userAction();prev();}});
+var raf;r.addEventListener('scroll',function(){cancelAnimationFrame(raf);raf=requestAnimationFrame(syncDots);},{passive:true});
+document.addEventListener('visibilitychange',function(){document.hidden?stop():start();});
+if('IntersectionObserver' in window){new IntersectionObserver(function(en){inView=en[0].isIntersecting;inView?start():stop();},{threshold:.25}).observe(r);}
+window.addEventListener('resize',function(){buildDots();});
+buildDots();setPaused(userPaused);
+})();</script>
+</div>
+{% endblock %}

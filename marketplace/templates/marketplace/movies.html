@@ -1,0 +1,27 @@
+{% extends 'marketplace/base.html' %}
+{% load humanize cart_tags %}
+{% block title %}Movies{% endblock %}
+{% block body %}
+<div class="sp-page">
+  <section class="mv-hero" aria-labelledby="mv-h">
+    <h1 id="mv-h">Movies</h1>
+    <p>Watch the trailer, pay securely with mobile money, and download the full movie instantly.</p>
+    <form class="mv-search" action="{% url 'marketplace:movies' %}" method="get" role="search">
+      <input type="search" name="q" value="{{ q }}" placeholder="Search title, actor or genre" aria-label="Search movies" maxlength="100">
+      {% if selected_genre %}<input type="hidden" name="genre" value="{{ selected_genre }}">{% endif %}
+      <button type="submit">Search</button>
+    </form>
+  </section>
+
+  <section aria-labelledby="mv-list-h">
+    <div class="sp-sec-head"><h2 id="mv-list-h">All movies</h2><span class="sub">{{ products.paginator.count }} movie{{ products.paginator.count|pluralize }}</span></div>
+    {% if genres %}<div class="sp-cats"><a class="sp-chip-link {% if not selected_genre %}active{% endif %}" href="{% url 'marketplace:movies' %}{% if q %}?q={{ q|urlencode }}{% endif %}">All genres</a>{% for g in genres %}<a class="sp-chip-link {% if selected_genre|lower == g|lower %}active{% endif %}" href="?genre={{ g|urlencode }}{% if q %}&q={{ q|urlencode }}{% endif %}">{{ g }}</a>{% endfor %}</div>{% endif %}
+    {% if q %}<div class="sp-filter-note">Results for “{{ q }}” <a href="{% url 'marketplace:movies' %}{% if selected_genre %}?genre={{ selected_genre|urlencode }}{% endif %}" aria-label="Clear search"><svg class="i"><use href="#i-x"/></svg></a></div>{% endif %}
+    <div class="mv-grid" id="marketplace-product-grid">
+      {% for product in products %}{% include 'marketplace/_product_card.html' %}
+      {% empty %}<div class="sp-empty sp-empty-rich"><h3>No movies found</h3><p>{% if q or selected_genre %}Try a different title or genre.{% else %}Movies from our sellers will appear here soon.{% endif %}</p><div class="sp-empty-actions"><a class="sp-pill-btn" href="{% url 'marketplace:movies' %}">Show all movies</a></div></div>{% endfor %}
+    </div>
+    {% if products.has_other_pages %}<nav class="sp-pager" aria-label="Movie pages">{% if products.has_previous %}<a class="sp-pill-btn" href="?q={{ q|urlencode }}&genre={{ selected_genre|urlencode }}&page={{ products.previous_page_number }}">← Previous</a>{% endif %}<span>Page {{ products.number }} of {{ products.paginator.num_pages }}</span>{% if products.has_next %}<a class="sp-pill-btn" href="?q={{ q|urlencode }}&genre={{ selected_genre|urlencode }}&page={{ products.next_page_number }}">Next →</a>{% endif %}</nav>{% endif %}
+  </section>
+</div>
+{% endblock %}

@@ -1,0 +1,80 @@
+{% comment %}
+  Shared look of the system-notice banner (customer banner + HQ review preview).
+  Compact, professional card: tinted icon, type chip, 2-line message (tap to expand),
+  small action button, and a soft light travelling around the border.
+  Self-contained CSS, so no Tailwind rebuild is needed. Light/dark safe, reduced-motion safe.
+{% endcomment %}
+<style>
+.spn-stack{display:flex;flex-direction:column;gap:.45rem;margin:.6rem 1rem 0}
+.spn{--spn-bg:#f5f9ff;--spn-bd:#d5e3fb;--spn-fg:#1e3a8a;--spn-ac:#2563eb;--spn-chip:#dbeafe;--spn-btnfg:#fff;
+  position:relative;display:flex;align-items:flex-start;gap:.65rem;padding:.6rem .75rem;border-radius:.85rem;
+  background:linear-gradient(180deg,#fff 0%,var(--spn-bg) 100%);border:1px solid var(--spn-bd);color:var(--spn-fg);
+  box-shadow:0 1px 2px rgba(15,23,42,.05),0 4px 12px -6px rgba(15,23,42,.12);line-height:1.35}
+.spn[hidden]{display:none}
+.spn-brand{--spn-bg:#effcf9;--spn-bd:#bdeee6;--spn-fg:#134e4a;--spn-ac:#0d9488;--spn-chip:#ccfbf1}
+.spn-warning{--spn-bg:#fff8e6;--spn-bd:#f8e0a1;--spn-fg:#78350f;--spn-ac:#d97706;--spn-chip:#fef3c7}
+.spn-danger{--spn-bg:#fff0f0;--spn-bd:#f8c9c9;--spn-fg:#7f1d1d;--spn-ac:#dc2626;--spn-chip:#fee2e2}
+.spn-success{--spn-bg:#eefcf5;--spn-bd:#b7ecd2;--spn-fg:#064e3b;--spn-ac:#059669;--spn-chip:#d1fae5}
+[data-theme="dark"] .spn{--spn-bg:#0f2238;--spn-bd:#27425c;--spn-fg:#dbeafe;--spn-ac:#60a5fa;--spn-chip:#1e3a5f;--spn-btnfg:#0b1220;background:linear-gradient(180deg,#12283f 0%,var(--spn-bg) 100%);box-shadow:none}
+[data-theme="dark"] .spn-brand{--spn-bg:#0d2a2c;--spn-bd:#1f5a58;--spn-fg:#ccfbf1;--spn-ac:#2dd4bf;--spn-chip:#134e4a}
+[data-theme="dark"] .spn-warning{--spn-bg:#2a2210;--spn-bd:#6b5314;--spn-fg:#fde68a;--spn-ac:#fbbf24;--spn-chip:#4a3a0e}
+[data-theme="dark"] .spn-danger{--spn-bg:#2a1214;--spn-bd:#7f2a2f;--spn-fg:#fecaca;--spn-ac:#f87171;--spn-chip:#5b1d21}
+[data-theme="dark"] .spn-success{--spn-bg:#0d2a21;--spn-bd:#1f6b4f;--spn-fg:#a7f3d0;--spn-ac:#34d399;--spn-chip:#14532d}
+.spn-ico{flex:none;display:grid;place-items:center;width:1.9rem;height:1.9rem;border-radius:.6rem;background:var(--spn-chip);color:var(--spn-ac)}
+.spn-ico svg{width:1.05rem;height:1.05rem;display:block}
+.spn-body{flex:1;min-width:0}
+.spn-head{display:flex;align-items:center;gap:.45rem}
+.spn-badge{flex:none;font-size:.625rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:.1rem .45rem;border-radius:999px;background:var(--spn-chip);color:var(--spn-fg)}
+.spn-title{flex:1;min-width:0;font-size:.875rem;font-weight:650;letter-spacing:-.005em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.spn-msg{margin:.2rem 0 0;font-size:.8rem;opacity:.9;word-break:break-word;cursor:pointer;
+  display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden}
+.spn.spn-open .spn-msg{-webkit-line-clamp:unset;line-clamp:unset;display:block}
+.spn.spn-open .spn-title{white-space:normal}
+.spn-foot{display:flex;align-items:center;justify-content:space-between;gap:.6rem;margin-top:.4rem}
+.spn-meta{font-size:.68rem;opacity:.6;font-variant-numeric:tabular-nums}
+.spn-link{flex:none;display:inline-flex;align-items:center;gap:.3rem;font-size:.75rem;font-weight:600;line-height:1;white-space:nowrap;
+  padding:.4rem .7rem;border-radius:.55rem;background:var(--spn-ac);color:var(--spn-btnfg);text-decoration:none;
+  box-shadow:0 1px 2px rgba(15,23,42,.18);transition:transform .15s ease,box-shadow .15s ease,filter .15s ease}
+.spn-link>span{display:inline-flex;align-items:center}
+.spn-link svg{display:block;width:.9rem;height:.9rem;transition:transform .15s ease}
+.spn-link:hover{filter:brightness(1.07);box-shadow:0 3px 8px -2px color-mix(in srgb,var(--spn-ac) 60%,transparent)}
+.spn-link:hover svg{transform:scale(1.12)}
+.spn-link[hidden],.spn-x[hidden]{display:none}
+.spn-link:focus-visible,.spn-x:focus-visible{outline:2px solid var(--spn-ac);outline-offset:2px}
+.spn-x{flex:none;display:grid;place-items:center;width:1.5rem;height:1.5rem;margin:-.15rem -.25rem -.15rem 0;border:0;border-radius:.45rem;background:transparent;color:var(--spn-fg);opacity:.55;cursor:pointer;transition:background .15s,opacity .15s}
+.spn-x svg{width:.8rem;height:.8rem}
+.spn-x:hover{opacity:1;background:var(--spn-chip)}
+/* Soft light travelling around the border (colour follows the notice type). */
+@property --spn-angle{syntax:'<angle>';initial-value:0deg;inherits:false}
+.spn::before{content:"";position:absolute;inset:-1px;border-radius:inherit;padding:1.5px;pointer-events:none;
+  background:conic-gradient(from var(--spn-angle),transparent 0%,transparent 64%,var(--spn-ac) 88%,transparent 100%);
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0);
+  mask-composite:exclude;animation:spn-spin 4s linear infinite}
+.spn-danger::before{animation-duration:2.4s}
+.spn-warning::before{animation-duration:3.2s}
+@keyframes spn-spin{to{--spn-angle:360deg}}
+/* Gentle breathing glow, only for notices that need attention. */
+.spn-danger{animation:spn-glow-d 2.4s ease-in-out infinite}
+.spn-warning{animation:spn-glow-w 3.2s ease-in-out infinite}
+@keyframes spn-glow-d{0%,100%{box-shadow:0 1px 2px rgba(15,23,42,.05),0 0 0 0 transparent}50%{box-shadow:0 1px 2px rgba(15,23,42,.05),0 0 12px 1px color-mix(in srgb,var(--spn-ac) 36%,transparent)}}
+@keyframes spn-glow-w{0%,100%{box-shadow:0 1px 2px rgba(15,23,42,.05),0 0 0 0 transparent}50%{box-shadow:0 1px 2px rgba(15,23,42,.05),0 0 9px 0 color-mix(in srgb,var(--spn-ac) 26%,transparent)}}
+.spn-danger .spn-ico svg{animation:spn-pulse 1.8s ease-in-out infinite}
+@keyframes spn-pulse{0%,100%{opacity:1}50%{opacity:.5}}
+@media (max-width:640px){
+  .spn-stack{margin:.45rem .5rem 0}
+  .spn{padding:.55rem .65rem;gap:.55rem}
+}
+.spn-narrow .spn{padding:.55rem .65rem;gap:.55rem}
+@media (prefers-reduced-motion:reduce){.spn-danger .spn-ico svg,.spn-danger,.spn-warning{animation:none}.spn::before{animation:none;display:none}.spn-link,.spn-link svg{transition:none}}
+</style>
+<script>
+(function () {
+  if (window.__spNoticeExpand) return;
+  window.__spNoticeExpand = true;
+  document.addEventListener('click', function (e) {
+    var m = e.target.closest ? e.target.closest('.spn-msg') : null;
+    if (m) { var c = m.closest('.spn'); if (c) c.classList.toggle('spn-open'); }
+  });
+})();
+</script>

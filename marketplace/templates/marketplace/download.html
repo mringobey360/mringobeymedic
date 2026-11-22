@@ -1,0 +1,76 @@
+{% extends 'marketplace/base.html' %}{% load humanize %}{% block title %}Your download · SmartPOS Marketplace{% endblock %}{% block body %}
+<section class="panel" style="max-width:640px;margin:32px auto;padding:clamp(22px,4vw,40px)">
+  {% if state == 'ready' %}
+    <p class="eyebrow">SMARTPOS MARKETPLACE · DIGITAL DOWNLOAD</p>
+    <h1 style="overflow-wrap:anywhere">{{ item.name }}</h1>
+    <p class="muted">Your payment is confirmed. Download the file below and keep it somewhere safe.</p>
+    <div class="summary-line"><span>Format</span><strong>{{ product.digital_format|default:"File" }}</strong></div>
+    {% if product.digital_file_size %}<div class="summary-line"><span>Size</span><strong>{{ product.digital_file_size|filesizeformat }}</strong></div>{% endif %}
+    {% if store %}<div class="summary-line"><span>Sold by</span><strong>{{ store.public_name }}</strong></div>{% endif %}
+    <div class="summary-line"><span>Downloads left</span><strong>{{ grant.remaining }} of {{ grant.max_downloads }}</strong></div>
+    <form method="post" class="pay-actions" data-download-form data-no-loading style="margin-top:20px">{% csrf_token %}<button class="btn checkout-btn" type="submit" data-download-button>Download now</button></form>
+    <p class="muted" data-download-status role="status" aria-live="polite" style="font-size:.8125rem;margin-top:10px;min-height:1.2em"></p>
+    <script>
+    (function () {
+      var form = document.querySelector('[data-download-form]');
+      if (!form || form.dataset.downloadHandler === '1') return;
+      form.dataset.downloadHandler = '1';
+      var button = form.querySelector('[data-download-button]');
+      var status = document.querySelector('[data-download-status]');
+      var originalText = button ? button.textContent : 'Download now';
+      var locked = false;
+      form.addEventListener('submit', function (event) {
+        if (locked) { event.preventDefault(); return; }
+        locked = true;
+        if (button) {
+          button.disabled = true;
+          button.classList.remove('is-loading');
+          button.setAttribute('aria-busy', 'false');
+          button.textContent = 'Preparing download…';
+        }
+        if (status) status.textContent = 'Your download is being prepared. Check your browser downloads.';
+        // A file attachment does not navigate the page, so the global page-loading
+        // indicator cannot know when the browser has accepted the download.
+        // Stop the button spinner promptly without claiming the file fully completed.
+        window.setTimeout(function () {
+          if (button) {
+            button.classList.remove('is-loading');
+            button.removeAttribute('aria-busy');
+            button.textContent = 'Download requested';
+          }
+          if (status) status.textContent = 'Download requested. Check your browser’s Downloads list; large files may take time to finish.';
+        }, 1800);
+        // If a browser blocked the download, allow a retry after a short cooldown.
+        window.setTimeout(function () {
+          locked = false;
+          if (button) {
+            button.disabled = false;
+            button.classList.remove('is-loading');
+            button.removeAttribute('aria-busy');
+            button.textContent = originalText;
+          }
+        }, 6000);
+      });
+    }());
+    </script>
+    <p class="muted" style="font-size:.8125rem;margin-top:14px">Each press of the button counts as one download. If a download is interrupted, you can try again while downloads remain. Do not share this page: anyone with the link can use your downloads.</p>
+  {% elif state == 'limit' %}
+    <p class="eyebrow">SMARTPOS MARKETPLACE · DOWNLOAD</p>
+    <h1>Download limit reached</h1>
+    <p class="muted">This purchase has used all {{ grant.max_downloads }} downloads. Contact {% if store %}<b>{{ store.public_name }}</b>{% else %}the seller{% endif %} and quote your Ticket ID <code>{{ order.reference }}</code> if you need more.</p>
+  {% elif state == 'storage_error' %}
+    <p class="eyebrow">SMARTPOS MARKETPLACE · DOWNLOAD</p>
+    <h1>Download temporarily unavailable</h1>
+    <p class="muted">The payment is still confirmed, and this attempt has not been counted. Please try again shortly. If the problem continues, contact the seller and quote Ticket ID <code>{{ order.reference }}</code>.</p>
+  {% elif state == 'missing' %}
+    <p class="eyebrow">SMARTPOS MARKETPLACE · DOWNLOAD</p>
+    <h1>File temporarily unavailable</h1>
+    <p class="muted">The seller's file could not be found. You have not lost a download. Please contact {% if store %}<b>{{ store.public_name }}</b>{% else %}the seller{% endif %} with Ticket ID <code>{{ order.reference }}</code>.</p>
+  {% else %}
+    <p class="eyebrow">SMARTPOS MARKETPLACE · DOWNLOAD</p>
+    <h1>Download not available</h1>
+    <p class="muted">This download is not active: the order is not paid, was cancelled, or access was withdrawn. Ticket ID <code>{{ order.reference }}</code>.</p>
+  {% endif %}
+  <div class="pay-actions"><a class="btn outline" href="{% url 'marketplace:track' %}?reference={{ order.reference }}&phone={{ order.phone|urlencode }}">View order</a></div>
+</section>
+{% endblock %}

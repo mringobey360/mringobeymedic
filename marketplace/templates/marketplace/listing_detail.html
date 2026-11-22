@@ -1,0 +1,112 @@
+{% extends 'marketplace/base.html' %}{% load humanize cart_tags social_tags %}
+{% block title %}{{ listing.title }}{% endblock %}
+{% block head_extra %}
+<meta name="description" content="{{ listing.get_property_type_display }} {{ listing.get_purpose_display|lower }} in {{ listing.location_line }}. TSh {{ listing.price|floatformat:0|intcomma }} {{ listing.price_suffix }}.">
+<meta property="og:type" content="website"><meta property="og:title" content="{{ listing.title }} — TSh {{ listing.price|floatformat:0|intcomma }} {{ listing.price_suffix }}">
+<meta property="og:description" content="{{ listing.get_property_type_display }} {{ listing.get_purpose_display|lower }} · {{ listing.location_line }}">
+<meta property="og:url" content="{{ request.build_absolute_uri }}">
+{% if images %}<meta property="og:image" content="{{ request.scheme }}://{{ request.get_host }}{{ images.0.image.url }}">{% endif %}
+{% include 'marketplace/_ls_styles.html' %}{% endblock %}
+{% block body %}
+{% include 'marketplace/_ls_sprite.html' %}
+<div class="ls-page">
+  <nav class="sp-crumbs" aria-label="Breadcrumb"><a class="sp-back" href="{% url 'marketplace:listings' %}" aria-label="Back to properties"><svg class="i"><use href="#i-back"/></svg></a><a href="{% url 'marketplace:listings' %}">Properties</a><span class="sep">/</span><b>{{ listing.title }}</b></nav>
+  <div class="ls-detail">
+    <div style="display:grid;gap:1rem;min-width:0">
+      <div class="ls-gal">
+        {% if images %}
+        <div class="ls-main"><img id="ls-big" src="{{ images.0.image.url }}" alt="{{ listing.title }}">
+          
+        </div>
+        {% if images|length > 1 %}<div class="ls-thumbs" id="ls-thumbs">{% for im in images %}<button type="button" class="{% if forloop.first %}on{% endif %}" data-src="{{ im.image.url }}" aria-label="Photo {{ forloop.counter }}"><img src="{{ im.image.url }}" alt="" loading="lazy"></button>{% endfor %}</div>{% endif %}
+        {% else %}<div class="ls-main"><div class="ls-noimg" style="color:#cbd5e1">No photos yet</div></div>{% endif %}
+      </div>
+
+      <section class="ls-box ls-head">
+        <div style="display:flex;gap:.4rem;flex-wrap:wrap"><span class="ls-pill{% if listing.purpose == 'SALE' %} sale{% endif %}" style="position:static">{{ listing.get_purpose_display }}</span><span class="ls-pill" style="background:#475569">{{ listing.get_property_type_display }}</span>{% if listing.is_featured %}<span class="ls-pill feat">Featured</span>{% endif %}{% if listing.status == 'RESERVED' %}<span class="ls-pill res">Reserved</span>{% endif %}</div>
+        <h1>{{ listing.title }}</h1>
+        <div class="ls-loc" style="font-size:.9rem">📍 {{ listing.location_line }}{% if listing.landmark %} · near {{ listing.landmark }}{% endif %}</div>
+        <div class="ls-big" style="margin-top:.5rem">TSh {{ listing.price|floatformat:0|intcomma }} <small>{{ listing.price_suffix }}</small></div>
+        <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.3rem">{% if listing.negotiable %}<span class="ls-pill" style="background:#0369a1;position:static">Negotiable</span>{% endif %}{% if listing.installments %}<span class="ls-pill" style="background:#7c3aed;position:static">Instalments</span>{% endif %}</div>
+        {% if listing.payment_terms %}<p style="margin:.5rem 0 0;font-size:.85rem;color:#475569">Terms: {{ listing.payment_terms }}</p>{% endif %}
+      </section>
+
+      <section class="ls-box"><h2>Key details</h2>
+        <div class="ls-facts">
+          <div><small>Type</small><strong>{{ listing.get_property_type_display }}</strong></div>
+          {% if listing.size_value %}<div><small>Size</small><strong>{{ listing.size_value|floatformat:"-2" }} {{ listing.get_size_unit_display }}</strong></div>{% endif %}
+          {% if listing.bedrooms %}<div><small>Bedrooms</small><strong>{{ listing.bedrooms }}</strong></div>{% endif %}
+          {% if listing.bathrooms %}<div><small>Bathrooms</small><strong>{{ listing.bathrooms }}</strong></div>{% endif %}
+          {% if listing.title_type %}<div><small>Ownership document</small><strong>{{ listing.get_title_type_display }}</strong></div>{% endif %}
+          {% if listing.is_land %}<div><small>Surveyed</small><strong>{% if listing.surveyed %}Yes{% else %}No / unknown{% endif %}</strong></div>{% endif %}
+          <div><small>Listed</small><strong>{{ listing.published_at|default:listing.created_at|date:"d M Y" }}</strong></div>
+          <div><small>Views</small><strong>{{ listing.views_count }}</strong></div>
+        </div>
+      </section>
+
+      {% if listing.description %}<section class="ls-box"><h2>Description</h2><div class="ls-desc">{{ listing.description }}</div></section>{% endif %}
+      {% if listing.amenity_labels %}<section class="ls-box"><h2>Features &amp; amenities</h2><div class="ls-chips">{% for a in listing.amenity_labels %}<span>{{ a }}</span>{% endfor %}</div></section>{% endif %}
+
+      <section class="ls-box"><h2>Location</h2>
+        <p style="margin:0 0 .7rem;color:#334155;font-size:.9rem">{{ listing.location_line }}{% if listing.landmark %}<br><span style="color:#64748b">Landmark: {{ listing.landmark }}</span>{% endif %}</p>
+        <a class="ls-btn ls-out" style="display:inline-flex;padding:0 1.2rem" href="{{ listing.map_url }}" target="_blank" rel="noopener">Open in Google Maps ↗</a>
+      </section>
+    </div>
+
+    <aside class="ls-side">
+      <section class="ls-box">
+        {% if listing.status == 'CLOSED' %}<div class="ls-closed">This property is no longer available.</div>
+        {% else %}
+        <div class="ls-seller"><div class="lg">{% if store.logo %}<img src="{{ store.logo.url }}" alt="">{% else %}{{ store.public_name|slice:":1"|upper }}{% endif %}</div><div><strong style="color:#0f172a">{{ store.public_name }}</strong>{% if store.verified %} <span class="ls-pill" style="position:static;background:#15803d">✓ Verified</span>{% endif %}<br><a style="font-size:.78rem;color:#0f766e" href="{% url 'marketplace:seller_store_public' store.slug %}">View all from this seller</a>{% social_links store compact=True %}</div></div>
+        <div class="ls-cta" style="margin-top:.9rem">
+          {% if listing.contact_for_whatsapp %}<a class="ls-btn ls-wa" rel="noopener" target="_blank" href="https://wa.me/{{ listing.contact_for_whatsapp|intl_phone }}?text={{ 'Hello, I am interested in: '|urlencode }}{{ listing.title|urlencode }}%20({{ request.build_absolute_uri|urlencode }})"><svg viewBox="0 0 24 24"><use href="#i-whatsapp"/></svg> WhatsApp the owner</a>{% endif %}
+          <a class="ls-btn ls-call" href="tel:+{{ listing.contact_phone|intl_phone }}"><svg viewBox="0 0 24 24"><use href="#i-phone"/></svg> Call {{ listing.contact_phone }}</a>
+          <button class="ls-btn ls-out ls-share-btn" type="button" data-share aria-label="Share this property"><svg class="ls-share-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.7 10.7 6.6-4.4M8.7 13.3l6.6 4.4"/></svg><span>Share this listing</span></button>
+          <a class="ls-btn ls-out" href="{% url 'marketplace:listing_flyer' listing.slug %}" target="_blank" rel="noopener">Printable flyer + QR</a>
+        </div>
+        {% endif %}
+      </section>
+
+      {% if listing.status != 'CLOSED' %}
+      <section class="ls-box"><h2>Request a viewing / ask a question</h2>
+        <form class="ls-form" method="post" action="{% url 'marketplace:listing_inquiry' listing.slug %}">{% csrf_token %}
+          <div class="ls-hp" aria-hidden="true"><label>Website<input name="website" tabindex="-1" autocomplete="off"></label></div>
+          <div><label for="iq-name">Your name</label><input id="iq-name" name="name" required maxlength="120" value="{{ initial.name|default:'' }}" autocomplete="name"></div>
+          <div><label for="iq-phone">Your phone</label><input id="iq-phone" name="phone" type="tel" required inputmode="tel" value="{{ initial.phone|default:'' }}" autocomplete="tel" placeholder="0712 345 678"></div>
+          <div><label for="iq-date">Preferred viewing date (optional)</label><input id="iq-date" name="visit_date" type="date"></div>
+          <div><label for="iq-msg">Message</label><textarea id="iq-msg" name="message" rows="3" maxlength="1000" placeholder="Is it still available? Can I see it this weekend?"></textarea></div>
+          <button class="ls-btn ls-call" type="submit">Send enquiry</button>
+        </form>
+      </section>
+      {% endif %}
+
+      <div class="ls-safe"><b>Stay safe.</b> Never pay before you have visited the property and checked the documents. Verify ownership with the local authority, and pay only through a signed agreement. SmartPOS does not take payments for properties.
+        <br><br><details><summary style="cursor:pointer;font-weight:700">Report this advert</summary>
+        <form class="ls-form" method="post" action="{% url 'marketplace:listing_report' listing.slug %}" style="margin-top:.6rem">{% csrf_token %}
+          <div class="ls-hp" aria-hidden="true"><input name="website" tabindex="-1" autocomplete="off"></div>
+          <select name="reason" required style="padding:.5rem;border-radius:.5rem;border:1px solid #e2e8f0"><option value="">Select a reason</option>{% for v, label in report_reasons %}<option value="{{ v }}">{{ label }}</option>{% endfor %}</select>
+          <input name="details" maxlength="500" placeholder="What is wrong? (optional)">
+          <input name="phone" type="tel" placeholder="Your phone (optional)">
+          <button class="ls-btn ls-out" type="submit">Send report</button>
+        </form></details></div>
+    </aside>
+  </div>
+
+  {% if similar %}<section><h2 style="font-size:1.1rem;font-weight:700;margin:.5rem 0 .8rem">Similar properties</h2><div class="ls-grid">{% for l in similar %}{% include 'marketplace/_listing_card.html' %}{% endfor %}</div></section>{% endif %}
+</div>
+<script>
+(function(){
+  var big=document.getElementById('ls-big'),box=document.getElementById('ls-thumbs');
+  if(big&&box){
+    var btns=[].slice.call(box.querySelectorAll('button')),i=0,timer=null;
+    function go(n){if(!btns.length)return;i=(n+btns.length)%btns.length;big.src=btns[i].dataset.src;btns.forEach(function(b,k){b.classList.toggle('on',k===i);});}
+    btns.forEach(function(b,k){b.addEventListener('click',function(){go(k);restart();});});
+    function restart(){if(timer)clearInterval(timer);if(btns.length>1)timer=setInterval(function(){if(!document.hidden)go(i+1);},4200);}
+    var x=null;big.addEventListener('touchstart',function(e){x=e.touches[0].clientX;},{passive:true});
+    big.addEventListener('touchend',function(e){if(x===null)return;var d=e.changedTouches[0].clientX-x;if(Math.abs(d)>40){go(i+(d<0?1:-1));restart();}x=null;},{passive:true});
+    big.addEventListener('mouseenter',function(){if(timer)clearInterval(timer);});big.addEventListener('mouseleave',restart);restart();
+  }
+  document.querySelectorAll('[data-share]').forEach(function(btn){btn.addEventListener('click',async function(){var data={title:document.title,text:document.title,url:location.href};try{if(navigator.share)await navigator.share(data);else if(navigator.clipboard&&navigator.clipboard.writeText){await navigator.clipboard.writeText(location.href);var label=btn.querySelector('span');if(label){var old=label.textContent;label.textContent='Link copied';setTimeout(function(){label.textContent=old;},1800);}}else window.prompt('Copy this link',location.href);}catch(e){if(e&&e.name!=='AbortError')window.prompt('Copy this link',location.href);}});});
+})();
+</script>
+{% endblock %}

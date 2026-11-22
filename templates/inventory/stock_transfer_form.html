@@ -1,0 +1,455 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}New Stock Transfer · SmartPOS{% endblock %}
+{% block content %}
+<div class="mb-5">
+  <a href="{% url 'inventory:stock_transfer_list' %}" class="row-action">← Transfer history</a>
+  <p class="text-xs uppercase tracking-widest text-emerald-700 font-bold mt-4 mb-1">Inventory control</p>
+  <h1 class="text-2xl font-bold text-ink-900">New Stock Transfer</h1>
+  <p class="text-sm text-ink-500 mt-1">Transfer one or many products between branches in a single, all-or-nothing operation.</p>
+</div>
+
+{% if form_error %}
+<div class="rounded-xl border border-red-200 bg-red-50 text-red-800 text-sm p-4 mb-5" role="alert">
+  <strong class="block mb-1">Transfer not completed</strong>{{ form_error }}
+  <span class="block text-xs mt-1 text-red-700">Your cart has been kept. Fix any items marked in red, then try again.</span>
+</div>
+{% endif %}
+
+<form method="post" id="transferForm" novalidate>
+{% csrf_token %}
+<input type="hidden" name="idempotency_key" value="{{ idempotency_key }}">
+<input type="hidden" name="source_branch" value="{{ source.pk }}" id="source_branch_value">
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
+  <div class="lg:col-span-2 space-y-5">
+    <div class="card p-5">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="form-label" for="source_select">From branch</label>
+          <select class="form-input w-full" id="source_select">{% for branch in branches %}<option value="{{ branch.pk }}" {% if branch.pk == source.pk %}selected{% endif %}>{{ branch.name }}</option>{% endfor %}</select>
+          <p class="text-xs text-ink-500 mt-1">Stock will be deducted from this branch.</p>
+        </div>
+        <div>
+          <label class="form-label" for="destination_branch">To branch</label>
+          <select class="form-input w-full" id="destination_branch" name="destination_branch" required>{% for branch in destinations %}<option value="{{ branch.pk }}" {% if selected_destination == branch.pk|stringformat:"s" %}selected{% endif %}>{{ branch.name }}</option>{% endfor %}</select>
+          <p class="text-xs text-ink-500 mt-1">Only active branches you manage are listed.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card p-5">
+      <label class="form-label" for="batchSearch">Search and add products</label>
+      <div style="display:flex;gap:8px;align-items:stretch">
+        <input id="batchSearch" type="search" class="form-input w-full" style="flex:1 1 auto;min-width:0" placeholder="Search name, barcode or batch number…" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="batchSuggestions">
+        <button type="button" id="transferScanBtn" class="btn btn-primary" style="display:inline-flex;align-items:center;gap:8px;flex:none" aria-label="Scan product barcode with camera" title="Scan product barcode with camera">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><path d="M7 8v8M10.5 8v8M14 8v8M17 8v8"/></svg>
+          <span>Scan</span>
+        </button>
+      </div>
+      <div id="batchSuggestions" role="listbox" class="hidden border border-gray-200 rounded-xl bg-white shadow-sm mt-2 max-h-72 overflow-y-auto"></div>
+      <p id="batchSearchStatus" class="text-xs text-ink-500 mt-2" role="status" aria-live="polite">Type to find a product or batch, or scan its barcode (camera or USB scanner).</p>
+    </div>
+
+    <div class="card p-5">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="font-bold">Transfer cart <span id="cartBadge" class="text-xs font-semibold text-ink-500"></span></h2>
+        <button type="button" id="clearCart" class="text-xs text-red-600 hover:underline hidden">Clear cart</button>
+      </div>
+      <div id="cartEmpty" class="text-center text-sm text-ink-500 py-8 border border-dashed border-gray-200 rounded-xl">Cart is empty. Search above and add the batches you want to move.</div>
+      <ul id="cartList" class="space-y-3"></ul>
+    </div>
+  </div>
+
+  <aside class="card p-5 lg:sticky lg:top-4">
+    <h2 class="font-bold mb-3">Summary</h2>
+    <dl class="text-sm space-y-2">
+      <div class="flex justify-between"><dt class="text-ink-500">Products / batches</dt><dd class="font-bold" id="sumItems">0</dd></div>
+      <div class="flex justify-between"><dt class="text-ink-500">Total units</dt><dd class="font-bold" id="sumUnits">0</dd></div>
+    </dl>
+    <label class="form-label mt-4" for="note">Reason / note <span class="text-ink-400">(optional)</span></label>
+    <input class="form-input w-full" type="text" maxlength="255" id="note" name="note" value="{{ note }}" placeholder="e.g. Replenishment for high demand">
+    <p id="formProblem" class="text-xs text-red-600 mt-3 hidden" role="alert"></p>
+    <div class="flex flex-col gap-2 mt-5">
+      <button class="btn btn-primary" type="button" id="reviewBtn" disabled>Review transfer</button>
+      <a class="btn btn-secondary text-center" href="{% url 'inventory:stock_transfer_list' %}">Cancel</a>
+    </div>
+    <ul class="text-xs text-ink-500 space-y-1 mt-5">
+      <li>• Quantities are re-checked on the server when you confirm.</li>
+      <li>• If one item fails, nothing is transferred.</li>
+      <li>• Cost, price and expiry are carried to the destination.</li>
+      <li>• Expired batches cannot be transferred.</li>
+    </ul>
+  </aside>
+</div>
+
+<div id="reviewModal" class="fixed inset-0 z-[130] hidden items-center justify-center p-3" style="background:rgba(15,23,42,.6)" role="dialog" aria-modal="true" aria-labelledby="reviewTitle">
+  <div class="bg-white rounded-2xl w-full max-w-2xl max-h-[92dvh] flex flex-col shadow-2xl">
+    <div class="p-5 border-b"><h2 id="reviewTitle" class="font-bold text-lg">Review stock transfer</h2><p class="text-sm text-ink-500 mt-1" id="reviewRoute"></p></div>
+    <div class="p-5 overflow-y-auto"><table class="w-full text-sm"><thead><tr class="text-left text-ink-500 border-b"><th class="py-2">Product</th><th class="py-2">Batch</th><th class="py-2 text-right">Qty</th></tr></thead><tbody id="reviewRows"></tbody></table></div>
+    <div class="p-5 border-t flex flex-wrap items-center justify-between gap-3"><p class="text-sm"><strong id="reviewTotals"></strong></p><div class="flex gap-2"><button type="button" class="btn btn-secondary" id="reviewBack">Back to cart</button><button type="submit" class="btn btn-primary" id="confirmBtn">Confirm transfer</button></div></div>
+  </div>
+</div>
+<div id="confirmDialog" class="fixed inset-0 z-[140] hidden items-center justify-center p-4" style="background:rgba(15,23,42,.6)" role="alertdialog" aria-modal="true" aria-labelledby="cdTitle" aria-describedby="cdBody">
+  <div class="bg-white rounded-2xl w-full max-w-sm shadow-2xl p-5">
+    <div class="flex items-start gap-3">
+      <span id="cdIcon" class="shrink-0 rounded-full bg-red-50 text-red-600 w-10 h-10 flex items-center justify-center text-lg" aria-hidden="true">!</span>
+      <div class="min-w-0"><h3 id="cdTitle" class="font-bold text-ink-900 text-base"></h3><p id="cdBody" class="text-sm text-ink-500 mt-1 leading-5 break-words"></p></div>
+    </div>
+    <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 mt-5">
+      <button type="button" class="btn btn-secondary justify-center" id="cdCancel">Cancel</button>
+      <button type="button" class="btn btn-danger justify-center" id="cdOk">Yes, continue</button>
+    </div>
+  </div>
+</div>
+<div id="hiddenItems"></div>
+</form>
+
+{{ cart|json_script:"initial-cart" }}
+<style>
+.tsc-ov{position:fixed;inset:0;z-index:2147483000;background:rgba(15,23,42,.6);display:flex;align-items:flex-end;justify-content:center}
+.tsc-sheet{width:100%;max-width:660px;max-height:94vh;display:flex;flex-direction:column;background:#fff;border-radius:18px 18px 0 0;box-shadow:0 -10px 40px rgba(0,0,0,.25)}
+@media(min-width:700px){.tsc-ov{align-items:center}.tsc-sheet{border-radius:18px;max-height:90vh}}
+.tsc-body{overflow-y:auto;overscroll-behavior:contain;padding:16px 18px 6px}
+.tsc-badge{display:inline-block;font-size:10.5px;font-weight:800;letter-spacing:.08em;padding:3px 9px;border-radius:999px;background:#dbeafe;color:#1d4ed8}
+.tsc-title{margin:6px 0 2px;font-size:19px;font-weight:800;color:#0f172a;line-height:1.2;word-break:break-word}
+.tsc-sub{margin:0;font-size:12.5px;color:#64748b}
+.tsc-route{display:flex;align-items:center;gap:8px;margin:12px 0 0;padding:8px 12px;border-radius:10px;background:#f8fafc;border:1px solid #e2e8f0;font-size:13px;font-weight:700;color:#0f172a;flex-wrap:wrap}
+.tsc-route span.arrow{color:#0f766e}
+.tsc-cards{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.tsc-card{padding:12px 14px;border-radius:12px;border:1px solid #e2e8f0;background:#f8fafc;min-width:0}
+.tsc-card.is-src{background:#f0fdf4;border-color:#bbf7d0}.tsc-card.is-dst{background:#eff6ff;border-color:#bfdbfe}
+.tsc-label{font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#475569}
+.tsc-branch{font-size:12px;color:#334155;font-weight:700;margin-top:1px;word-break:break-word}
+.tsc-num{font-size:28px;font-weight:800;line-height:1.1;color:#0f172a;margin-top:6px}.tsc-unit{font-size:12.5px;font-weight:600;color:#475569;margin-left:4px}
+.tsc-after{margin-top:6px;font-size:12.5px;color:#0f766e;font-weight:700;min-height:18px}
+.tsc-chip{display:inline-block;margin-top:6px;font-size:11px;font-weight:800;padding:2px 9px;border-radius:999px;background:#fef3c7;color:#92400e}
+.tsc-sec{margin:14px 0 6px;font-size:11.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#475569}
+.tsc-tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tsc-tbl th{text-align:left;font-size:11px;color:#64748b;font-weight:700;padding:4px 6px;border-bottom:1px solid #e2e8f0}
+.tsc-tbl td{padding:7px 6px;border-bottom:1px solid #f1f5f9;color:#0f172a}
+.tsc-tbl .r{text-align:right}.tsc-tbl tr.is-exp td{color:#94a3b8;text-decoration:line-through}.tsc-tbl .take{font-weight:800;color:#0f766e}
+.tsc-qty{display:flex;gap:8px;align-items:center;margin-top:6px}
+.tsc-qty input{flex:1 1 auto;min-width:0;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:10px;padding:10px 12px;font-size:20px;font-weight:800;min-height:48px;color:#0f172a}
+.tsc-qty input:focus{outline:2px solid rgba(15,118,110,.2);border-color:#0f766e}
+.tsc-max{border:1px solid #cbd5e1;background:#fff;border-radius:10px;padding:0 14px;min-height:48px;font-weight:800;color:#0f766e;cursor:pointer}
+.tsc-help{margin:4px 0 0;font-size:11.5px;color:#94a3b8}
+.tsc-err{margin:8px 0 0;font-size:13px;font-weight:700;color:#dc2626}
+.tsc-note{margin:8px 0 0;padding:8px 10px;border-radius:8px;font-size:12.5px;background:#fffbeb;border:1px solid #fde68a;color:#92400e}
+.tsc-note.is-info{background:#eff6ff;border-color:#bfdbfe;color:#1e40af}
+.tsc-foot{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;padding:12px 18px max(14px,env(safe-area-inset-bottom));border-top:1px solid #e2e8f0;background:#fff}
+.tsc-btn{border:1px solid #cbd5e1;background:#fff;color:#334155;border-radius:10px;padding:11px 16px;font-size:14px;font-weight:700;cursor:pointer;min-height:44px}
+.tsc-btn.is-primary{background:#0f766e;border-color:#0f766e;color:#fff}.tsc-btn.is-strong{background:#115e59;border-color:#115e59}
+.tsc-btn[disabled]{opacity:.5;cursor:not-allowed}
+@media(max-width:520px){.tsc-cards{grid-template-columns:1fr}.tsc-foot .tsc-btn{flex:1 1 auto}}
+</style>
+<script src="{% static 'js/pm-scanner.js' %}?v=2"></script>
+<script>
+(function () {
+  const searchUrl = "{% url 'inventory:stock_transfer_search' %}";
+  const scanUrl = "{% url 'inventory:stock_transfer_scan' %}";
+  const sourceId = "{{ source.pk }}";
+  const $ = id => document.getElementById(id);
+  const search = $('batchSearch'), suggestions = $('batchSuggestions'), status = $('batchSearchStatus');
+  const cartList = $('cartList'), cartEmpty = $('cartEmpty'), cartBadge = $('cartBadge'), clearBtn = $('clearCart');
+  const reviewBtn = $('reviewBtn'), modal = $('reviewModal'), form = $('transferForm'), problem = $('formProblem');
+  const dest = $('destination_branch'), sourceSel = $('source_select');
+  let cart = [];
+  try { cart = JSON.parse($('initial-cart').textContent) || []; } catch (e) { cart = []; }
+  let timer = null, seq = 0, submitting = false;
+  const dlg = $('confirmDialog');
+  function askConfirm({ title, body, ok = 'Yes, continue', danger = true }) {
+    return new Promise(resolve => {
+      const prev = document.activeElement, okBtn = $('cdOk'), cancel = $('cdCancel');
+      $('cdTitle').textContent = title; $('cdBody').textContent = body; okBtn.textContent = ok;
+      okBtn.className = 'btn justify-center ' + (danger ? 'btn-danger' : 'btn-primary');
+      $('cdIcon').className = 'shrink-0 rounded-full w-10 h-10 flex items-center justify-center text-lg ' + (danger ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-700');
+      dlg.classList.remove('hidden'); dlg.classList.add('flex'); cancel.focus();
+      const done = v => {
+        dlg.classList.add('hidden'); dlg.classList.remove('flex');
+        okBtn.removeEventListener('click', yes); cancel.removeEventListener('click', no);
+        dlg.removeEventListener('click', backdrop); document.removeEventListener('keydown', key, true);
+        if (prev && prev.isConnected) prev.focus(); resolve(v);
+      };
+      const yes = () => done(true), no = () => done(false), backdrop = e => { if (e.target === dlg) done(false); };
+      const key = e => {
+        if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); done(false); }
+        else if (e.key === 'Tab') { const f = [cancel, okBtn], i = f.indexOf(document.activeElement); e.preventDefault(); f[(i + (e.shiftKey ? -1 : 1) + f.length) % f.length].focus(); }
+      };
+      okBtn.addEventListener('click', yes); cancel.addEventListener('click', no);
+      dlg.addEventListener('click', backdrop); document.addEventListener('keydown', key, true);
+    });
+  }
+  const fmt = n => Number(n || 0).toLocaleString();
+  const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text !== undefined) n.textContent = text; return n; };
+  const inCart = id => cart.some(c => c.id === id);
+  const lineProblem = c => {
+    if (c.expired) return 'Batch imeexpire.';
+    if (!Number.isInteger(c.qty) || c.qty < 1) return 'Weka kiasi cha angalau 1.';
+    if (c.qty > c.available) return 'Kiasi kinazidi stock (' + fmt(c.available) + ').';
+    return '';
+  };
+  function cartProblem() {
+    if (!cart.length) return 'Ongeza angalau bidhaa moja.';
+    if (!dest.value) return 'Choose a destination branch.';
+    if (dest.value === sourceId) return 'Source na destination haziwezi kuwa sawa.';
+    const bad = cart.find(c => lineProblem(c));
+    return bad ? bad.product + ': ' + lineProblem(bad) : '';
+  }
+  function updateSummary() {
+    const units = cart.reduce((s, c) => s + (Number.isInteger(c.qty) && c.qty > 0 ? c.qty : 0), 0);
+    $('sumItems').textContent = cart.length; $('sumUnits').textContent = fmt(units);
+    cartBadge.textContent = cart.length ? '· ' + cart.length + (cart.length === 1 ? ' batch' : ' batches') : '';
+    cartEmpty.classList.toggle('hidden', cart.length > 0); clearBtn.classList.toggle('hidden', !cart.length);
+    const p = cartProblem(); reviewBtn.disabled = !!p;
+    problem.textContent = cart.length ? p : ''; problem.classList.toggle('hidden', !(cart.length && p));
+  }
+  function renderCart() {
+    cartList.replaceChildren();
+    cart.forEach((c, idx) => {
+      const err = c.error || lineProblem(c);
+      const li = el('li', 'rounded-xl border p-3 ' + (err ? 'border-red-300 bg-red-50' : 'border-gray-200'));
+      const top = el('div', 'flex items-start justify-between gap-3');
+      const info = el('div');
+      info.append(el('div', 'font-semibold', c.product), el('div', 'text-xs text-ink-500', c.batch + ' · Available ' + fmt(c.available) + ' ' + c.unit + (c.expiry ? ' · Exp ' + c.expiry : '')));
+      const rm = el('button', 'text-xs text-red-600 hover:underline shrink-0', 'Remove'); rm.type = 'button';
+      rm.addEventListener('click', async () => {
+        const ok = await askConfirm({ title: 'Remove this item?', body: c.product + ' (' + c.batch + ', ' + (Number.isInteger(c.qty) ? fmt(c.qty) : '0') + ' ' + c.unit + ') will be removed from the transfer cart.', ok: 'Yes, remove' });
+        if (!ok) return; const at = cart.indexOf(c); if (at > -1) cart.splice(at, 1);
+        renderCart(); status.textContent = c.product + ' removed from cart.';
+      });
+      top.append(info, rm);
+      const row = el('div', 'flex items-center gap-2 mt-2');
+      const lab = el('label', 'text-xs text-ink-500', 'Transfer quantity'); lab.htmlFor = 'qty-' + c.id;
+      const inp = el('input', 'form-input w-28'); inp.type = 'number'; inp.min = '1'; inp.max = String(c.available);
+      inp.id = 'qty-' + c.id; inp.inputMode = 'numeric'; inp.value = Number.isInteger(c.qty) ? c.qty : '';
+      const msg = el('div', 'text-xs text-red-600 mt-1', err);
+      inp.addEventListener('input', () => {
+        c.qty = inp.value === '' ? NaN : parseInt(inp.value, 10); c.error = '';
+        const e2 = lineProblem(c); msg.textContent = e2;
+        li.className = 'rounded-xl border p-3 ' + (e2 ? 'border-red-300 bg-red-50' : 'border-gray-200'); updateSummary();
+      });
+      const all = el('button', 'text-xs text-emerald-700 hover:underline', 'Max'); all.type = 'button';
+      all.addEventListener('click', () => { c.qty = c.available; inp.value = c.available; inp.dispatchEvent(new Event('input')); });
+      row.append(lab, inp, all);
+      li.append(top, row, msg); cartList.appendChild(li);
+    });
+    updateSummary();
+  }
+  function add(item) {
+    if (inCart(item.id)) { status.textContent = item.product + ' (' + item.batch + ') tayari ipo kwenye cart.'; return; }
+    cart.push(Object.assign({}, item, { qty: 1, error: '' }));
+    renderCart(); suggestions.classList.add('hidden'); search.value = ''; search.focus();
+    status.textContent = item.product + ' imeongezwa. Weka quantity kwenye cart.';
+  }
+  const closeList = () => { suggestions.classList.add('hidden'); search.setAttribute('aria-expanded', 'false'); };
+  async function runSearch() {
+    const term = search.value.trim();
+    if (!term) { suggestions.replaceChildren(); closeList(); status.textContent = 'Type to find a product or batch.'; return; }
+    const mine = ++seq; status.textContent = 'Searching…';
+    try {
+      const r = await fetch(searchUrl + '?source=' + encodeURIComponent(sourceId) + '&q=' + encodeURIComponent(term), { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' });
+      if (!r.ok) throw new Error('bad status');
+      const data = await r.json(); if (mine !== seq) return;
+      suggestions.replaceChildren();
+      data.results.forEach(it => {
+        const dup = inCart(it.id), b = el('button', 'block w-full text-left px-4 py-3 border-b border-gray-100 text-sm ' + (dup || it.expired ? 'opacity-60 cursor-not-allowed' : 'hover:bg-emerald-50 focus:bg-emerald-50 focus:outline-none'));
+        b.type = 'button'; b.setAttribute('role', 'option'); b.disabled = dup || it.expired;
+        b.append(el('span', 'font-semibold', it.product), el('span', 'block text-xs text-ink-500', it.batch + ' · Available ' + fmt(it.available) + ' ' + it.unit + (it.expiry ? ' · Exp ' + it.expiry : '') + (it.expired ? ' · EXPIRED' : '') + (dup ? ' · Already in cart' : '')));
+        b.addEventListener('click', () => add(it)); suggestions.appendChild(b);
+      });
+      if (data.total > data.results.length) suggestions.appendChild(el('p', 'px-4 py-2 text-xs text-gray-500', 'Showing first ' + data.results.length + ' of ' + data.total + '. Type more to narrow the search.'));
+      const has = data.results.length > 0; suggestions.classList.toggle('hidden', !has); search.setAttribute('aria-expanded', has ? 'true' : 'false');
+      status.textContent = has ? data.total + ' matching batches' : 'No matching batches with stock.';
+    } catch (e) { if (mine === seq) status.textContent = 'Search imeshindikana. Angalia mtandao kisha jaribu tena.'; }
+  }
+  search.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(runSearch, 250); });
+  search.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeList();
+    if (e.key === 'ArrowDown') { e.preventDefault(); suggestions.querySelector('button:not([disabled])')?.focus(); }
+    if (e.key === 'Enter') { e.preventDefault(); enterScan(); }
+  });
+  suggestions.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { closeList(); search.focus(); }
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault(); const bs = Array.from(suggestions.querySelectorAll('button:not([disabled])'));
+      bs[bs.indexOf(document.activeElement) + (e.key === 'ArrowDown' ? 1 : -1)]?.focus();
+    }
+  });
+  document.addEventListener('click', e => { if (!search.contains(e.target) && !suggestions.contains(e.target)) closeList(); });
+  clearBtn.addEventListener('click', async () => {
+    const n = cart.length, units = cart.reduce((t, c) => t + (Number.isInteger(c.qty) && c.qty > 0 ? c.qty : 0), 0);
+    const ok = await askConfirm({ title: 'Clear the whole cart?', body: n + (n === 1 ? ' item' : ' items') + ' (' + fmt(units) + ' units) will be removed. No stock has been moved yet.', ok: 'Yes, clear cart' });
+    if (ok) { cart = []; renderCart(); status.textContent = 'Cart cleared.'; search.focus(); }
+  });
+  dest.addEventListener('change', updateSummary);
+  sourceSel.addEventListener('change', async () => {
+    const target = sourceSel.value;
+    if (cart.length) {
+      sourceSel.value = sourceId;
+      const ok = await askConfirm({ title: 'Change source branch?', body: 'Your current cart (' + cart.length + (cart.length === 1 ? ' item' : ' items') + ') belongs to the selected source branch and will be cleared.', ok: 'Yes, change branch' });
+      if (!ok) return; sourceSel.value = target;
+    }
+    submitting = true; window.location.href = '?source=' + encodeURIComponent(target);
+  });
+  function openReview() {
+    const p = cartProblem(); if (p) { updateSummary(); return; }
+    const rows = $('reviewRows'); rows.replaceChildren();
+    cart.forEach(c => { const tr = el('tr', 'border-b'); tr.append(el('td', 'py-2 font-medium', c.product), el('td', 'py-2 text-ink-500', c.batch), el('td', 'py-2 text-right font-bold', fmt(c.qty) + ' ' + c.unit)); rows.appendChild(tr); });
+    const units = cart.reduce((s, c) => s + c.qty, 0);
+    $('reviewRoute').textContent = sourceSel.options[sourceSel.selectedIndex].text + '  →  ' + dest.options[dest.selectedIndex].text;
+    $('reviewTotals').textContent = cart.length + ' batches · ' + fmt(units) + ' total units';
+    modal.classList.remove('hidden'); modal.classList.add('flex'); $('confirmBtn').focus();
+  }
+  const closeReview = () => { modal.classList.add('hidden'); modal.classList.remove('flex'); };
+  reviewBtn.addEventListener('click', openReview); $('reviewBack').addEventListener('click', closeReview);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeReview(); });
+  form.addEventListener('submit', e => {
+    if (submitting) { e.preventDefault(); return; }
+    if (cartProblem()) { e.preventDefault(); closeReview(); updateSummary(); return; }
+    submitting = true; const box = $('hiddenItems'); box.replaceChildren();
+    cart.forEach(c => {
+      [['item_batch', c.id], ['item_qty', c.qty]].forEach(([n, v]) => { const i = document.createElement('input'); i.type = 'hidden'; i.name = n; i.value = v; box.appendChild(i); });
+    });
+    const b = $('confirmBtn'); b.disabled = true; b.textContent = 'Processing transfer…'; reviewBtn.disabled = true;
+  });
+  // If the request never replaces the page (offline, download, timeout) release the form again.
+  document.addEventListener('sp:buttons-restored', () => {
+    submitting = false; const b = $('confirmBtn'); b.disabled = false; b.textContent = 'Confirm transfer'; updateSummary();
+  });
+  window.addEventListener('beforeunload', e => { if (cart.length && !submitting) { e.preventDefault(); e.returnValue = ''; } });
+
+  // ---------- Scan a product (camera, USB / Bluetooth scanner, or code + Enter) -> professional transfer sheet ----------
+  const scanBtn = $('transferScanBtn');
+  let pendingScan = null, scanSheet = null, lastVia = 'usb';
+  const toast = (m, k) => { if (typeof window.showToast === 'function') window.showToast(m, k || 'success'); };
+  const looksLikeCode = v => /^\d{6,}$/.test(v) || /^PM\d+$/i.test(v) || /^SKU-/i.test(v) || /^\(?01\)?\d{14}/.test(v);
+
+  async function scanLookup(raw) {
+    if (!dest.value) return { ok: false, message: 'Choose the destination branch first.' };
+    const parsed = window.PMScanner ? PMScanner.parse(raw) : { code: String(raw || '').trim() };
+    if (parsed.link) return { ok: false, message: 'That is a brand link/QR, not a product barcode. Scan the barcode (black lines).' };
+    if (!parsed.code) return { ok: false, message: 'Empty code.' };
+    let data;
+    try {
+      const r = await fetch(scanUrl + '?source=' + encodeURIComponent(sourceId) + '&destination=' + encodeURIComponent(dest.value) + '&code=' + encodeURIComponent(parsed.code),
+        { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' });
+      if ((r.headers.get('content-type') || '').indexOf('json') === -1) throw new Error('session');
+      data = await r.json();
+    } catch (e) { return { ok: false, message: 'Could not check this product (network or session problem). Please try again.' }; }
+    if (data.status === 'ok') { pendingScan = data; return { ok: true, message: data.product.name + '. Opening the transfer form...' }; }
+    return { ok: false, message: data.message || 'This code could not be read. Please try again.' };
+  }
+
+  function openCamera() {
+    if (!window.PMScanner) { toast('The scanner could not be loaded. Please reload the page.', 'error'); return; }
+    lastVia = 'camera'; pendingScan = null;
+    PMScanner.open({
+      title: 'Scan product to transfer',
+      hint: 'Scan the product barcode. The transfer form opens with stock for both branches.',
+      continuous: false,
+      onResult: p => scanLookup(p.raw),
+      onClose: () => { if (pendingScan) { const d = pendingScan; pendingScan = null; openScanSheet(d); } else search.focus(); }
+    });
+  }
+  scanBtn.addEventListener('click', openCamera);
+
+  // USB / Bluetooth scanners type the code into the search box and press Enter.
+  async function enterScan() {
+    const v = search.value.trim();
+    if (!/^[A-Za-z0-9\-_.\/\x1d()]{4,64}$/.test(v) || scanSheet) return;
+    clearTimeout(timer); seq++;
+    const res = await scanLookup(v);
+    if (res.ok) {
+      lastVia = 'usb'; search.value = ''; closeList();
+      if (window.PMScanner) PMScanner.beep(true);
+      const d = pendingScan; pendingScan = null; openScanSheet(d);
+    } else if (looksLikeCode(v)) {
+      if (window.PMScanner) PMScanner.beep(false);
+      toast(res.message, 'warning'); status.textContent = res.message;
+    }
+  }
+
+  const remainingFor = b => { const c = cart.find(x => x.id === b.id); return Math.max(0, b.available - (c && Number.isInteger(c.qty) ? c.qty : 0)); };
+
+  function openScanSheet(d) {
+    if (scanSheet) scanSheet.remove();
+    const prod = d.product, src = d.source, dst = d.dest;
+    const batches = d.batches;                                  // already in FEFO order (oldest expiry first)
+    const usable = batches.filter(b => !b.expired);
+    const inCartUnits = () => usable.reduce((s, b) => s + (b.available - remainingFor(b)), 0);
+    const maxQty = () => usable.reduce((s, b) => s + remainingFor(b), 0);
+
+    const ov = el('div', 'tsc-ov'); ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true'); ov.setAttribute('aria-label', 'Transfer product');
+    const sheet = el('div', 'tsc-sheet'), body = el('div', 'tsc-body'), foot = el('div', 'tsc-foot');
+    body.append(el('span', 'tsc-badge', 'TRANSFER'), el('h2', 'tsc-title', prod.name),
+      el('p', 'tsc-sub', (prod.barcode ? 'Barcode ' + prod.barcode + ' \u00b7 ' : '') + 'Moves stock between branches. Cost, price and expiry go with it.'));
+    const route = el('div', 'tsc-route'); route.append(el('span', '', src.name), el('span', 'arrow', '\u2192'), el('span', '', dst ? dst.name : '\u2014')); body.appendChild(route);
+
+    const cards = el('div', 'tsc-cards');
+    const mkCard = (cls, label, branch) => { const c = el('div', 'tsc-card ' + cls); const n = el('div', 'tsc-num'), u = el('span', 'tsc-unit', prod.unit); const a = el('div', 'tsc-after');
+      c.append(el('div', 'tsc-label', label), el('div', 'tsc-branch', branch), n, a); n.appendChild(u); return { c, n, u, a }; };
+    const sc = mkCard('is-src', 'Available to send', src.name), dc = mkCard('is-dst', 'Current stock there', dst ? dst.name : '\u2014');
+    cards.append(sc.c, dc.c); body.appendChild(cards);
+    const setNum = (card, v) => { card.n.replaceChildren(document.createTextNode(fmt(v)), card.u); };
+    if (dst && !dst.exists) { const chip = el('span', 'tsc-chip', 'Not stocked yet'); dc.c.appendChild(chip); }
+
+    body.appendChild(el('div', 'tsc-sec', 'Batches in ' + src.name + ' (oldest expiry first)'));
+    const tbl = el('table', 'tsc-tbl'), thead = el('thead'), htr = el('tr');
+    ['Batch', 'Expiry', 'Available', 'Sending'].forEach((t, i) => htr.appendChild(el('th', i > 1 ? 'r' : '', t))); thead.appendChild(htr);
+    const tb = el('tbody'); tbl.append(thead, tb); body.appendChild(tbl);
+    const rows = batches.map(b => { const tr = el('tr', b.expired ? 'is-exp' : ''); const tdT = el('td', 'r take', '');
+      tr.append(el('td', '', b.batch), el('td', '', b.expiry ? b.expiry + (b.expired ? ' (expired)' : '') : '\u2014'), el('td', 'r', ''), tdT); tb.appendChild(tr); return { b, avail: tr.children[2], take: tdT }; });
+
+    body.appendChild(el('div', 'tsc-sec', 'Quantity to transfer'));
+    const qrow = el('div', 'tsc-qty'), qin = el('input'); qin.type = 'number'; qin.min = '1'; qin.step = '1'; qin.inputMode = 'numeric'; qin.value = '1'; qin.setAttribute('aria-label', 'Quantity to transfer'); qin.autocomplete = 'off';
+    const maxBtn = el('button', 'tsc-max', 'Max'); maxBtn.type = 'button'; qrow.append(qin, maxBtn); body.appendChild(qrow);
+    body.appendChild(el('p', 'tsc-help', 'Split across batches automatically, oldest expiry first. Units already in your transfer cart are not counted twice.'));
+    const msg = el('div'); body.appendChild(msg);
+
+    const cancel = el('button', 'tsc-btn', 'Cancel'), add = el('button', 'tsc-btn is-primary', 'Add to transfer'), next = el('button', 'tsc-btn is-primary is-strong', 'Add & scan next');
+    [cancel, add, next].forEach(b => b.type = 'button'); foot.append(cancel, add, next);
+    sheet.append(body, foot); ov.appendChild(sheet); document.body.appendChild(ov); scanSheet = ov;
+
+    function allocate(q) {
+      const lines = []; let left = q;
+      for (const b of usable) { if (left <= 0) break; const take = Math.min(remainingFor(b), left); if (take > 0) { lines.push({ b, take }); left -= take; } }
+      return left > 0 ? null : lines;
+    }
+    function refresh() {
+      const q = qin.value === '' ? NaN : Number(qin.value), mx = maxQty(), carted = inCartUnits();
+      const valid = Number.isInteger(q) && q >= 1 && q <= mx;
+      const plan = valid ? allocate(q) : null, takeBy = {}; (plan || []).forEach(l => { takeBy[l.b.id] = l.take; });
+      rows.forEach(r => { r.avail.textContent = r.b.expired ? '\u2014' : fmt(remainingFor(r.b)); r.take.textContent = takeBy[r.b.id] ? fmt(takeBy[r.b.id]) : ''; });
+      setNum(sc, mx); sc.a.textContent = valid ? 'After: ' + fmt(Math.max(0, src.stock - carted - q)) + ' left' : (carted ? fmt(carted) + ' already in cart' : '');
+      if (dst) { setNum(dc, dst.stock); dc.a.textContent = valid ? 'After: ' + fmt(dst.stock + carted + q) : ''; } else { dc.n.textContent = '\u2014'; }
+      msg.replaceChildren();
+      if (qin.value !== '' && !valid) msg.appendChild(el('p', 'tsc-err', !Number.isInteger(q) || q < 1 ? 'Enter a whole number of at least 1.' : 'Only ' + fmt(mx) + ' ' + prod.unit + ' available to transfer.'));
+      if (valid) {
+        const left = src.stock - carted - q;
+        if (left <= (prod.reorder_level || 0)) msg.appendChild(el('p', 'tsc-note', 'This leaves ' + fmt(Math.max(0, left)) + ' in ' + src.name + (prod.reorder_level ? ', at or below its reorder level (' + fmt(prod.reorder_level) + ').' : '. Nothing will be left for sale there.')));
+        if (dst && !dst.exists) msg.appendChild(el('p', 'tsc-note is-info', dst.name + ' does not stock this product yet. It will be created there automatically.'));
+      }
+      add.disabled = next.disabled = !valid;
+    }
+    function commit() {
+      const q = Number(qin.value), plan = allocate(q); if (!plan) { refresh(); return false; }
+      plan.forEach(({ b, take }) => { const ex = cart.find(c => c.id === b.id); if (ex) ex.qty = (Number.isInteger(ex.qty) ? ex.qty : 0) + take; else cart.push(Object.assign({}, b, { qty: take, error: '' })); });
+      renderCart(); closeList();
+      const m = fmt(q) + ' ' + prod.unit + ' of ' + prod.name + ' added (' + plan.map(l => l.b.batch + ': ' + fmt(l.take)).join(', ') + ').';
+      status.textContent = m; toast(m, 'success'); if (window.PMScanner) PMScanner.beep(true); return true;
+    }
+    const close = () => { ov.remove(); scanSheet = null; document.removeEventListener('keydown', onKey, true); };
+    const onKey = e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); search.focus(); } };
+    document.addEventListener('keydown', onKey, true);
+    qin.addEventListener('input', refresh);
+    qin.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); if (!add.disabled && commit()) { close(); search.focus(); } } });
+    maxBtn.addEventListener('click', () => { qin.value = maxQty(); refresh(); qin.focus(); });
+    cancel.addEventListener('click', () => { close(); search.focus(); });
+    add.addEventListener('click', () => { if (commit()) { close(); search.focus(); } });
+    next.addEventListener('click', () => { if (commit()) { close(); if (lastVia === 'camera') openCamera(); else search.focus(); } });
+    refresh(); setTimeout(() => { qin.focus(); qin.select(); }, 40);
+  }
+  renderCart(); search.focus();
+})();
+</script>
+{% endblock %}

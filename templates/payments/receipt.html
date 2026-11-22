@@ -1,0 +1,63 @@
+{% load static humanize %}<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Payment receipt · SmartPOS</title>
+<link rel="icon" href="{% static 'img/smartPOS.svg' %}">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+{% include "payments/_pay_base_css.html" %}
+<style>
+.rc{max-width:560px;margin:18px auto 0}
+.tools{display:flex;justify-content:space-between;align-items:center;margin:16px 0 12px;font-size:13px}
+.tools a{text-decoration:none;font-weight:600;color:var(--ink2)}
+.rc-head{background:linear-gradient(135deg,var(--brand-d),var(--brand));color:#fff;padding:20px;border-radius:var(--r) var(--r) 0 0}
+.rc-head .who{display:flex;align-items:center;gap:10px;font-weight:800}
+.rc-head .who img{width:36px;height:36px;border-radius:9px;object-fit:contain;padding:5px;background:#fff}
+.rc-head .who small{display:block;font-weight:500;font-size:11.5px;opacity:.75}
+.rc-amt{margin-top:18px;display:flex;justify-content:space-between;align-items:flex-end;gap:10px}
+.rc-amt small{font-size:12px;opacity:.75}
+.rc-amt b{display:block;font-size:28px;letter-spacing:-.02em;line-height:1.15}
+.tag{font-size:12px;font-weight:800;background:rgba(255,255,255,.18);border-radius:999px;padding:5px 12px}
+.rc-body{padding:6px 20px 4px}
+.r{display:flex;justify-content:space-between;gap:14px;padding:11px 0;border-bottom:1px dashed var(--line);font-size:13.5px}
+.r span{color:var(--ink2)}.r b{text-align:right;font-weight:600;word-break:break-all}
+.r b.m{font:600 12px ui-monospace,Menlo,Consolas,monospace}
+.ver{margin:14px 20px 18px;padding:12px 14px;border-radius:12px;background:#ecfdf5;color:#065f46;font-size:12.5px;display:flex;gap:10px;align-items:flex-start}
+.ver.p{background:#f8fafc;color:var(--ink2)}
+.rc-foot{border-top:1px solid var(--line);text-align:center;padding:12px;font-size:12px;color:var(--ink3)}
+@media print{.tools,.foot{display:none!important}body{background:#fff}.card{box-shadow:none;border:0}.rc-head{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+</style>
+<style id="sp-no-flash">
+/* Consistency: no default blue tap/selection flash on any clickable element, on every page. */
+html{-webkit-tap-highlight-color:transparent!important}
+a,button,input,select,textarea,label,summary,[role="button"],[onclick],.btn,.nav-link,.card{-webkit-tap-highlight-color:transparent!important;-webkit-touch-callout:none}
+a,button,summary,[role="button"],.btn,.nav-link{touch-action:manipulation}
+button,[role="button"],.btn,.nav-link,summary,.sidebar-text{-webkit-user-select:none;user-select:none}
+a:focus:not(:focus-visible),button:focus:not(:focus-visible),[role="button"]:focus:not(:focus-visible),summary:focus:not(:focus-visible),.btn:focus:not(:focus-visible),.nav-link:focus:not(:focus-visible){outline:none!important;box-shadow:none}
+</style>
+</head>
+<body>
+<div class="wrap rc">
+  <div class="tools"><a href="{{ final_url }}">&larr; Back to SmartPOS</a><button class="btn" onclick="window.print()" style="min-height:38px;padding:0 14px">Print receipt</button></div>
+  <section class="card" style="overflow:hidden">
+    <div class="rc-head">
+      <div class="who"><img src="{% static 'img/smartpos-icon.svg' %}" alt="SmartPOS"><div>SmartPOS<small>Online payment receipt</small></div></div>
+      <div class="rc-amt"><div><small>Amount paid</small><b>{{ txn.currency }} {{ txn.amount|floatformat:0|intcomma }}</b></div><span class="tag">{% if txn.status == 'COMPLETED' %}PAID{% else %}{{ txn.get_status_display|upper }}{% endif %}</span></div>
+    </div>
+    <div class="rc-body">
+      <div class="r"><span>Service</span><b>{{ txn.get_purpose_display }}</b></div>
+      <div class="r"><span>Customer</span><b>{{ txn.payer_name|default:"—" }}</b></div>
+      <div class="r"><span>Date</span><b>{% if txn.completed_at %}{{ txn.completed_at|date:"d M Y, H:i" }}{% else %}{{ txn.created_at|date:"d M Y, H:i" }}{% endif %}</b></div>
+      <div class="r"><span>Payment method</span><b>{{ txn.payment_method|default:"Online payment" }}</b></div>
+      <div class="r"><span>Reference</span><b class="m">{{ txn.merchant_reference }}</b></div>
+      <div class="r"><span>{% if txn.gateway == "ABLINER" %}ABLiner{% else %}PesaPal{% endif %} tracking ID</span><b class="m">{{ txn.order_tracking_id|default:"—" }}</b></div>
+      <div class="r" style="border:0"><span>Confirmation code</span><b class="m">{{ txn.confirmation_code|default:"—" }}</b></div>
+    </div>
+    <div class="ver p" style="margin-top:10px"><span>&#9888;</span><span><b>Onyo:</b> SmartPOS haitakuomba PIN wala kukupigia kudai kurudisha pesa. Ukipigiwa na mtu anayedai hivyo, kata simu. <i>We never call to ask for your PIN or a &ldquo;reversal&rdquo;.</i></span></div>
+    {% if txn.status == 'COMPLETED' %}<div class="ver"><span>&#10003;</span><span><b>Payment verified.</b> This receipt shows the status confirmed directly by {% if txn.gateway == 'ABLINER' %}ABLiner{% else %}PesaPal{% endif %}.</span></div>
+    {% else %}<div class="ver p"><span>&#9432;</span><span>This payment is not complete yet, so it is not a valid proof of payment.</span></div>{% endif %}
+    <div class="rc-foot">Need help? {% if payment_settings.support_phone %}{{ payment_settings.support_phone }}{% else %}Contact support{% endif %}</div>
+  </section>
+</div>
+</body></html>

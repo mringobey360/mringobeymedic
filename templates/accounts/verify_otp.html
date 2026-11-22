@@ -1,0 +1,28 @@
+{% extends "accounts/auth_base.html" %}
+{% block title %}Verify Code - SmartPOS{% endblock %}
+
+{% block auth_content %}
+<div class="auth-card text-center">
+    <div class="auth-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H8l-5 4V6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 10h8M8 13h5"/></svg>
+    </div>
+    <h1 class="text-lg font-bold text-ink-900">Enter verification code</h1>
+    <p class="mt-2 text-sm text-ink-600">
+        We sent a 6-digit code{% if masked_phone %} to <span class="font-semibold text-ink-800">{{ masked_phone }}</span>{% else %} to your phone{% endif %}. It expires in 5 minutes.
+    </p>
+
+    <form method="post" class="mt-5 text-left" novalidate>
+        {% csrf_token %}
+        <label for="{{ form.code.id_for_label }}" class="sr-only">6-digit code</label>
+        {{ form.code }}
+        {% if form.code.errors %}<p class="mt-2 text-center text-xs font-medium text-red-600" role="alert">{{ form.code.errors.0 }}</p>{% endif %}
+
+        <button type="submit" class="auth-btn mt-5">Verify Code</button>
+    </form>
+
+    <div class="mt-5 flex items-center justify-between gap-3 text-sm">
+        <a href="{% url 'accounts:forgot_password' %}" class="auth-link">Didn't get it? Try again</a>
+        <a href="{% url 'accounts:login' %}" class="text-ink-500 hover:text-ink-800 transition">Back to login</a>
+    </div>
+</div>
+{% endblock %}

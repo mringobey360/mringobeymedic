@@ -1,0 +1,115 @@
+{% extends "base.html" %}{% load humanize static %}
+{% block title %}My products · {{ store.public_name }}{% endblock %}
+{% block extra_head %}{% include 'marketplace/_mk_styles.html' %}{% endblock %}
+{% block content %}
+<div class="mk-page">
+ <nav class="mk-crumbs" aria-label="Breadcrumb"><a href="{% url 'marketplace:seller_dashboard' %}">Seller Centre</a><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg><b>Products</b></nav>
+ <header class="mk-hero">
+  <div class="mk-hero-main">
+   <span class="mk-hero-icon"><svg viewBox="0 0 24 24"><path d="M3 7.5l9-4 9 4-9 4-9-4z"/><path d="M3 7.5v9l9 4 9-4v-9"/></svg></span>
+   <div><h1>Products &amp; downloads</h1><p>{{ store.public_name }} · add, edit, restock or hide what shoppers see in your shop.</p></div>
+  </div>
+  <div class="mk-actions">{% if selling_active %}<a class="btn btn-primary" href="{% url 'marketplace:seller_product_add' store.id %}">+ Add product</a>{% else %}<a class="btn btn-primary" href="{% url 'marketplace:seller_service_requests' %}">Activate Online Selling</a>{% endif %}</div>
+ </header>
+
+ <section class="mk-card">
+  <div class="mk-toolbar">
+   <div class="mk-segment" role="navigation" aria-label="Product views">
+    <a class="{% if not view %}is-active{% endif %}" href="?q={{ q|urlencode }}">All<span>{{ counts.all_count }}</span></a>
+    <a class="{% if view == 'active' %}is-active{% endif %}" href="?view=active&q={{ q|urlencode }}">Visible<span>{{ counts.active_count }}</span></a>
+    <a class="{% if view == 'hidden' %}is-active{% endif %}" href="?view=hidden&q={{ q|urlencode }}">Hidden<span>{{ counts.hidden_count }}</span></a>
+    <a class="{% if view == 'low' %}is-active{% endif %}" href="?view=low&q={{ q|urlencode }}">Low stock<span>{{ counts.low_count }}</span></a>
+    <a class="{% if view == 'out' %}is-active{% endif %}" href="?view=out&q={{ q|urlencode }}">Out of stock<span>{{ counts.out_count }}</span></a>
+    <a class="{% if view == 'digital' %}is-active{% endif %}" href="?view=digital&q={{ q|urlencode }}">Digital<span>{{ counts.digital_count }}</span></a>
+    <a class="{% if view == 'featured' %}is-active{% endif %}" href="?view=featured&q={{ q|urlencode }}">Featured</a>
+   </div>
+   <form class="mk-search" method="get"><input type="hidden" name="view" value="{{ view }}"><input name="q" value="{{ q }}" placeholder="Search by product name or category" aria-label="Search products"><button class="btn btn-primary" type="submit">Search</button>{% if q %}<a class="btn btn-ghost" href="?view={{ view }}">Reset</a>{% endif %}</form>
+  </div>
+  <form id="bulk-delete-form" method="post" action="{% url 'marketplace:seller_products_bulk_delete' store.id %}" data-mk-confirm="Permanently delete selected products?" data-mk-detail="Products with order or digital-download history will be archived to protect customer records. Products without protected history will be permanently deleted. This cannot be undone." data-mk-accept="Delete selected" data-mk-cancel="Cancel" data-mk-tone="danger">
+   {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
+   <div style="display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap;padding:.7rem 1.25rem;background:#f8fafc;border-bottom:1px solid #eef2f6;font-size:.8125rem">
+    <label style="display:flex;align-items:center;gap:.5rem;font-weight:600"><input type="checkbox" id="select-all-products"> Select products on this page</label>
+    <button class="btn btn-secondary btn-sm mk-btn-danger-soft" type="submit" id="bulk-delete-button" disabled>Delete selected permanently</button>
+   </div>
+  </form>
+  <div class="mk-table-wrap">
+   <table class="mk-table" style="min-width:880px">
+    <thead><tr><th>Select</th><th>Product</th><th>Category</th><th class="mk-num">Price</th><th>Stock</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+    {% for p in page_obj %}
+     <tr>
+      <td><input type="checkbox" class="product-select" name="product_ids" value="{{ p.id }}" form="bulk-delete-form" aria-label="Select {{ p.name }} for bulk deletion"></td>
+      <td><div style="display:flex;align-items:center;gap:.65rem">
+        {% if p.image %}<img class="mk-thumb" src="{{ p.image.url }}" alt="" loading="lazy">{% else %}<span class="mk-thumb mk-thumb-empty">No photo</span>{% endif %}
+        <div><div class="mk-strong">{{ p.name }}</div><div class="mk-muted">Added {{ p.created_at|date:'d M Y' }}{% if p.featured %} · ★ Featured{% endif %}</div></div></div></td>
+      <td class="mk-muted">{{ p.category.name }}</td>
+      <td class="mk-num">TSh {{ p.price|floatformat:0|intcomma }}</td>
+      <td>
+       {% if p.is_digital %}<span class="mk-badge mk-b-published">Digital download</span><div class="mk-muted" style="margin-top:.25rem">{{ p.digital_format|default:"File" }}{% if p.digital_file_size %} · {{ p.digital_file_size|filesizeformat }}{% endif %} · no stock</div>
+       {% else %}
+       <form method="post" action="{% url 'marketplace:seller_product_action' store.id p.id %}" style="display:flex;gap:.35rem;align-items:center;margin:0">{% csrf_token %}
+        <input type="hidden" name="action" value="set_stock"><input type="hidden" name="next" value="{{ request.get_full_path }}">
+        <input type="number" name="stock" value="{{ p.stock }}" min="0" step="1" inputmode="numeric" aria-label="Stock for {{ p.name }}" style="width:5.2rem;padding:.35rem .5rem;border:1px solid #cbd5e1;border-radius:.5rem">
+        <button class="btn btn-secondary btn-sm" type="submit">Save</button>
+       </form>
+       {% if p.stock == 0 %}<span class="mk-badge mk-b-bad" style="margin-top:.3rem">Out of stock</span>{% elif p.stock <= low_limit %}<span class="mk-badge mk-b-warn" style="margin-top:.3rem">Low stock</span>{% endif %}
+       {% endif %}
+      </td>
+      <td>{% if p.is_active %}<span class="mk-badge mk-b-active">Visible</span>{% else %}<span class="mk-badge mk-b-muted">Hidden</span>{% endif %}</td>
+      <td><div class="mk-cell-actions">
+        <a class="btn btn-secondary btn-sm" href="{% url 'marketplace:seller_product_edit' store.id p.id %}">Edit</a>
+        <form method="post" action="{% url 'marketplace:seller_product_action' store.id p.id %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button class="btn btn-secondary btn-sm" name="action" value="toggle_active" type="submit">{% if p.is_active %}Hide{% else %}Show{% endif %}</button></form>
+        <form method="post" action="{% url 'marketplace:seller_product_action' store.id p.id %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button class="btn btn-secondary btn-sm" name="action" value="toggle_featured" type="submit" title="Show this product first in your shop">{% if p.featured %}★ Unfeature{% else %}☆ Feature{% endif %}</button></form>
+        <form method="post" action="{% url 'marketplace:seller_product_action' store.id p.id %}" data-mk-confirm="Delete “{{ p.name }}”?" data-mk-detail="The product will be permanently deleted if no order or download history depends on it. Otherwise it will be archived to protect customer records." data-mk-accept="Yes, delete" data-mk-cancel="Keep product" data-mk-tone="danger">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button class="btn btn-secondary btn-sm mk-btn-danger-soft" name="action" value="delete" type="submit">Delete</button></form>
+      </div></td>
+     </tr>
+    {% empty %}
+     <tr><td colspan="7"><div class="mk-empty">
+       {% if q or view %}<b>No products match</b>Try another view or clear the search.
+       {% else %}<b>No products added yet</b>Add your first product to start receiving orders.{% if selling_active %}<div class="mk-actions" style="justify-content:center;margin-top:.8rem"><a class="btn btn-primary" href="{% url 'marketplace:seller_product_add' store.id %}">+ Add product</a></div>{% endif %}{% endif %}
+     </div></td></tr>
+    {% endfor %}
+    </tbody>
+   </table>
+  </div>
+  <nav class="mk-pager" aria-label="Product pages">
+   <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }} · {{ page_obj.paginator.count }} product{{ page_obj.paginator.count|pluralize }}</span>
+   <div class="mk-pager-nav">
+    {% if page_obj.has_previous %}<a class="btn btn-secondary btn-sm" href="?view={{ view|urlencode }}&q={{ q|urlencode }}&page={{ page_obj.previous_page_number }}">Previous</a>{% endif %}
+    {% if page_obj.has_next %}<a class="btn btn-secondary btn-sm" href="?view={{ view|urlencode }}&q={{ q|urlencode }}&page={{ page_obj.next_page_number }}">Next</a>{% endif %}
+   </div>
+  </nav>
+ </section>
+</div>
+<div id="mk-confirm-overlay" hidden style="position:fixed;inset:0;z-index:99999;background:rgba(15,23,42,.58);display:none;align-items:center;justify-content:center;padding:1rem" role="presentation">
+ <section role="dialog" aria-modal="true" aria-labelledby="mk-confirm-title" style="width:min(100%,460px);background:var(--card-bg,#fff);color:var(--text-color,#172033);border-radius:1rem;padding:1.4rem;box-shadow:0 24px 80px rgba(0,0,0,.28)">
+  <div style="display:flex;gap:.8rem;align-items:flex-start"><span aria-hidden="true" style="display:grid;place-items:center;flex:0 0 42px;height:42px;border-radius:50%;background:#fee2e2;color:#991b1b;font-weight:800;font-size:1.2rem">!</span><div><h2 id="mk-confirm-title" style="font-size:1.15rem;margin:0 0 .5rem">Confirm deletion</h2><p id="mk-confirm-message" style="margin:0;line-height:1.6"></p></div></div>
+  <div style="display:flex;justify-content:flex-end;gap:.6rem;margin-top:1.4rem;flex-wrap:wrap"><button type="button" id="mk-confirm-cancel" class="btn btn-secondary">Cancel</button><button type="button" id="mk-confirm-accept" class="btn btn-primary" style="background:#b91c1c;border-color:#b91c1c">Delete</button></div>
+ </section>
+</div>
+<script>
+(function(){
+ const overlay=document.getElementById('mk-confirm-overlay'); if(!overlay)return;
+ const message=document.getElementById('mk-confirm-message'), title=document.getElementById('mk-confirm-title'), accept=document.getElementById('mk-confirm-accept'), cancel=document.getElementById('mk-confirm-cancel');
+ let pendingForm=null, pendingSubmitter=null;
+ function close(){overlay.hidden=true;overlay.style.display='none';pendingForm=null;pendingSubmitter=null;}
+ document.addEventListener('submit',function(e){
+  const form=e.target; if(!(form instanceof HTMLFormElement))return;
+  if(form.dataset.mkConfirmHandled==='1')return;
+  const submitter=e.submitter; const action=(submitter&&submitter.name==='action')?submitter.value:'';
+  const isDelete=action==='delete'||form===document.getElementById('bulk-delete-form');
+  if(!isDelete)return;
+  e.preventDefault();pendingForm=form;pendingSubmitter=submitter;
+  title.textContent=form.dataset.mkConfirm||'Confirm deletion';
+  message.textContent=form.dataset.mkDetail||'This action cannot be undone.';
+  accept.textContent=form.dataset.mkAccept||'Delete';cancel.textContent=form.dataset.mkCancel||'Cancel';
+  overlay.hidden=false;overlay.style.display='flex';accept.focus();
+ },true);
+ accept.addEventListener('click',function(){if(!pendingForm)return;const f=pendingForm,b=pendingSubmitter;f.dataset.mkConfirmHandled='1';close();if(f.requestSubmit)f.requestSubmit(b||undefined);else f.submit();});
+ cancel.addEventListener('click',close);overlay.addEventListener('click',e=>{if(e.target===overlay)close();});document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!overlay.hidden)close();});
+ const checks=Array.from(document.querySelectorAll('.product-select')), all=document.getElementById('select-all-products'), bulk=document.getElementById('bulk-delete-button');
+ function sync(){const n=checks.filter(c=>c.checked).length;bulk.disabled=n===0;all.checked=checks.length>0&&n===checks.length;all.indeterminate=n>0&&n<checks.length;bulk.textContent=n?('Delete '+n+' selected permanently'):'Delete selected permanently';}
+ checks.forEach(c=>c.addEventListener('change',sync));all.addEventListener('change',()=>{checks.forEach(c=>c.checked=all.checked);sync();});sync();
+})();
+</script>
+{% endblock %}

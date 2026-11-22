@@ -1,0 +1,294 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+    <div>
+        <h1 class="text-2xl font-bold text-ink-900 tracking-tight">Dashboard</h1>
+        <p class="text-sm text-ink-500 mt-0.5">Here's what's happening at your business today.</p>
+    </div>
+</div>
+
+{% include "dashboard/_onboarding.html" %}
+
+<div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-5">
+    <div class="card stat-card">
+        <div class="stat-head">
+            <div class="stat-icon bg-brand-50 text-brand-700">
+                <svg class="w-4 h-4" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg>
+            </div>
+            <p class="stat-label">Today's Sales</p>
+        </div>
+        {% with amount=today_sales_total|floatformat:0|intcomma %}
+        <p class="stat-value text-ink-900" style="--n: {{ amount|length }}"><span class="stat-cur">TZS</span>{{ amount }}</p>
+        {% endwith %}
+        <p class="text-xs text-ink-400 mt-1">{{ today_transaction_count }} transaction(s) · value incl. credit</p>
+    </div>
+    <div class="card stat-card">
+        <div class="stat-head">
+            <div class="stat-icon bg-emerald-50 text-emerald-600">
+                <svg class="w-4 h-4" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><line x1="12" y1="19" x2="12" y2="5"/><path d="M6 11l6-6 6 6"/></svg>
+            </div>
+            <p class="stat-label">Today's Profit</p>
+        </div>
+        {% with amount=today_profit_total|floatformat:0|intcomma|cut:"-" %}
+        {% if today_profit_total <= -0.5 %}
+        <p class="stat-value text-red-600" style="--n: {{ amount|length }}"><span class="stat-cur">TZS</span>{{ amount }}</p>
+        <p class="text-xs text-red-600 mt-1">Loss today (sold below cost)</p>
+        {% else %}
+        <p class="stat-value text-emerald-600" style="--n: {{ amount|length }}"><span class="stat-cur">TZS</span>{{ amount }}</p>
+        {% endif %}
+        {% endwith %}
+    </div>
+    <div class="card stat-card">
+        <div class="stat-head">
+            <div class="stat-icon bg-brand-50 text-brand-700">
+                <svg class="w-4 h-4" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="4" width="18" height="17" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/></svg>
+            </div>
+            <p class="stat-label">{{ card.sales_title }}</p>
+            <a href="{% url 'dashboard:performance' %}" class="ml-auto shrink-0 inline-flex h-7 w-7 items-center justify-center rounded-lg text-ink-400 hover:bg-ink-100 hover:text-brand-700 transition" title="Customize period" aria-label="Customize period"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg></a>
+        </div>
+        {% with amount=month_sales_total|floatformat:0|intcomma %}
+        <p class="stat-value text-ink-900" style="--n: {{ amount|length }}"><span class="stat-cur">TZS</span>{{ amount }}</p>
+        {% endwith %}
+        <p class="text-xs text-ink-400 mt-1">{{ card.transactions }} transaction(s){% if not card.is_default %} · {{ card.start|date:"d M" }} – {{ card.end|date:"d M" }}{% endif %}</p>
+    </div>
+    <div class="card stat-card">
+        <div class="stat-head">
+            <div class="stat-icon bg-emerald-50 text-emerald-600">
+                <svg class="w-4 h-4" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><line x1="4" y1="20" x2="4" y2="11"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="20" y1="20" x2="20" y2="15"/></svg>
+            </div>
+            <p class="stat-label">{{ card.profit_title }}</p>
+        </div>
+        {% with amount=month_profit_total|floatformat:0|intcomma|cut:"-" %}
+        {% if month_profit_total <= -0.5 %}
+        <p class="stat-value text-red-600" style="--n: {{ amount|length }}"><span class="stat-cur">TZS</span>{{ amount }}</p>
+        <p class="text-xs text-red-600 mt-1">Loss for this period</p>
+        {% else %}
+        <p class="stat-value text-emerald-600" style="--n: {{ amount|length }}"><span class="stat-cur">TZS</span>{{ amount }}</p>
+        {% endif %}
+        {% endwith %}
+    </div>
+</div>
+
+<style>
+/* Today's money flow (V117.1) — self-contained, uses the SmartPOS theme tokens so light/dark both work. */
+.mf{--mf-surface:var(--sp-surface,#fff);--mf-soft:var(--sp-surface-2,#f8fafc);--mf-border:var(--sp-border,#e2e8f0);--mf-text:var(--sp-text,#172033);--mf-muted:var(--sp-muted,#64748b);
+    --mf-cash:#0f766e;--mf-mobile:#2563eb;--mf-deposit:#d97706;--mf-debt:#7c3aed;--mf-good:#059669;--mf-warn:#d97706;
+    background:var(--mf-surface);border:1px solid var(--mf-border);border-radius:1rem;padding:1rem;margin-bottom:1.5rem;min-width:0}
+@media(min-width:640px){.mf{padding:1.25rem 1.5rem}}
+html[data-theme="dark"] .mf{--mf-good:#34d399;--mf-cash:#2dd4bf;--mf-mobile:#60a5fa;--mf-deposit:#fbbf24;--mf-debt:#a78bfa;--mf-warn:#fbbf24}
+.mf-head{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:.5rem 1rem;margin-bottom:1rem}
+.mf-eyebrow{font-size:.7rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--sp-accent,#0f766e);margin:0}
+.mf-sub{font-size:.8rem;color:var(--mf-muted);margin:.2rem 0 0;max-width:46rem;line-height:1.4}
+.mf-asof{display:inline-flex;align-items:center;gap:.4rem;font-size:.72rem;font-weight:600;color:var(--mf-muted);background:var(--mf-soft);border:1px solid var(--mf-border);border-radius:999px;padding:.25rem .65rem;white-space:nowrap}
+.mf-asof i{width:.45rem;height:.45rem;border-radius:50%;background:var(--mf-good);box-shadow:0 0 0 3px rgba(5,150,105,.18)}
+.mf-body{display:grid;gap:.75rem;grid-template-columns:minmax(0,1fr)}
+@media(min-width:1024px){.mf-body{grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:1rem}}
+.mf-hero{display:flex;flex-direction:column;justify-content:center;background:var(--mf-soft);border:1px solid var(--mf-border);border-radius:.85rem;padding:1rem;min-width:0}
+@media(min-width:640px){.mf-hero{padding:1.1rem 1.25rem}}
+.mf-label{font-size:.75rem;font-weight:600;color:var(--mf-muted);margin:0}
+.mf-big{font-size:clamp(1.55rem,6.2vw,2.25rem);font-weight:800;line-height:1.1;margin:.25rem 0 0;color:var(--mf-good);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.mf-big small,.mf-num small{font-size:.5em;font-weight:600;opacity:.7;margin-right:.25em;letter-spacing:.02em}
+.mf-bar{display:flex;height:.6rem;border-radius:999px;overflow:hidden;background:var(--mf-border);margin:.9rem 0 .75rem}
+.mf-bar span{display:block;height:100%;min-width:0}
+.mf-legend{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.45rem .75rem}
+@media(min-width:640px){.mf-legend{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.mf-legend li{min-width:0;display:flex;flex-direction:column;gap:.1rem}
+.mf-legend .k{display:flex;align-items:center;gap:.4rem;font-size:.72rem;color:var(--mf-muted);min-width:0}
+.mf-legend .k b{width:.55rem;height:.55rem;border-radius:3px;flex:none}
+.mf-legend .v{font-size:.9rem;font-weight:700;color:var(--mf-text);font-variant-numeric:tabular-nums;padding-left:.95rem;overflow-wrap:anywhere}
+.mf-refunds{margin-top:.8rem;border:1px solid var(--mf-border);border-radius:.7rem;background:#fff;padding:.6rem .8rem;display:grid;gap:.3rem}
+.mf-rrow{display:flex;justify-content:space-between;align-items:baseline;gap:.75rem;font-size:.8rem;color:var(--mf-muted)}
+.mf-rrow b{font-size:.9rem;color:var(--mf-text);font-variant-numeric:tabular-nums;white-space:nowrap}
+.mf-rrow b.neg{color:#b91c1c}
+.mf-rexp{font-size:.7rem;line-height:1.4;color:var(--mf-muted);margin:.15rem 0 0;border-top:1px dashed var(--mf-border);padding-top:.35rem}
+.pr-mini.three{grid-template-columns:repeat(2,minmax(0,1fr))}
+@media(min-width:640px){.pr-mini.three{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.pr-mini b.neg{color:#b91c1c}
+.pr-note{font-size:.72rem;line-height:1.4;color:var(--sp-muted,#64748b);margin:0 0 .6rem}
+.pr-how{margin-top:.2rem;border-top:1px solid var(--sp-border,#e2e8f0);padding-top:.5rem}
+.pr-how summary{cursor:pointer;font-size:.75rem;font-weight:600;color:var(--sp-accent,#0f766e);list-style:none}
+.pr-how summary::-webkit-details-marker{display:none}
+.pr-how dl{margin:.5rem 0 0;display:grid;gap:.3rem}
+.pr-how dl div{display:flex;justify-content:space-between;gap:.75rem;font-size:.78rem}
+.pr-how dd{margin:0;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+.pr-how .tot{border-top:1px solid var(--sp-border,#e2e8f0);padding-top:.35rem;font-weight:800}
+.mf-note{font-size:.72rem;color:var(--mf-muted);margin:.7rem 0 0}
+.mf-side{display:grid;gap:.6rem;grid-template-columns:minmax(0,1fr)}
+@media(min-width:700px) and (max-width:1023px){.mf-side{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.mf-tile{border:1px solid var(--mf-border);border-left-width:4px;border-radius:.85rem;padding:.75rem 1rem;min-width:0;display:flex;align-items:center;justify-content:space-between;gap:.75rem}
+.mf-tile.sales{border-left-color:var(--mf-cash)}
+.mf-tile.credit{border-left-color:var(--mf-warn)}
+.mf-tile.debts{border-left-color:var(--mf-debt)}
+.mf-txt{min-width:0;flex:1 1 auto}
+.mf-num{flex:none;text-align:right;white-space:nowrap;font-size:clamp(1.05rem,4.6vw,1.3rem);font-weight:700;color:var(--mf-text);margin:0;font-variant-numeric:tabular-nums}
+.mf-tile.credit.has .mf-num{color:var(--mf-warn)}
+/* Tablet (3 across) and desktop (stacked in a side column): label, number, hint read top-to-bottom */
+@media(min-width:700px){
+  .mf-tile{flex-direction:column;align-items:stretch;justify-content:center;gap:.1rem}
+  .mf-txt{display:contents}
+  .mf-tile .mf-label{order:1}.mf-tile .mf-num{order:2;text-align:left}.mf-tile .mf-hint{order:3}
+}
+@media(min-width:1024px){
+  .mf-tile{flex-direction:row;align-items:center;justify-content:space-between;gap:.75rem}
+  .mf-txt{display:block}
+  .mf-tile .mf-num{text-align:right}
+}
+.mf-hint{font-size:.7rem;color:var(--mf-muted);margin:0;line-height:1.35}
+</style>
+<section class="mf" aria-labelledby="mf-title">
+    <div class="mf-head">
+        <div>
+            <p class="mf-eyebrow" id="mf-title">Today's money flow</p>
+            <p class="mf-sub">Sales value is not money received: credit sales become money only when the customer pays.</p>
+        </div>
+        <span class="mf-asof" title="Figures update each time the dashboard loads"><i></i>As of {% now "H:i" %}</span>
+    </div>
+    <div class="mf-body">
+        <div class="mf-hero">
+            <p class="mf-label">Money received{% if today_breakdown.refunds_earlier %} (after refunds){% endif %}</p>
+            <p class="mf-big"{% if today_breakdown.net_received < 0 %} style="color:#b91c1c"{% endif %}>{% if today_breakdown.net_received < 0 %}<span>− </span>{% endif %}<small>TZS</small>{{ today_breakdown.net_abs|floatformat:0|intcomma }}</p>
+            
+            <div class="mf-bar" role="img" aria-label="Composition of money received today">
+                {% for part in today_breakdown.parts %}{% if part.pct > 0 %}<span style="width:{{ part.pct|floatformat:2 }}%;background:var(--mf-{{ part.key }})"></span>{% endif %}{% endfor %}
+            </div>
+            <ul class="mf-legend">
+                {% for part in today_breakdown.parts %}
+                <li><span class="k"><b style="background:var(--mf-{{ part.key }})"></b>{{ part.label }}</span><span class="v">{{ part.amount|floatformat:0|intcomma }}</span></li>
+                {% endfor %}
+            </ul>
+            {% if today_breakdown.refunds_earlier %}<p class="mf-note">Includes TZS {{ today_breakdown.refunds_earlier|floatformat:0|intcomma }} refunded today for sales made on earlier days.</p>{% endif %}
+        </div>
+        <div class="mf-side">
+            <div class="mf-tile sales">
+                <div class="mf-txt"><p class="mf-label">Sales value</p>
+                <p class="mf-hint">Cash + mobile + credit</p>
+            </div><p class="mf-num"><small>TZS</small>{{ today_sales_total|floatformat:0|intcomma }}</p>
+                </div>
+            <div class="mf-tile credit{% if today_breakdown.credit %} has{% endif %}">
+                <div class="mf-txt"><p class="mf-label">Credit lent today</p>
+                <p class="mf-hint">Unpaid part of today's credit sales</p>
+            </div><p class="mf-num"><small>TZS</small>{{ today_breakdown.credit|floatformat:0|intcomma }}</p>
+                </div>
+            <div class="mf-tile debts">
+                <div class="mf-txt"><p class="mf-label">Old debts collected</p>
+                <p class="mf-hint">Not part of today's sales</p>
+            </div><p class="mf-num"><small>TZS</small>{{ today_breakdown.debt_collected|floatformat:0|intcomma }}</p>
+                </div>
+        </div>
+    </div>
+</section>
+
+<style>
+/* Dashboard priorities (V117.2): "Needs attention" + "Cash today". Scoped, theme-token based. */
+.pr{display:grid;gap:1rem;grid-template-columns:minmax(0,1fr);margin-bottom:1.5rem}
+@media(min-width:1024px){.pr{grid-template-columns:minmax(0,1.25fr) minmax(0,1fr)}}
+.pr-card{background:var(--sp-surface,#fff);border:1px solid var(--sp-border,#e2e8f0);border-radius:1rem;padding:1rem;min-width:0}
+@media(min-width:640px){.pr-card{padding:1.15rem 1.35rem}}
+.pr-eyebrow{font-size:.7rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--sp-accent,#0f766e);margin:0}
+.pr-head{display:flex;align-items:center;justify-content:space-between;gap:.5rem;margin-bottom:.6rem}
+.pr-link{font-size:.75rem;font-weight:600;color:var(--sp-accent,#0f766e);text-decoration:none;white-space:nowrap}
+.pr-link:hover{text-decoration:underline}
+.pr-list{list-style:none;margin:0;padding:0}
+.pr-row a{display:flex;align-items:center;gap:.75rem;padding:.65rem .1rem;text-decoration:none;color:var(--sp-text,#172033);border-bottom:1px solid var(--sp-border,#e2e8f0);min-height:2.75rem}
+.pr-row:last-child a{border-bottom:0}
+.pr-dot{width:.6rem;height:.6rem;border-radius:50%;flex:none}
+.pr-dot.warn{background:#d97706}.pr-dot.bad{background:#dc2626}.pr-dot.info{background:#2563eb}
+.pr-txt{flex:1 1 auto;min-width:0;font-size:.88rem;font-weight:600}
+.pr-txt small{display:block;font-weight:500;font-size:.72rem;color:var(--sp-muted,#64748b);margin-top:.05rem}
+.pr-count{flex:none;font-size:.85rem;font-weight:700;font-variant-numeric:tabular-nums;padding:.15rem .6rem;border-radius:999px;background:var(--sp-surface-2,#f1f5f9)}
+.pr-chev{flex:none;color:var(--sp-muted,#64748b);font-size:1rem}
+.pr-ok{display:flex;align-items:center;gap:.6rem;font-size:.9rem;color:var(--sp-muted,#64748b);padding:.8rem 0}
+.pr-big{font-size:clamp(1.5rem,6vw,2rem);font-weight:800;line-height:1.1;margin:.25rem 0 .1rem;color:var(--sp-text,#172033);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.pr-big small{font-size:.5em;font-weight:600;opacity:.7;margin-right:.25em}
+.pr-sub{font-size:.75rem;color:var(--sp-muted,#64748b);margin:0}
+.pr-mini{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.6rem;margin:.9rem 0}
+.pr-mini div{background:var(--sp-surface-2,#f8fafc);border:1px solid var(--sp-border,#e2e8f0);border-radius:.75rem;padding:.6rem .8rem;min-width:0}
+.pr-mini span{display:block;font-size:.7rem;color:var(--sp-muted,#64748b)}
+.pr-mini b{display:block;font-size:.95rem;font-variant-numeric:tabular-nums;white-space:nowrap}
+.pr-state{font-size:.78rem;border-radius:.75rem;padding:.6rem .8rem;margin:.9rem 0}
+.pr-state.warn{background:rgba(217,119,6,.12);color:#b45309}.pr-state.bad{background:rgba(220,38,38,.1);color:#b91c1c}
+.pr-actions{display:flex;flex-wrap:wrap;gap:.5rem}
+.pr-actions .btn{flex:1 1 9rem;justify-content:center;gap:.5rem;text-decoration:none}
+.pr-actions .pr-cc{flex:1 1 100%}
+@media(min-width:480px){.pr-actions .pr-cc{flex:1 1 9rem}}
+.pr-foot{display:flex;flex-wrap:wrap;gap:.6rem}
+.pr-foot .btn{flex:1 1 12rem;justify-content:center;gap:.5rem;text-decoration:none}
+.pr-arrow{width:16px;height:16px;flex:none}
+@media(min-width:640px){.pr-foot .btn{flex:0 0 auto}}
+</style>
+
+<div class="pr">
+    <section class="pr-card" aria-labelledby="pr-att">
+        <div class="pr-head">
+            <p class="pr-eyebrow" id="pr-att">Needs attention</p>
+        </div>
+        {% if low_stock_count or expiring_count or expired_count or pending_debts_count or pending_expenses_count or workforce_outside_count or workforce_stale_count %}
+        <ul class="pr-list">
+            {% if expired_count %}<li class="pr-row"><a href="{% url 'inventory:product_list' %}?stock=expiring"><span class="pr-dot bad"></span><span class="pr-txt">Expired products<small>Remove or return from stock</small></span><span class="pr-count">{{ expired_count }}</span><span class="pr-chev">›</span></a></li>{% endif %}
+            {% if low_stock_count %}<li class="pr-row"><a href="{% url 'inventory:product_list' %}?stock=low"><span class="pr-dot warn"></span><span class="pr-txt">Low stock<small>At or below reorder level</small></span><span class="pr-count">{{ low_stock_count }}</span><span class="pr-chev">›</span></a></li>{% endif %}
+            {% if expiring_count %}<li class="pr-row"><a href="{% url 'inventory:product_list' %}?stock=expiring"><span class="pr-dot warn"></span><span class="pr-txt">Expiring within 30 days<small>Sell or discount first</small></span><span class="pr-count">{{ expiring_count }}</span><span class="pr-chev">›</span></a></li>{% endif %}
+            {% if pending_debts_count %}<li class="pr-row"><a href="{% url 'sales:debt_list' %}"><span class="pr-dot info"></span><span class="pr-txt">Unpaid customer debts<small>TZS {{ total_debt_outstanding|floatformat:0|intcomma }} outstanding</small></span><span class="pr-count">{{ pending_debts_count }}</span><span class="pr-chev">›</span></a></li>{% endif %}
+            {% if pending_expenses_count %}<li class="pr-row"><a href="{% url 'expenses:list' %}"><span class="pr-dot warn"></span><span class="pr-txt">Expenses awaiting approval<small>Affects profit and drawer cash</small></span><span class="pr-count">{{ pending_expenses_count }}</span><span class="pr-chev">›</span></a></li>{% endif %}
+            {% if workforce_outside_count or workforce_stale_count %}<li class="pr-row"><a href="{% url 'dashboard:workforce' %}"><span class="pr-dot {% if workforce_outside_count %}bad{% else %}warn{% endif %}"></span><span class="pr-txt">Staff location<small>{{ workforce_outside_count }} outside · {{ workforce_stale_count }} stale/unavailable</small></span><span class="pr-count">{{ workforce_outside_count|add:workforce_stale_count }}</span><span class="pr-chev">›</span></a></li>{% endif %}
+        </ul>
+        {% else %}
+        <p class="pr-ok"><span class="pr-dot" style="background:#059669"></span>All clear: nothing needs attention right now.</p>
+        {% endif %}
+    </section>
+
+    <section class="pr-card" aria-labelledby="pr-cash">
+        <div class="pr-head">
+            <p class="pr-eyebrow" id="pr-cash">Cash today</p>
+        </div>
+        {% if today_cash_day %}
+        <p class="pr-sub">Expected cash in drawer</p>
+        <p class="pr-big"><small>TZS</small>{{ today_cash_day.expected_closing_cash|floatformat:0|intcomma }}</p>
+        {% with b=cash_card.b %}
+        <div class="pr-mini three">
+            <div><span>Opening cash</span><b>TZS {{ b.opening|floatformat:0|intcomma }}</b></div>
+            <div><span>Cash sales</span><b>TZS {{ cash_card.net_sales|floatformat:0|intcomma }}</b></div>
+            {% if cash_card.earlier_refunds %}<div><span>Refunds for earlier days</span><b class="neg">− TZS {{ cash_card.earlier_refunds|floatformat:0|intcomma }}</b></div>{% endif %}
+        </div>
+        {% if cash_card.returned %}<p class="pr-note">Cash sales are after returns: TZS {{ cash_card.returned|floatformat:0|intcomma }} of today's sales were returned or voided and refunded, so they are not counted.</p>{% endif %}
+        <details class="pr-how">
+            <summary>How this is calculated</summary>
+            <dl>
+                <div><dt>Opening cash</dt><dd>TZS {{ b.opening|floatformat:0|intcomma }}</dd></div>
+                <div><dt>+ Cash sales (after today's returns)</dt><dd>TZS {{ cash_card.net_sales|floatformat:0|intcomma }}</dd></div>
+                {% if b.debt_collected %}<div><dt>+ Debt &amp; layaway paid in cash</dt><dd>TZS {{ b.debt_collected|floatformat:0|intcomma }}</dd></div>{% endif %}
+                {% if b.transfer_in %}<div><dt>+ Transfers in</dt><dd>TZS {{ b.transfer_in|floatformat:0|intcomma }}</dd></div>{% endif %}
+                {% if cash_card.earlier_refunds %}<div><dt>− Refunds for sales of earlier days</dt><dd>TZS {{ cash_card.earlier_refunds|floatformat:0|intcomma }}</dd></div>{% endif %}
+                {% if b.cash_expenses_total %}<div><dt>− Expenses &amp; staff meals</dt><dd>TZS {{ b.cash_expenses_total|floatformat:0|intcomma }}</dd></div>{% endif %}
+                {% if b.transfer_out %}<div><dt>− Transfers out</dt><dd>TZS {{ b.transfer_out|floatformat:0|intcomma }}</dd></div>{% endif %}
+                {% if b.layaway_refunded %}<div><dt>− Layaway refunds</dt><dd>TZS {{ b.layaway_refunded|floatformat:0|intcomma }}</dd></div>{% endif %}
+                <div class="tot"><dt>= Expected cash in drawer</dt><dd>TZS {{ b.expected|floatformat:0|intcomma }}</dd></div>
+            </dl>
+        </details>
+        {% endwith %}
+        {% if today_cash_day.status == 'OPEN' %}<p class="pr-note"><a href="{% url 'expenses:cash' %}#cash-transfer" style="font-weight:700;text-decoration:underline">Move mobile money into the drawer</a> &middot; <a href="{% url 'expenses:cash_transfer_history' %}" style="text-decoration:underline">Transfer history</a></p>{% endif %}
+        {% elif cash_automation_state == 'FIRST_SETUP' %}
+        <p class="pr-state warn">First cash day for this branch: enter the opening cash once in Cash Control. After that, closing and carry-forward are automatic.</p>
+        {% elif cash_automation_state == 'BLOCKED' %}
+        <p class="pr-state bad">Waiting for the previous cash day to be reconciled before today can start.</p>
+        {% else %}
+        <p class="pr-state warn">Cash day awaiting setup.</p>
+        {% endif %}
+        <div class="pr-actions">
+            <a href="{% url 'expenses:cash' %}" class="btn btn-primary pr-cc">
+                Open Cash Control
+                <svg class="pr-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><path d="M13 6l6 6-6 6"/></svg>
+            </a>
+            <a href="{% url 'expenses:list' %}" class="btn btn-secondary">Expenses today: TZS {{ today_expenses|floatformat:0|intcomma }}</a>
+        </div>
+    </section>
+</div>
+
+<div class="pr-foot">
+    <a href="{% url 'dashboard:reports' %}" class="btn btn-nav btn-primary">
+        View Full Analytical Reports
+        <svg class="pr-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><path d="M13 6l6 6-6 6"/></svg>
+    </a>
+</div>
+{% endblock %}

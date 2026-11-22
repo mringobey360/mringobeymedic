@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Expected Cash History{% endblock %}
+{% block content %}
+<div class="max-w-5xl mx-auto space-y-6">
+  <header class="flex flex-wrap items-end justify-between gap-4">
+    <div>
+      <p class="text-xs uppercase tracking-wider font-bold text-brand-700">Employee records</p>
+      <h1 class="text-2xl md:text-3xl font-extrabold mt-1">Expected Cash History</h1>
+      <p class="text-sm text-ink-500 mt-1">{{ employee_name }} &middot; cash sales minus meal money, day by day. Reference only: the branch drawer is verified by the manager.</p>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      <a href="?{% if not is_self %}employee={{ employee.pk }}&{% endif %}from={{ date_from }}&to={{ date_to }}&export=pdf" class="btn btn-primary">Download PDF</a>
+      {% if not request.user.is_employee_role %}<a href="?{% if not is_self %}employee={{ employee.pk }}&{% endif %}from={{ date_from }}&to={{ date_to }}&export=csv" class="btn btn-secondary">Download CSV</a>{% endif %}
+      <a href="{% if is_self %}{% url 'dashboard:home' %}{% else %}{% url 'expenses:cash' %}{% endif %}" class="btn btn-ghost">Back</a>
+    </div>
+  </header>
+
+  <section class="grid sm:grid-cols-2 xl:grid-cols-4 gap-4">
+    <div class="card"><p class="text-xs uppercase tracking-wide font-semibold text-ink-500">Cash sales</p><p class="text-2xl font-extrabold mt-2">TZS {{ totals.cash_sales|floatformat:0|intcomma }}</p><p class="text-xs text-ink-500 mt-2">{{ date_from }} to {{ date_to }}</p></div>
+    <div class="card"><p class="text-xs uppercase tracking-wide font-semibold text-ink-500">Meal money deducted</p><p class="text-2xl font-extrabold mt-2">TZS {{ totals.meal_earned|floatformat:0|intcomma }}</p><p class="text-xs text-ink-500 mt-2">Earned meals only</p></div>
+    <div class="card"><p class="text-xs uppercase tracking-wide font-semibold text-brand-700">Expected cash</p><p class="text-2xl font-extrabold mt-2 text-brand-700">TZS {{ totals.expected|floatformat:0|intcomma }}</p><p class="text-xs text-ink-500 mt-2">Cash sales &minus; refunds &minus; meals deducted</p></div>
+    <div class="card"><p class="text-xs uppercase tracking-wide font-semibold text-amber-700">Meals not yet deducted</p><p class="text-2xl font-extrabold mt-2 text-amber-700">TZS {{ totals.meal_not_deducted|floatformat:0|intcomma }}</p><p class="text-xs text-ink-500 mt-2">Debt or awaiting settlement</p></div>
+  </section>
+
+  <section class="card space-y-4">
+    <div><h2 class="text-lg font-bold">Period</h2><p class="text-sm text-ink-500">Up to 93 days at a time. Default is the last 30 days.</p></div>
+    <form method="get" class="grid sm:grid-cols-[1fr_1fr_auto] gap-3 items-end">
+      {% if not is_self %}<input type="hidden" name="employee" value="{{ employee.pk }}">{% endif %}
+      <label class="block text-sm font-semibold">From date<input type="date" name="from" value="{{ date_from }}" max="{{ today|date:'Y-m-d' }}" class="form-input mt-1 w-full"></label>
+      <label class="block text-sm font-semibold">To date<input type="date" name="to" value="{{ date_to }}" max="{{ today|date:'Y-m-d' }}" class="form-input mt-1 w-full"></label>
+      <div class="flex gap-2"><button class="btn btn-primary" type="submit">Apply</button><a class="btn btn-secondary" href="{% url 'dashboard:my_cash_history' %}{% if not is_self %}?employee={{ employee.pk }}{% endif %}">Reset</a></div>
+    </form>
+  </section>
+
+  <section class="card overflow-hidden">
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-4"><div><h2 class="text-lg font-bold">Daily breakdown</h2><p class="text-xs text-ink-500">{{ page_obj.paginator.count }} day{{ page_obj.paginator.count|pluralize }} with activity</p></div></div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm min-w-[640px]">
+        <thead><tr class="text-left border-b border-ink-100 th-sm"><th class="py-2.5 font-bold">Date</th><th class="font-bold text-right">Sales</th><th class="font-bold text-right">Cash sales</th><th class="font-bold text-right">&minus; Refunds</th><th class="font-bold text-right">&minus; Meal</th><th class="font-bold text-right">Expected cash</th><th class="font-bold text-right">Meal not deducted</th></tr></thead>
+        <tbody>
+        {% for r in page_obj %}<tr class="border-b border-ink-100">
+          <td class="py-3 font-medium">{{ r.date|date:"D, j M Y" }}{% if r.date == today %} <span class="chip chip-idle">Today</span>{% endif %}</td>
+          <td class="text-right text-ink-500">{{ r.sales_count }}</td>
+          <td class="text-right">TZS {{ r.cash_sales|floatformat:0|intcomma }}</td>
+          <td class="text-right {% if r.cash_refunds %}text-rose-700 font-semibold{% else %}text-ink-400{% endif %}">TZS {{ r.cash_refunds|floatformat:0|intcomma }}</td>
+          <td class="text-right">TZS {{ r.meal_earned|floatformat:0|intcomma }}</td>
+          <td class="text-right font-bold text-brand-700">TZS {{ r.expected|floatformat:0|intcomma }}</td>
+          <td class="text-right {% if r.meal_not_deducted %}text-amber-700 font-semibold{% else %}text-ink-400{% endif %}">TZS {{ r.meal_not_deducted|floatformat:0|intcomma }}</td>
+        </tr>{% empty %}<tr><td colspan="7" class="py-10 text-center text-ink-400">No cash sales or meals in this period.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if page_obj.paginator.num_pages > 1 %}
+    <div class="flex items-center justify-between mt-4 text-sm">
+      <span class="text-ink-500">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+      <div class="flex gap-2">
+        {% if page_obj.has_previous %}<a class="btn btn-secondary btn-sm" href="?{% if not is_self %}employee={{ employee.pk }}&{% endif %}from={{ date_from }}&to={{ date_to }}&page={{ page_obj.previous_page_number }}">Previous</a>{% endif %}
+        {% if page_obj.has_next %}<a class="btn btn-secondary btn-sm" href="?{% if not is_self %}employee={{ employee.pk }}&{% endif %}from={{ date_from }}&to={{ date_to }}&page={{ page_obj.next_page_number }}">Next</a>{% endif %}
+      </div>
+    </div>
+    {% endif %}
+    <p class="text-[11px] text-ink-400 mt-4">Cash payments only. Mobile money, bank and debt sales are not part of this figure. A meal is deducted once it is funded by your own sales for that business date; until then it shows under &ldquo;Meal not deducted&rdquo;.</p>
+  </section>
+</div>
+{% endblock %}

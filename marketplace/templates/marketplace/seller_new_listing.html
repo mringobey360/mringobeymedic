@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}New listing · {{ store.public_name }}{% endblock %}
+{% block extra_head %}{% include 'marketplace/_mk_styles.html' %}{% endblock %}
+{% block content %}
+<div class="mk-page">
+ <nav class="mk-crumbs" aria-label="Breadcrumb"><a href="{% url 'marketplace:seller_dashboard' %}">Seller Centre</a><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg><span>Sell</span><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg><b>New listing</b></nav>
+ <header class="mk-hero">
+  <div class="mk-hero-main">
+   <span class="mk-hero-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg></span>
+   <div><h1>What are you listing?</h1><p>Pick the type that matches what you sell. The next form shows only the details that matter for it.</p></div>
+  </div>
+  <div class="mk-actions"><a class="btn btn-secondary" href="{% url 'marketplace:seller_dashboard' %}">Back to Seller Centre</a></div>
+ </header>
+
+ <div class="mk-kinds">
+  <a class="mk-kind" href="{% url 'marketplace:seller_product_add' store.id %}">
+   <span class="mk-kind-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 7.5l9-4 9 4-9 4-9-4z"/><path d="M3 7.5v9l9 4 9-4v-9M12 11.5v9"/></svg></span>
+   <h2>Physical product</h2>
+   <p>Goods you deliver or hand over: stationery, books, clothes, phones, spare parts, food.</p>
+   <ul><li><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg>Price, photos and quantity in stock</li><li><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg>Stock goes down when payment is confirmed</li></ul>
+   <span class="mk-kind-go">Add physical product <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+  </a>
+  <a class="mk-kind" href="{% url 'marketplace:seller_product_add' store.id %}?kind=digital">
+   <span class="mk-kind-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5M12 15V3"/></svg></span>
+   <h2>Digital download</h2>
+   <p>PDF books, e-books, notes, videos, music or course files that the buyer downloads after paying.</p>
+   <ul><li><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg>No stock to manage</li><li><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg>The file is private: the download link appears only after verified payment</li></ul>
+   <span class="mk-kind-go">Add digital download <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+  </a>
+  <a class="mk-kind" href="{% url 'marketplace:seller_product_add' store.id %}?kind=movie">
+   <span class="mk-kind-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m10 9 5 3-5 3z"/></svg></span>
+   <h2>Movie</h2>
+   <p>Sell a film with a poster and an auto-playing trailer. Buyers download the full movie only after paying.</p>
+   <ul><li><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg>Professional movie card with trailer, year, quality and genres</li><li><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg>The full movie is private and unlocks after verified payment</li></ul>
+   <span class="mk-kind-go">Add movie <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+  </a>
+  <a class="mk-kind" href="{% url 'marketplace:seller_listing_add' store.id %}">
+   <span class="mk-kind-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 21V9l8-5 8 5v12"/><path d="M9 21v-6h6v6"/></svg></span>
+   <h2>Room, house or land</h2>
+   <p>Rentals and properties for sale. Customers enquire, call or WhatsApp the agent.</p>
+   <ul><li><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg>Rent per month, location and amenities</li><li><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg>Available, reserved or let/sold status instead of stock</li></ul>
+   <span class="mk-kind-go">Create property listing <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+  </a>
+ </div>
+</div>
+{% endblock %}

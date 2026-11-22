@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Shop categories · {{ store.public_name }}{% endblock %}
+{% block extra_head %}{% include 'marketplace/_mk_styles.html' %}{% endblock %}
+{% block content %}
+<div class="mk-page" style="max-width:960px">
+ <nav class="mk-crumbs" aria-label="Breadcrumb"><a href="{% url 'marketplace:seller_dashboard' %}">Seller Centre</a><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg><b>Categories</b></nav>
+ <header class="mk-hero">
+  <div class="mk-hero-main">
+   <span class="mk-hero-icon"><svg viewBox="0 0 24 24"><path d="M4 5h6v6H4zM14 5h6v6h-6zM4 15h6v4H4zM14 15h6v4h-6z"/></svg></span>
+   <div><h1>Categories</h1><p>{{ store.public_name }} · group your products so shoppers can find them easily. These categories belong to your shop only.</p></div>
+  </div>
+ </header>
+
+ <section class="mk-card mk-pad">
+  <form class="mk-form" method="post">{% csrf_token %}<input type="hidden" name="action" value="add">
+   <div class="mk-field"><label class="mk-label" for="cat-name">New category</label>
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap"><input id="cat-name" name="name" maxlength="100" required placeholder="e.g. Perfumes, Hair care, Phones" style="flex:1;min-width:200px"><button class="btn btn-primary" type="submit">Add category</button></div>
+    <small class="mk-help">Use clear names shoppers understand. You can also create a category while adding a product.</small></div>
+  </form>
+ </section>
+
+ <section class="mk-card">
+  <div class="mk-sec-head"><div><h2>Your categories</h2><p>{{ categories|length }} categor{{ categories|length|pluralize:"y,ies" }}</p></div><a class="btn btn-secondary btn-sm" href="{% url 'marketplace:seller_product_add' store.id %}">+ Add product</a></div>
+  {% for c in categories %}
+  <div class="mk-cat-row">
+   <div style="min-width:0"><span class="mk-strong">{{ c.name }}</span> <span class="mk-muted">· {{ c.product_count }} product{{ c.product_count|pluralize }}</span>
+    {% if not c.is_active %}<span class="mk-badge mk-b-hidden" style="margin-left:.4rem">Hidden</span>{% endif %}</div>
+   <div class="mk-cell-actions">
+    <form method="post">{% csrf_token %}<input type="hidden" name="category_id" value="{{ c.pk }}"><input type="hidden" name="action" value="rename"><input type="text" name="name" value="{{ c.name }}" maxlength="100" aria-label="Rename {{ c.name }}" required><button class="btn btn-secondary btn-sm" type="submit">Rename</button></form>
+    <form method="post">{% csrf_token %}<input type="hidden" name="category_id" value="{{ c.pk }}"><input type="hidden" name="action" value="toggle"><button class="btn btn-secondary btn-sm" type="submit">{% if c.is_active %}Hide{% else %}Show{% endif %}</button></form>
+    <form method="post" class="mk-cat-delete" data-mk-confirm="Delete the category “{{ c.name }}”?" data-mk-detail="{% if c.product_count %}Its products will be moved to the category you select below. Product and order history will be preserved.{% else %}This category will be permanently removed from your shop.{% endif %}" data-mk-accept="Yes, delete" data-mk-cancel="Keep category" data-mk-tone="danger">{% csrf_token %}<input type="hidden" name="category_id" value="{{ c.pk }}"><input type="hidden" name="action" value="delete">{% if c.product_count %}<label class="mk-delete-target"><span>Move {{ c.product_count }} product{{ c.product_count|pluralize }} to</span><select name="target_category_id" required aria-label="Destination category for products in {{ c.name }}"><option value="">Choose category…</option>{% for target in categories %}{% if target.pk != c.pk %}<option value="{{ target.pk }}">{{ target.name }}</option>{% endif %}{% endfor %}</select></label>{% endif %}<button class="btn btn-secondary btn-sm mk-btn-danger-soft" type="submit">Delete</button></form>
+   </div>
+  </div>
+  {% empty %}
+  <div class="mk-empty"><b>No categories yet</b>Add your first category above, then add products under it.</div>
+  {% endfor %}
+ </section>
+</div>
+{% endblock %}

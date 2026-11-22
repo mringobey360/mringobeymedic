@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}VIP Rules · SmartPOS<script>
+(function(){
+  const type = document.getElementById('discount_type');
+  const percent = document.getElementById('vip-percent-wrap');
+  const amount = document.getElementById('vip-amount-wrap');
+  function sync(){ const fixed = type && type.value === 'AMOUNT'; percent.classList.toggle('hidden', fixed); amount.classList.toggle('hidden', !fixed); document.getElementById('discount_percent').required = !fixed; document.getElementById('discount_amount').required = fixed; }
+  if(type){ type.addEventListener('change', sync); sync(); }
+})();
+</script>
+{% endblock %}
+{% block content %}
+<div class="max-w-3xl mx-auto space-y-5 px-1">
+  <div class="flex flex-wrap items-start justify-between gap-3">
+    <div><p class="text-xs font-bold uppercase tracking-widest text-teal-700">Customer loyalty · Manager controls</p><h1 class="text-2xl md:text-3xl font-extrabold text-ink-950">VIP qualification rules</h1><p class="text-sm text-ink-500 mt-1">{{ branch }} · These rules apply to this branch only.</p></div>
+    <a class="btn btn-outline" href="{% url 'rewards:overview' %}">Back to Loyalty</a>
+  </div>
+  <section class="card p-4 sm:p-6">
+    <p class="text-sm text-ink-600 mb-5">Configure the rules once. POS eligibility, the loyalty list and the VIP discount all read the same saved policy. Discounts still cannot reduce an item below its actual batch cost.</p>
+    <form method="post" class="space-y-5">{% csrf_token %}
+      <label class="flex items-start gap-3 rounded-xl border border-ink-100 p-4"><input type="checkbox" name="enabled" class="mt-1" {% if policy.enabled %}checked{% endif %}><span><strong class="block">Enable VIP programme</strong><span class="text-sm text-ink-500">Turn off VIP qualification and VIP discounts for this branch without deleting customer sales history.</span></span></label>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div><label for="qualifying_visits" class="block text-sm font-semibold mb-1">Purchases required</label><input id="qualifying_visits" name="qualifying_visits" type="number" min="1" max="100" required value="{{ policy.qualifying_visits }}" class="form-input w-full"><p class="text-xs text-ink-500 mt-1">Example: 4 qualifying completed purchases.</p></div>
+        <div><label for="window_days" class="block text-sm font-semibold mb-1">Rolling period (days)</label><input id="window_days" name="window_days" type="number" min="1" max="3650" required value="{{ policy.window_days }}" class="form-input w-full"><p class="text-xs text-ink-500 mt-1">Example: 90 days from today.</p></div>
+        <div class="sm:col-span-2 rounded-xl border border-ink-100 p-4 space-y-3"><label for="discount_type" class="block text-sm font-semibold mb-1">VIP discount method</label><select id="discount_type" name="discount_type" class="form-input w-full"><option value="PERCENT" {% if policy.discount_type == 'PERCENT' %}selected{% endif %}>Percentage (%)</option><option value="AMOUNT" {% if policy.discount_type == 'AMOUNT' %}selected{% endif %}>Fixed amount (TZS per item/unit)</option></select><div id="vip-percent-wrap"><label for="discount_percent" class="block text-sm font-semibold mb-1">Discount percentage (%)</label><input id="discount_percent" name="discount_percent" type="number" min="0" max="100" step="0.01" value="{{ policy.discount_percent }}" class="form-input w-full"></div><div id="vip-amount-wrap"><label for="discount_amount" class="block text-sm font-semibold mb-1">Fixed discount (TZS per item/unit)</label><input id="discount_amount" name="discount_amount" type="number" min="0" max="100000000" step="0.01" value="{{ policy.discount_amount }}" class="form-input w-full"><p class="text-xs text-ink-500 mt-1">Example: TZS 500 off each eligible unit. Actual discount is capped so the selling price never falls below batch cost.</p></div><p class="text-xs text-ink-500">Only the selected method is applied. Product-level discount is applied first; the VIP benefit is then applied server-side with cost-floor protection.</p></div>
+        <div><label for="minimum_spend" class="block text-sm font-semibold mb-1">Minimum spend (TZS)</label><input id="minimum_spend" name="minimum_spend" type="number" min="0" step="0.01" required value="{{ policy.minimum_spend }}" class="form-input w-full"><p class="text-xs text-ink-500 mt-1">Set 0 to disable the spend requirement.</p></div>
+      </div>
+      <div class="rounded-xl bg-slate-50 p-4 text-sm text-slate-700"><strong>Current rule:</strong> {% if policy.enabled %}{{ policy.qualifying_visits }} purchases within {{ policy.window_days }} days{% if policy.minimum_spend > 0 %} and at least TZS {{ policy.minimum_spend|floatformat:0 }} spend{% endif %}, receiving {% if policy.discount_type == 'PERCENT' %}up to {{ policy.discount_percent }}% VIP discount{% else %}up to TZS {{ policy.discount_amount|floatformat:2 }} off each eligible unit{% endif %}.{% else %}VIP programme is disabled for this branch.{% endif %}<br><span class="text-xs">Last updated: {% if policy.updated_at %}{{ policy.updated_at|date:"d M Y, H:i" }}{% else %}Not saved yet{% endif %}{% if policy.updated_by %} by {{ policy.updated_by.get_full_name|default:policy.updated_by.username }}{% endif %}.</span></div>
+      <div class="flex flex-col-reverse sm:flex-row gap-3"><a href="{% url 'rewards:overview' %}" class="btn btn-outline text-center">Cancel</a><button type="submit" class="btn btn-primary sm:flex-1">Save VIP rules</button></div>
+    </form>
+  </section>
+</div>
+<script>
+(function(){
+  const type = document.getElementById('discount_type');
+  const percent = document.getElementById('vip-percent-wrap');
+  const amount = document.getElementById('vip-amount-wrap');
+  function sync(){ const fixed = type && type.value === 'AMOUNT'; percent.classList.toggle('hidden', fixed); amount.classList.toggle('hidden', !fixed); document.getElementById('discount_percent').required = !fixed; document.getElementById('discount_amount').required = fixed; }
+  if(type){ type.addEventListener('change', sync); sync(); }
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,54 @@
+{% extends "base.html" %}{% load humanize cart_tags %}
+{% block title %}Manage order · SmartPOS HQ{% endblock %}
+{% block extra_head %}{% include 'marketplace/_mk_styles.html' %}{% endblock %}
+{% block content %}
+<div class="mk-page">
+ <header class="mk-head">
+  <div>
+   <a class="mk-back" href="{% url 'marketplace:manage_orders' %}">← All orders</a>
+   <p class="mk-eyebrow">SmartPOS · Platform HQ</p>
+   <h1 class="mk-title">Order &amp; payment management</h1>
+   <p class="mk-sub">Ticket ID <span style="font-family:ui-monospace,Menlo,monospace;font-size:.8rem">{{ order.reference }}</span></p>
+  </div>
+  <div class="mk-actions"><span class="mk-badge mk-b-{{ order.status }}">{{ order.get_status_display }}</span><span class="mk-badge mk-b-{{ order.payment_status }}">{{ order.get_payment_status_display }}</span></div>
+ </header>
+
+ <div class="mk-two">
+  <div style="display:grid;gap:1rem;min-width:0">
+   <section class="mk-card mk-pad" aria-labelledby="mk-cust-h">
+    <h2 id="mk-cust-h" style="font-size:1rem;font-weight:700;margin:0 0 .75rem">Customer</h2>
+    <div class="mk-kv">
+     <div><small>Name</small><strong>{{ order.customer_name }}</strong></div>
+     <div><small>Phone</small><strong>{{ order.phone }}</strong></div>
+     <div><small>Location</small><strong>{{ order.location|default:"—" }}</strong></div>
+     <div><small>Created</small><strong>{{ order.created_at|date:'d M Y, H:i' }}</strong></div>
+    </div>
+    {% if order.notes %}<p class="mk-muted" style="margin-top:.75rem"><strong>Customer notes:</strong> {{ order.notes }}</p>{% endif %}
+   </section>
+
+   <section class="mk-card" aria-labelledby="mk-items-h">
+    <div class="mk-sec-head"><h2 id="mk-items-h">Items</h2></div>
+    <div class="mk-table-wrap">
+     <table class="mk-table" style="min-width:420px">
+      <thead><tr><th>Product</th><th class="mk-num">Qty</th><th class="mk-num">Unit price</th><th class="mk-num">Line total</th></tr></thead>
+      <tbody>{% for item in order.items.all %}<tr><td class="mk-strong">{{ item.name }}</td><td class="mk-num">{{ item.quantity }}</td><td class="mk-num">TSh {{ item.unit_price|floatformat:0|intcomma }}</td><td class="mk-num">TSh {{ item.quantity|mul:item.unit_price|floatformat:0|intcomma }}</td></tr>{% endfor %}</tbody>
+     </table>
+    </div>
+    <div class="mk-total"><span>Total</span><span>TSh {{ order.total|floatformat:0|intcomma }}</span></div>
+   </section>
+  </div>
+
+  <section class="mk-card mk-pad" aria-labelledby="mk-upd-h">
+   <h2 id="mk-upd-h" style="font-size:1rem;font-weight:700;margin:0 0 .85rem">Update order</h2>
+   <form class="mk-form" method="post">{% csrf_token %}
+    <div class="mk-field"><label class="mk-label" for="mk-status">Order status</label><select id="mk-status" name="status">{% for value,label in status_choices %}<option value="{{ value }}" {% if order.status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+    <div class="mk-field"><label class="mk-label" for="mk-pay">Payment status</label><select id="mk-pay" name="payment_status">{% for value,label in payment_choices %}<option value="{{ value }}" {% if order.payment_status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+    <div class="mk-field"><label class="mk-label" for="mk-method">Payment method</label><input id="mk-method" name="payment_method" value="{{ order.payment_method }}" placeholder="Mobile money / gateway"></div>
+    <div class="mk-field"><label class="mk-label" for="mk-pref">Provider transaction reference</label><input id="mk-pref" name="payment_reference" value="{{ order.payment_reference }}"></div>
+    <div class="mk-note warn">Only mark as Paid after verifying a successful transaction with the payment provider.</div>
+    <div class="mk-form-actions"><a class="btn btn-secondary" href="{% url 'marketplace:manage_orders' %}">Cancel</a><button type="submit" class="btn btn-primary">Save order</button></div>
+   </form>
+  </section>
+ </div>
+</div>
+{% endblock %}

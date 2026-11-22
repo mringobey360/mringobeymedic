@@ -1,0 +1,322 @@
+{% extends 'base.html' %}
+{% load humanize %}
+{% block title %}Performance Monitor{% endblock %}
+{% block content %}
+{% with t=report.totals prev=report.previous %}
+<div class="w-full mx-auto space-y-5">
+
+  {# ───────── Header ───────── #}
+  <section class="rounded-3xl border border-ink-200 bg-white shadow-sm overflow-hidden">
+    <div class="p-5 sm:p-7 bg-gradient-to-br from-brand-50 via-white to-white flex flex-col lg:flex-row lg:items-end lg:justify-between gap-5">
+      <div class="min-w-0">
+        <div class="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[.16em] text-brand-700"><span class="h-2 w-2 rounded-full bg-brand-600"></span> Performance monitor</div>
+        <h1 class="mt-2 text-2xl sm:text-3xl font-extrabold tracking-tight text-ink-950">Sales, profit &amp; transactions</h1>
+        <p class="mt-1.5 text-sm text-ink-500 max-w-2xl">Choose the period you want to follow. Your dashboard cards use the same period, and every report below is generated for it.</p>
+        <p class="mt-2 text-xs text-ink-400">Branch: <span class="font-semibold text-ink-600">{{ pharmacy.name }}</span></p>
+      </div>
+      <div class="grid grid-cols-2 sm:flex gap-2">
+        <a href="{% url 'dashboard:performance_pdf' %}" class="btn btn-secondary" download>
+          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14"/></svg>PDF report
+        </a>
+        <a href="{% url 'dashboard:performance_excel' %}" class="btn btn-secondary" download>
+          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14"/></svg>Excel
+        </a>
+      </div>
+    </div>
+  </section>
+
+  {# ───────── Customize ───────── #}
+  <section class="card p-0 overflow-visible relative z-10">
+    <form method="post" id="perf-form" novalidate>
+      {% csrf_token %}
+      <div class="px-4 sm:px-5 py-4 border-b border-ink-100 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p class="text-[11px] uppercase tracking-wider text-ink-400 font-semibold">Customize</p>
+          <h2 class="font-extrabold text-ink-900 text-lg leading-tight">What do you want to monitor?</h2>
+        </div>
+        {% if is_default %}
+        <span class="badge bg-ink-100 text-ink-600">Default: Monthly Sales &amp; Profit</span>
+        {% else %}
+        <span class="badge bg-brand-50 text-brand-700">Custom period active</span>
+        {% endif %}
+      </div>
+
+      <div class="p-4 sm:p-5 space-y-4">
+        {% if form.non_field_errors %}<div role="alert" class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{ form.non_field_errors }}</div>{% endif %}
+
+        {# Quick presets #}
+        <div>
+          <p class="text-xs font-semibold text-ink-600 mb-2">Quick choices</p>
+          <div class="flex flex-wrap gap-2" id="presets">
+            <button type="button" class="chip" data-mode="LAST_DAYS" data-n="1" data-interval="DAY">Today</button>
+            <button type="button" class="chip" data-mode="LAST_DAYS" data-n="7" data-interval="DAY">Last 7 days</button>
+            <button type="button" class="chip" data-mode="LAST_WEEKS" data-n="2" data-interval="DAY">Last 2 weeks</button>
+            <button type="button" class="chip" data-mode="LAST_DAYS" data-n="30" data-interval="WEEK">Last 30 days</button>
+            <button type="button" class="chip" data-mode="LAST_MONTHS" data-n="3" data-interval="WEEK">Last 3 months</button>
+            <button type="button" class="chip" data-mode="LAST_MONTHS" data-n="6" data-interval="MONTH">Last 6 months</button>
+            <button type="button" class="chip" data-mode="MONTH" data-n="14" data-interval="DAY">This month (default)</button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-start">
+          <div class="lg:col-span-3">
+            <label for="{{ form.mode.id_for_label }}" class="block text-xs font-semibold text-ink-600 mb-1">{{ form.mode.label }}</label>
+            {{ form.mode }}
+            {% for e in form.mode.errors %}<p class="text-xs text-red-600 mt-1">{{ e }}</p>{% endfor %}
+          </div>
+
+          <div class="lg:col-span-2" data-show="LAST_DAYS LAST_WEEKS LAST_MONTHS">
+            <label for="{{ form.last_n.id_for_label }}" class="block text-xs font-semibold text-ink-600 mb-1"><span id="n-label">How many</span></label>
+            {{ form.last_n }}
+            {% for e in form.last_n.errors %}<p class="text-xs text-red-600 mt-1">{{ e }}</p>{% endfor %}
+          </div>
+
+          <div class="lg:col-span-2" data-show="CUSTOM">
+            <label for="{{ form.custom_start.id_for_label }}" class="block text-xs font-semibold text-ink-600 mb-1">{{ form.custom_start.label }}</label>
+            {{ form.custom_start }}
+            {% for e in form.custom_start.errors %}<p class="text-xs text-red-600 mt-1">{{ e }}</p>{% endfor %}
+          </div>
+          <div class="lg:col-span-2" data-show="CUSTOM">
+            <label for="{{ form.custom_end.id_for_label }}" class="block text-xs font-semibold text-ink-600 mb-1">{{ form.custom_end.label }}</label>
+            <input type="date" name="{{ form.custom_end.html_name }}" id="{{ form.custom_end.id_for_label }}" class="form-input" max="{{ today|date:'Y-m-d' }}" value="{{ form.custom_end.value|default_if_none:''|stringformat:'s' }}">
+            {% for e in form.custom_end.errors %}<p class="text-xs text-red-600 mt-1">{{ e }}</p>{% endfor %}
+          </div>
+
+          <div class="lg:col-span-3">
+            <label for="{{ form.interval.id_for_label }}" class="block text-xs font-semibold text-ink-600 mb-1">{{ form.interval.label }}</label>
+            {{ form.interval }}
+            {% for e in form.interval.errors %}<p class="text-xs text-red-600 mt-1">{{ e }}</p>{% endfor %}
+          </div>
+        </div>
+
+        <div class="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3 pt-1">
+          <p class="text-xs text-ink-400">Saved for your account. Dashboard cards: Sales and Profit follow this period.</p>
+          <div class="flex flex-col-reverse sm:flex-row gap-2">
+            {% if not is_default %}
+            <button type="submit" name="reset" value="1" class="btn btn-secondary" formnovalidate>Back to default</button>
+            {% endif %}
+            <button type="submit" class="btn btn-primary" id="perf-save">Save &amp; apply</button>
+          </div>
+        </div>
+      </div>
+    </form>
+  </section>
+
+  {# ───────── Period banner ───────── #}
+  <section class="flex flex-wrap items-center justify-between gap-2 px-1">
+    <div class="min-w-0">
+      <p class="text-[11px] uppercase tracking-wider text-ink-400 font-semibold">Showing</p>
+      <h2 class="text-lg sm:text-xl font-extrabold text-ink-900">{{ report.label }}</h2>
+      <p class="text-xs text-ink-500">{{ report.start|date:"D d M Y" }} to {{ report.end|date:"D d M Y" }} · {{ t.days }} day{{ t.days|pluralize }} · {{ report.interval_label|lower }} breakdown</p>
+    </div>
+    <p class="text-xs text-ink-400">Compared with {{ prev.start|date:"d M" }} – {{ prev.end|date:"d M Y" }}</p>
+  </section>
+  {% if report.interval_note %}<div class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">{{ report.interval_note }}</div>{% endif %}
+
+  {# ───────── KPIs ───────── #}
+  <section class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+    <div class="card stat-card">
+      <p class="stat-label">Total sales</p>
+      {% with amount=t.sales|floatformat:0|intcomma %}<p class="stat-value text-ink-900 mt-1.5" style="--n: {{ amount|length }}"><span class="stat-cur">TZS</span>{{ amount }}</p>{% endwith %}
+      {% include "dashboard/_delta.html" with pct=prev.sales_pct %}
+    </div>
+    <div class="card stat-card">
+      <p class="stat-label">Total profit</p>
+      {% with amount=t.profit|floatformat:0|intcomma %}<p class="stat-value text-emerald-600 mt-1.5" style="--n: {{ amount|length }}"><span class="stat-cur">TZS</span>{{ amount }}</p>{% endwith %}
+      {% include "dashboard/_delta.html" with pct=prev.profit_pct %}
+      <p class="text-[11px] text-ink-400 mt-0.5">{{ t.margin|floatformat:1 }}% margin</p>
+    </div>
+    <div class="card stat-card">
+      <p class="stat-label">Transactions</p>
+      <p class="stat-value text-ink-900 mt-1.5">{{ t.transactions|intcomma }}</p>
+      {% include "dashboard/_delta.html" with pct=prev.tx_pct %}
+      <p class="text-[11px] text-ink-400 mt-0.5">{{ t.active_days }} trading day{{ t.active_days|pluralize }}</p>
+    </div>
+    <div class="card stat-card">
+      <p class="stat-label">Average sale</p>
+      {% with amount=t.avg_ticket|floatformat:0|intcomma %}<p class="stat-value text-ink-900 mt-1.5" style="--n: {{ amount|length }}"><span class="stat-cur">TZS</span>{{ amount }}</p>{% endwith %}
+      <p class="text-[11px] text-ink-400 mt-1">{{ t.units|intcomma }} unit{{ t.units|pluralize }} sold</p>
+    </div>
+  </section>
+
+  <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+    <div class="rounded-2xl border border-ink-200 bg-white p-4">
+      <p class="text-[11px] font-bold uppercase tracking-wider text-ink-400">Average per day</p>
+      <p class="mt-1.5 text-sm font-bold text-ink-900">TZS {{ t.avg_daily_sales|floatformat:0|intcomma }} <span class="font-normal text-ink-400">sales</span></p>
+      <p class="text-sm font-bold text-emerald-700">TZS {{ t.avg_daily_profit|floatformat:0|intcomma }} <span class="font-normal text-ink-400">profit</span></p>
+    </div>
+    <div class="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4">
+      <p class="text-[11px] font-bold uppercase tracking-wider text-emerald-700">Best {{ report.interval|lower }}</p>
+      {% if report.best %}<p class="mt-1.5 text-sm font-bold text-ink-900">{{ report.best.label }}</p><p class="text-xs text-ink-600">TZS {{ report.best.sales|floatformat:0|intcomma }} · {{ report.best.tx }} sale{{ report.best.tx|pluralize }}</p>{% else %}<p class="mt-1.5 text-sm text-ink-400">No sales yet</p>{% endif %}
+    </div>
+    <div class="rounded-2xl border border-amber-200 bg-amber-50/60 p-4">
+      <p class="text-[11px] font-bold uppercase tracking-wider text-amber-700">Weakest trading {{ report.interval|lower }}</p>
+      {% if report.worst %}<p class="mt-1.5 text-sm font-bold text-ink-900">{{ report.worst.label }}</p><p class="text-xs text-ink-600">TZS {{ report.worst.sales|floatformat:0|intcomma }} · {{ report.worst.tx }} sale{{ report.worst.tx|pluralize }}</p>{% else %}<p class="mt-1.5 text-sm text-ink-400">No sales yet</p>{% endif %}
+    </div>
+    <div class="rounded-2xl border border-ink-200 bg-white p-4">
+      <p class="text-[11px] font-bold uppercase tracking-wider text-ink-400">Busiest {{ report.interval|lower }}</p>
+      {% if report.busiest %}<p class="mt-1.5 text-sm font-bold text-ink-900">{{ report.busiest.label }}</p><p class="text-xs text-ink-600">{{ report.busiest.tx|intcomma }} transaction{{ report.busiest.tx|pluralize }}</p>{% else %}<p class="mt-1.5 text-sm text-ink-400">No sales yet</p>{% endif %}
+    </div>
+  </section>
+
+  {# ───────── Chart ───────── #}
+  <section class="card p-0 overflow-hidden">
+    <div class="px-4 sm:px-5 py-4 border-b border-ink-100 flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <p class="text-[11px] uppercase tracking-wider text-ink-400 font-semibold">Trend</p>
+        <h2 class="font-extrabold text-ink-900 text-lg leading-tight">Sales &amp; profit by {{ report.interval|lower }}</h2>
+      </div>
+      <div class="flex items-center gap-4 text-xs text-ink-500">
+        <span class="inline-flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-sm bg-brand-300"></span>Sales</span>
+        <span class="inline-flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-sm bg-emerald-600"></span>Profit</span>
+      </div>
+    </div>
+    <div class="p-4 sm:p-5 overflow-x-auto" tabindex="0" aria-label="Sales and profit chart">
+      <div class="flex items-end gap-1.5 min-w-max" style="height: 12.5rem">
+        {% for b in report.buckets %}
+        <div class="flex flex-col items-center justify-end h-full {% if report.buckets|length > 31 %}w-7{% else %}w-9 sm:w-11{% endif %}" title="{{ b.label }} · Sales TZS {{ b.sales|floatformat:0|intcomma }} · Profit TZS {{ b.profit|floatformat:0|intcomma }} · {{ b.tx }} transaction{{ b.tx|pluralize }}">
+          <div class="flex items-end gap-0.5 w-full flex-1">
+            <div class="flex-1 rounded-t bg-brand-300 min-h-[2px]" style="height: {{ b.bar_sales }}%"></div>
+            <div class="flex-1 rounded-t bg-emerald-600 min-h-[2px]" style="height: {{ b.bar_profit }}%"></div>
+          </div>
+          <span class="mt-1.5 text-[10px] leading-tight text-ink-400 whitespace-nowrap">{% if report.interval == 'MONTH' %}{{ b.start|date:"M y" }}{% else %}{{ b.start|date:"d M" }}{% endif %}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+
+  {# ───────── Breakdown table ───────── #}
+  <section class="card p-0 overflow-hidden">
+    <div class="px-4 sm:px-5 py-4 border-b border-ink-100 flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <p class="text-[11px] uppercase tracking-wider text-ink-400 font-semibold">Detail</p>
+        <h2 class="font-extrabold text-ink-900 text-lg leading-tight">{{ report.interval_label }} breakdown</h2>
+      </div>
+      <div class="flex items-center gap-3">
+        <span class="badge bg-ink-100 text-ink-600">{{ page_obj.paginator.count }} row{{ page_obj.paginator.count|pluralize }}</span>
+        <form method="get" class="hidden sm:flex items-center gap-2 text-xs text-ink-500">
+          <label for="pm-per-page">Rows</label>
+          <select id="pm-per-page" name="per_page" class="rounded-lg border border-ink-200 bg-white px-2 py-1.5 text-xs" onchange="this.form.submit()">
+            {% for n in per_page_choices %}<option value="{{ n }}" {% if n == per_page %}selected{% endif %}>{{ n }}</option>{% endfor %}
+          </select>
+        </form>
+      </div>
+    </div>
+
+    <div class="hidden md:block overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="bg-ink-50 text-ink-500">
+          <tr>
+            <th class="text-left px-5 py-3 font-semibold">{% if report.interval == 'DAY' %}Day{% elif report.interval == 'WEEK' %}Week{% else %}Month{% endif %}</th>
+            <th class="text-right px-5 py-3 font-semibold">Sales</th>
+            <th class="text-right px-5 py-3 font-semibold">Profit</th>
+            <th class="text-right px-5 py-3 font-semibold">Margin</th>
+            <th class="text-right px-5 py-3 font-semibold">Transactions</th>
+            <th class="text-right px-5 py-3 font-semibold">Avg sale</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-ink-100">
+          {% for b in page_obj %}
+          <tr class="hover:bg-ink-50/60 transition {% if not b.tx %}text-ink-400{% endif %}">
+            <td class="px-5 py-3 font-semibold whitespace-nowrap {% if b.tx %}text-ink-900{% endif %}">{{ b.label }}</td>
+            <td class="px-5 py-3 text-right tabular-nums whitespace-nowrap">TZS {{ b.sales|floatformat:0|intcomma }}</td>
+            <td class="px-5 py-3 text-right tabular-nums whitespace-nowrap {% if b.profit > 0 %}text-emerald-700 font-semibold{% elif b.profit < 0 %}text-red-600 font-semibold{% endif %}">TZS {{ b.profit|floatformat:0|intcomma }}</td>
+            <td class="px-5 py-3 text-right tabular-nums">{% if b.sales %}{{ b.margin|floatformat:0 }}%{% else %}—{% endif %}</td>
+            <td class="px-5 py-3 text-right tabular-nums">{{ b.tx|intcomma }}</td>
+            <td class="px-5 py-3 text-right tabular-nums whitespace-nowrap">{% if b.tx %}TZS {{ b.avg_ticket|floatformat:0|intcomma }}{% else %}—{% endif %}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="6" class="px-5 py-12 text-center text-ink-400">No data for this period.</td></tr>
+          {% endfor %}
+        </tbody>
+        <tfoot class="bg-ink-50 font-bold text-ink-900">
+          <tr>
+            <td class="px-5 py-3">Total</td>
+            <td class="px-5 py-3 text-right tabular-nums whitespace-nowrap">TZS {{ t.sales|floatformat:0|intcomma }}</td>
+            <td class="px-5 py-3 text-right tabular-nums whitespace-nowrap text-emerald-700">TZS {{ t.profit|floatformat:0|intcomma }}</td>
+            <td class="px-5 py-3 text-right tabular-nums">{{ t.margin|floatformat:0 }}%</td>
+            <td class="px-5 py-3 text-right tabular-nums">{{ t.transactions|intcomma }}</td>
+            <td class="px-5 py-3 text-right tabular-nums whitespace-nowrap">TZS {{ t.avg_ticket|floatformat:0|intcomma }}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <ul class="md:hidden divide-y divide-ink-100">
+      {% for b in page_obj %}
+      <li class="px-4 py-3.5 {% if not b.tx %}opacity-60{% endif %}">
+        <div class="flex items-start justify-between gap-3">
+          <p class="font-semibold text-ink-900">{{ b.label }}</p>
+          <p class="font-bold text-ink-900 tabular-nums text-sm">TZS {{ b.sales|floatformat:0|intcomma }}</p>
+        </div>
+        <div class="mt-1.5 flex items-center justify-between gap-3 text-xs text-ink-500">
+          <span>{{ b.tx|intcomma }} transaction{{ b.tx|pluralize }}</span>
+          <span class="{% if b.profit > 0 %}text-emerald-700 font-semibold{% elif b.profit < 0 %}text-red-600 font-semibold{% endif %}">Profit TZS {{ b.profit|floatformat:0|intcomma }}</span>
+        </div>
+      </li>
+      {% empty %}
+      <li class="px-4 py-12 text-center text-sm text-ink-400">No data for this period.</li>
+      {% endfor %}
+      <li class="px-4 py-3.5 bg-ink-50">
+        <div class="flex items-start justify-between gap-3 font-bold text-ink-900"><span>Total</span><span class="tabular-nums text-sm">TZS {{ t.sales|floatformat:0|intcomma }}</span></div>
+        <div class="mt-1.5 flex items-center justify-between gap-3 text-xs"><span class="text-ink-600">{{ t.transactions|intcomma }} transactions</span><span class="text-emerald-700 font-semibold">Profit TZS {{ t.profit|floatformat:0|intcomma }}</span></div>
+      </li>
+    </ul>
+
+    <div class="px-4 sm:px-5 pb-4">
+      {% include "partials/pagination.html" with page_obj=page_obj %}
+    </div>
+  </section>
+
+  <p class="text-xs text-ink-400 px-1">Sales and profit are calculated the same way as your dashboard (net of returns and voids). Transactions exclude voided sales. Days are counted in Africa/Dar_es_Salaam time.</p>
+</div>
+
+<style>
+  .chip { display:inline-flex; align-items:center; border:1px solid #e2e8f0; background:#fff; color:#334155; border-radius:9999px; padding:.375rem .8rem; font-size:.75rem; font-weight:600; transition:all .15s ease; min-height:34px; }
+  .chip:hover { border-color:#14b8a6; color:#0f766e; background:#f0fdfa; }
+  .chip.is-on { border-color:#0f766e; background:#0f766e; color:#fff; }
+</style>
+
+<script>
+(function () {
+  var form = document.getElementById('perf-form');
+  if (!form) return;
+  var mode = form.querySelector('[name="mode"]');
+  var n = form.querySelector('[name="last_n"]');
+  var interval = form.querySelector('[name="interval"]');
+  var nLabel = document.getElementById('n-label');
+  var units = {LAST_DAYS: 'Number of days', LAST_WEEKS: 'Number of weeks', LAST_MONTHS: 'Number of months'};
+
+  function sync() {
+    var m = mode.value;
+    form.querySelectorAll('[data-show]').forEach(function (el) {
+      el.classList.toggle('hidden', el.getAttribute('data-show').split(' ').indexOf(m) === -1);
+    });
+    if (nLabel) nLabel.textContent = units[m] || 'How many';
+    document.querySelectorAll('#presets .chip').forEach(function (c) {
+      var on = c.dataset.mode === m && (m === 'MONTH' || String(c.dataset.n) === String(n.value));
+      c.classList.toggle('is-on', on);
+    });
+  }
+  mode.addEventListener('change', sync);
+  n.addEventListener('input', sync);
+
+  document.querySelectorAll('#presets .chip').forEach(function (c) {
+    c.addEventListener('click', function () {
+      mode.value = c.dataset.mode; n.value = c.dataset.n; interval.value = c.dataset.interval;
+      sync();
+      form.querySelector('#perf-save').click();
+    });
+  });
+
+  var save = document.getElementById('perf-save');
+  form.addEventListener('submit', function (e) {
+    var submitter = e.submitter;
+    if (save && submitter === save) { save.disabled = true; save.textContent = 'Saving…'; }
+  });
+  sync();
+})();
+</script>
+{% endwith %}
+{% endblock %}

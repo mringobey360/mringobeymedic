@@ -1,0 +1,240 @@
+{% extends "base.html" %}
+{% block title %}Platform Overview - HQ{% endblock %}
+{% block content %}
+<div class="max-w-6xl mx-auto space-y-6">
+
+    <!-- Page header -->
+    <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+        <div>
+            <h1 class="text-2xl font-bold text-ink-900 tracking-tight">Platform Overview</h1>
+            <p class="text-sm text-ink-500 mt-1">Customers, billing and SMS services at a glance &middot; {% now "l, d F Y" %}</p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+            <a href="{% url 'hq:announcement_compose' %}" class="btn btn-primary text-sm">
+                <svg class="icon !w-4 !h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-5v12L3 14v-3z"/><path d="M7 14v4a2 2 0 002 2h1"/></svg>
+                Send SMS Announcement
+            </a>
+            <a href="{% url 'hq:payment_settings' %}" class="btn btn-secondary text-sm">Payment Settings</a>
+        </div>
+    </div>
+
+    <!-- Needs attention -->
+    {% if attention %}
+    <section class="card !p-0 overflow-hidden ring-1 ring-amber-200">
+        <div class="flex items-center gap-2 px-5 py-3 bg-amber-50 border-b border-amber-100">
+            <svg class="icon !w-4 !h-4 text-amber-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4"/><circle cx="12" cy="16.3" r="0.6" fill="currentColor"/><path d="M10.3 3.9L2.6 17.5A1.5 1.5 0 004 19.8h16a1.5 1.5 0 001.3-2.3L13.7 3.9a1.5 1.5 0 00-2.6 0z"/></svg>
+            <h2 class="text-sm font-semibold text-amber-800">Needs your attention</h2>
+        </div>
+        <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-px bg-ink-100">
+            {% for item in attention %}
+            <a href="{{ item.url }}" class="flex items-center justify-between gap-3 bg-white px-5 py-3.5 hover:bg-ink-50 transition">
+                <span class="text-sm text-ink-700">{{ item.label }}</span>
+                <span class="badge {% if item.tone == 'red' %}bg-red-100 text-red-700{% else %}bg-amber-100 text-amber-700{% endif %}">{{ item.count }}</span>
+            </a>
+            {% endfor %}
+        </div>
+    </section>
+    {% else %}
+    <section class="card !py-3.5 flex items-center gap-3 ring-1 ring-emerald-200 bg-emerald-50/60">
+        <svg class="icon text-emerald-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.7 2.7L16 9.5"/></svg>
+        <p class="text-sm font-medium text-emerald-800">All caught up &mdash; no payments or requests are waiting for review.</p>
+    </section>
+    {% endif %}
+
+    <!-- Key numbers -->
+    <section class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div class="card">
+            <p class="text-xs font-medium text-ink-500">Customers</p>
+            <p class="text-2xl font-bold text-ink-900 mt-1">{{ stats.customer_count }}</p>
+            <p class="text-xs text-ink-400 mt-1">{{ stats.active_branch_count }} of {{ stats.branch_count }} branches active</p>
+        </div>
+        <div class="card">
+            <p class="text-xs font-medium text-ink-500">Active subscriptions</p>
+            <p class="text-2xl font-bold text-emerald-600 mt-1">{{ stats.active_subscriptions }}</p>
+            <p class="text-xs text-ink-400 mt-1">{{ stats.expired_count }} expired</p>
+        </div>
+        <div class="card">
+            <p class="text-xs font-medium text-ink-500">Expiring in 7 days</p>
+            <p class="text-2xl font-bold {% if stats.expiring_soon %}text-red-600{% else %}text-ink-900{% endif %} mt-1">{{ stats.expiring_soon }}</p>
+            <p class="text-xs text-ink-400 mt-1">Renewals to follow up</p>
+        </div>
+        <div class="card">
+            <p class="text-xs font-medium text-ink-500">Total collected</p>
+            <p class="text-2xl font-bold text-ink-900 mt-1"><span class="text-sm font-semibold text-ink-400">TZS</span> {{ stats.total_collected|floatformat:0 }}</p>
+            <p class="text-xs text-ink-400 mt-1">Subscription payments</p>
+        </div>
+    </section>
+
+    <div class="grid lg:grid-cols-3 gap-6">
+
+        <!-- Main column -->
+        <div class="lg:col-span-2 space-y-6">
+
+            <section class="card">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="text-sm font-semibold text-ink-800">Subscriptions ending soon</h2>
+                    <a href="{% url 'hq:subscription_list' %}" class="text-xs font-medium text-brand-700 hover:text-brand-800">View all &rarr;</a>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="text-left border-b border-ink-200">
+                                <th class="py-2 pr-4">Customer</th>
+                                <th class="py-2 pr-4">Plan</th>
+                                <th class="py-2 pr-4">Ends</th>
+                                <th class="py-2">Remaining</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for sub in expiring_subscriptions %}
+                            <tr class="border-b border-ink-100">
+                                <td class="py-2.5 pr-4 font-medium text-ink-800">{% firstof sub.owner.get_full_name sub.owner.username %}</td>
+                                <td class="py-2.5 pr-4 text-ink-500">{{ sub.get_plan_display }}</td>
+                                <td class="py-2.5 pr-4 text-ink-500">{{ sub.end_date|date:"d M Y" }}</td>
+                                <td class="py-2.5">
+                                    <span class="badge {% if sub.days_remaining <= 3 %}bg-red-100 text-red-700{% else %}bg-amber-100 text-amber-700{% endif %}">
+                                        {% if sub.days_remaining == 0 %}Today{% else %}{{ sub.days_remaining }} day{{ sub.days_remaining|pluralize }}{% endif %}
+                                    </span>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="4" class="py-6 text-center text-ink-400">No subscriptions end in the next 14 days.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="card">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="text-sm font-semibold text-ink-800">Recent registrations</h2>
+                    <a href="{% url 'hq:signup_list' %}" class="text-xs font-medium text-brand-700 hover:text-brand-800">View all &rarr;</a>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="text-left border-b border-ink-200">
+                                <th class="py-2 pr-4">Business</th>
+                                <th class="py-2 pr-4">Owner</th>
+                                <th class="py-2 pr-4">Plan</th>
+                                <th class="py-2 pr-4">Status</th>
+                                <th class="py-2">Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for signup in recent_signups %}
+                            <tr class="border-b border-ink-100">
+                                <td class="py-2.5 pr-4"><a href="{% url 'hq:signup_detail' signup.pk %}" class="text-brand-700 font-medium hover:text-brand-800">{{ signup.business_name }}</a></td>
+                                <td class="py-2.5 pr-4 text-ink-500">{{ signup.owner_full_name }}</td>
+                                <td class="py-2.5 pr-4 text-ink-500">{{ signup.get_plan_display }}</td>
+                                <td class="py-2.5 pr-4">
+                                    <span class="badge
+                                        {% if signup.status == 'PENDING_PAYMENT' %}bg-amber-100 text-amber-700
+                                        {% elif signup.status == 'ACTIVE' %}bg-emerald-100 text-emerald-700
+                                        {% elif signup.status == 'DELIVERED' %}bg-brand-100 text-brand-700
+                                        {% else %}bg-red-100 text-red-700{% endif %}">
+                                        {{ signup.get_status_display }}
+                                    </span>
+                                </td>
+                                <td class="py-2.5 text-ink-500 whitespace-nowrap">{{ signup.created_at|date:"d M Y" }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="5" class="py-6 text-center text-ink-400">No registrations yet.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+
+        <!-- Side column -->
+        <aside class="space-y-6">
+
+            <section class="card">
+                <h2 class="text-sm font-semibold text-ink-800 mb-2">Quick access</h2>
+
+                <p class="text-[11px] font-semibold uppercase tracking-wider text-ink-400 mt-2 mb-1 px-2">Marketplace</p>
+                <a href="{% url 'marketplace:manage' %}" class="flex items-center justify-between px-2 py-2 rounded-lg text-sm text-ink-700 hover:bg-ink-50 transition"><span>Products, photos &amp; orders</span><span class="text-ink-300">&rsaquo;</span></a>
+                <a href="{% url 'marketplace:catalog' %}" target="_blank" rel="noopener" class="flex items-center justify-between px-2 py-2 rounded-lg text-sm text-ink-700 hover:bg-ink-50 transition"><span>View public Marketplace</span><span class="text-ink-300">&nearr;</span></a>
+
+                <p class="text-[11px] font-semibold uppercase tracking-wider text-ink-400 mt-2 mb-1 px-2">Customers</p>
+                <a href="{% url 'hq:customer_list' %}" class="flex items-center justify-between px-2 py-2 rounded-lg text-sm text-ink-700 hover:bg-ink-50 transition">Customer portfolio <span class="text-ink-300">&rsaquo;</span></a>
+                <a href="{% url 'hq:signup_list' %}" class="flex items-center justify-between px-2 py-2 rounded-lg text-sm text-ink-700 hover:bg-ink-50 transition"><span>Registration requests</span>{% if stats.pending_count %}<span class="badge bg-amber-100 text-amber-700">{{ stats.pending_count }}</span>{% else %}<span class="text-ink-300">&rsaquo;</span>{% endif %}</a>
+                <a href="{% url 'hq:branch_addon_list' %}" class="flex items-center justify-between px-2 py-2 rounded-lg text-sm text-ink-700 hover:bg-ink-50 transition"><span>Branch requests</span>{% if stats.pending_branch_requests %}<span class="badge bg-amber-100 text-amber-700">{{ stats.pending_branch_requests }}</span>{% else %}<span class="text-ink-300">&rsaquo;</span>{% endif %}</a>
+                <a href="{% url 'hq:staff_list' %}" class="flex items-center justify-between px-2 py-2 rounded-lg text-sm text-ink-700 hover:bg-ink-50 transition">Staff &amp; users <span class="text-ink-300">&rsaquo;</span></a>
+
+                <p class="text-[11px] font-semibold uppercase tracking-wider text-ink-400 mt-4 mb-1 px-2">Billing</p>
+                <a href="{% url 'hq:subscription_list' %}" class="flex items-center justify-between px-2 py-2 rounded-lg text-sm text-ink-700 hover:bg-ink-50 transition">Subscriptions <span class="text-ink-300">&rsaquo;</span></a>
+                <a href="{% url 'hq:debt_sms_purchases' %}" class="flex items-center justify-between px-2 py-2 rounded-lg text-sm text-ink-700 hover:bg-ink-50 transition"><span>Debt SMS payments</span>{% if stats.pending_debt_sms %}<span class="badge bg-amber-100 text-amber-700">{{ stats.pending_debt_sms }}</span>{% else %}<span class="text-ink-300">&rsaquo;</span>{% endif %}</a>
+                <a href="{% url 'hq:receipt_sms_purchases' %}" class="flex items-center justify-between px-2 py-2 rounded-lg text-sm text-ink-700 hover:bg-ink-50 transition"><span>Receipt SMS payments</span>{% if stats.pending_receipt_sms %}<span class="badge bg-amber-100 text-amber-700">{{ stats.pending_receipt_sms }}</span>{% else %}<span class="text-ink-300">&rsaquo;</span>{% endif %}</a>
+                <a href="{% url 'hq:payment_settings' %}" class="flex items-center justify-between px-2 py-2 rounded-lg text-sm text-ink-700 hover:bg-ink-50 transition">Payment settings <span class="text-ink-300">&rsaquo;</span></a>
+
+                <p class="text-[11px] font-semibold uppercase tracking-wider text-ink-400 mt-4 mb-1 px-2">SMS services</p>
+                <a href="{% url 'hq:announcement_list' %}" class="flex items-center justify-between px-2 py-2 rounded-lg text-sm text-ink-700 hover:bg-ink-50 transition">SMS announcements <span class="text-ink-300">&rsaquo;</span></a>
+                <a href="{% url 'hq:notice_list' %}" class="flex items-center justify-between px-2 py-2 rounded-lg text-sm text-ink-700 hover:bg-ink-50 transition">System notices (banners) <span class="text-ink-300">&rsaquo;</span></a>
+                <a href="{% url 'hq:customer_sms_access' %}" class="flex items-center justify-between px-2 py-2 rounded-lg text-sm text-ink-700 hover:bg-ink-50 transition">Customer SMS access <span class="text-ink-300">&rsaquo;</span></a>
+                <a href="{% url 'hq:sms_package_list' %}" class="flex items-center justify-between px-2 py-2 rounded-lg text-sm text-ink-700 hover:bg-ink-50 transition">Debt SMS packages <span class="text-ink-300">&rsaquo;</span></a>
+                <a href="{% url 'hq:receipt_sms_package_list' %}" class="flex items-center justify-between px-2 py-2 rounded-lg text-sm text-ink-700 hover:bg-ink-50 transition">Receipt SMS packages <span class="text-ink-300">&rsaquo;</span></a>
+            </section>
+
+            <section class="card">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="text-sm font-semibold text-ink-800">Latest SMS announcements</h2>
+                    <a href="{% url 'hq:announcement_list' %}" class="text-xs font-medium text-brand-700 hover:text-brand-800">All &rarr;</a>
+                </div>
+                {% for item in recent_announcements %}
+                <a href="{% url 'hq:announcement_detail' item.pk %}" class="block py-2.5 border-b border-ink-100 last:border-0 hover:bg-ink-50 -mx-2 px-2 rounded-lg transition">
+                    <div class="flex items-center justify-between gap-2">
+                        <p class="text-sm font-medium text-ink-800 truncate">{{ item.title }}</p>
+                        <span class="badge shrink-0 {% if item.status == 'COMPLETED' %}bg-emerald-100 text-emerald-700{% elif item.status == 'PARTIAL' %}bg-amber-100 text-amber-700{% elif item.status == 'FAILED' %}bg-red-100 text-red-700{% else %}bg-brand-100 text-brand-700{% endif %}">{{ item.get_status_display }}</span>
+                    </div>
+                    <p class="text-xs text-ink-400 mt-0.5">{{ item.created_at|date:"d M Y H:i" }} &middot; {{ item.sent_count }}/{{ item.total_recipients }} delivered</p>
+                </a>
+                {% empty %}
+                <p class="text-sm text-ink-400 py-3">No announcements sent yet. <a href="{% url 'hq:announcement_compose' %}" class="text-brand-700 font-medium">Send the first one</a>.</p>
+                {% endfor %}
+            </section>
+        </aside>
+    </div>
+
+    <!-- Customer portfolio -->
+    <section class="card">
+        <div class="flex items-center justify-between mb-3">
+            <h2 class="text-sm font-semibold text-ink-800">Newest customers</h2>
+            <a href="{% url 'hq:customer_list' %}" class="text-xs font-medium text-brand-700 hover:text-brand-800">Manage all customers &rarr;</a>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-left border-b border-ink-200">
+                        <th class="py-2 pr-4">Owner</th>
+                        <th class="py-2 pr-4">Branches</th>
+                        <th class="py-2 pr-4">Branch names</th>
+                        <th class="py-2"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for owner in customers %}
+                    <tr class="border-b border-ink-100">
+                        <td class="py-3 pr-4">
+                            <p class="font-medium text-ink-800">{% firstof owner.get_full_name owner.username %}</p>
+                            <p class="text-xs text-ink-400">{{ owner.phone_number }}</p>
+                        </td>
+                        <td class="py-3 pr-4 whitespace-nowrap">
+                            <span class="inline-flex min-w-8 justify-center rounded-full bg-brand-100 text-brand-700 px-2 py-0.5 text-xs font-bold">{{ owner.active_branch_count }} / {{ owner.branch_count }}</span>
+                            <span class="text-xs text-ink-400 ml-1">active</span>
+                        </td>
+                        <td class="py-3 pr-4">
+                            {% for branch in owner.managed_pharmacies.all %}<span class="inline-block mr-3 mb-0.5 text-ink-600">{{ branch.name }} <span class="text-xs {% if branch.is_active %}text-emerald-600{% else %}text-amber-600{% endif %}">({% if branch.is_active %}Active{% else %}Locked{% endif %})</span></span>{% empty %}<span class="text-ink-300">&mdash;</span>{% endfor %}
+                        </td>
+                        <td class="py-3 text-right"><a href="{% url 'hq:customer_detail' owner.pk %}" class="btn btn-secondary !px-3 !py-1.5 !text-xs">Manage</a></td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="4" class="py-8 text-center text-ink-400">No customers yet.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+{% endblock %}

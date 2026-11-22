@@ -1,0 +1,347 @@
+{% extends "base.html" %}
+{% block title %}{{ heading }} · {{ store.public_name }}{% endblock %}
+{% block extra_head %}{% include 'marketplace/_mk_styles.html' %}<style>
+/* Property listing form — uses the same V74 Seller Centre components as the product form. */
+.mk-seg{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.75rem}
+.mk-seg .mk-choice-card{align-items:center}
+.mk-choice-opt .mk-ch-ico{flex:none;display:grid;place-items:center;width:38px;height:38px;border-radius:10px;background:#f0fdfa;color:#0f766e}
+.mk-choice-opt .mk-ch-ico svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.mk-choice-opt input:checked+.mk-choice-card .mk-ch-ico{background:#0f766e;color:#fff}
+.mk-choice-card .mk-radio{margin-left:auto;margin-top:0}
+.mk-seg .mk-choice-card .mk-radio{order:3}
+.mk-form select{appearance:none;-webkit-appearance:none;padding-right:2.2rem;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>");background-repeat:no-repeat;background-position:right .7rem center;background-size:16px}
+.mk-sub-h{margin:.2rem 0 -.2rem;font-size:.6875rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#64748b}
+.mk-am{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:.5rem}
+.mk-am-opt{position:relative;display:block;cursor:pointer;min-width:0}
+.mk-am-opt input{position:absolute;opacity:0;inset:0;width:100%!important;height:100%;margin:0;cursor:pointer;z-index:1}
+.mk-am-opt span{display:flex;align-items:center;gap:.55rem;min-height:2.6rem;padding:.5rem .75rem;border:1.5px solid #e2e8f0;border-radius:10px;background:#fff;font-size:.8125rem;font-weight:600;color:#334155;transition:border-color .15s,background .15s,color .15s}
+.mk-am-opt span::before{content:"";flex:none;width:16px;height:16px;border-radius:5px;border:2px solid #cbd5e1;background:#fff center/10px no-repeat;transition:all .15s}
+.mk-am-opt:hover span{border-color:#99d5ce}
+.mk-am-opt input:focus-visible+span{box-shadow:0 0 0 3px rgba(20,184,166,.25)}
+.mk-am-opt input:checked+span{border-color:#0f766e;background:#f0fdfa;color:#115e59}
+.mk-am-opt input:checked+span::before{border-color:#0f766e;background-color:#0f766e;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'><path d='m5 12 5 5 9-10'/></svg>")}
+.mk-gps{display:flex;gap:.75rem;align-items:center;flex-wrap:wrap;padding:.85rem 1rem;border:1px solid #e2e8f0;border-radius:12px;background:#f8fafc}
+.mk-gps>div{flex:1;min-width:200px}.mk-gps strong{display:block;font-size:.875rem;color:#0f172a}.mk-gps small{display:block;margin-top:.1rem;font-size:.78rem;color:#64748b;line-height:1.45}
+.mk-gps .btn{display:inline-flex;gap:.4rem;align-items:center}.mk-gps .btn svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.ls-imgs{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:.7rem}
+.ls-img{border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;background:#fff;position:relative}
+.ls-img img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block}
+.ls-img .row{display:flex;gap:.3rem;padding:.4rem;flex-wrap:wrap;border-top:1px solid #eef2f6}
+.ls-img button{font-size:.72rem;font-weight:600;padding:.25rem .55rem;border-radius:.45rem;border:1px solid #e2e8f0;background:#f8fafc;color:#334155;cursor:pointer}
+.ls-img button:hover{background:#f0fdfa;border-color:#99d5ce;color:#115e59}
+.ls-img button.is-del{color:#b91c1c}.ls-img button.is-del:hover{background:#fef2f2;border-color:#fecaca;color:#b91c1c}
+.ls-img .cov{position:absolute;top:.4rem;left:.4rem;background:#0f766e;color:#fff;font-size:.65rem;font-weight:700;padding:.1rem .5rem;border-radius:999px}
+#ls-prev-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:.5rem}
+#ls-prev-grid:empty{display:none}
+#ls-prev-grid img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px;border:1px solid #e2e8f0}
+.mk-drop{display:grid;gap:.35rem;justify-items:center;text-align:center;padding:1.4rem 1rem;border:1.5px dashed #cbd5e1;border-radius:12px;background:#f8fafc;transition:border-color .15s,background .15s}
+.mk-drop:hover{border-color:#5eb8ae;background:#f0fdfa}
+.mk-drop .mk-sect-ico{width:44px;height:44px;border-radius:12px;background:#ccfbf1}
+.mk-drop strong{font-size:.9rem;color:#0f172a}.mk-drop small{font-size:.78rem;color:#64748b}
+.mk-page .mk-drop input[type=file]{border:0;background:transparent;padding:0;min-height:0;font-size:.78rem;width:auto;max-width:100%}
+.mk-status{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}
+.mk-aside-card .mk-kv{grid-template-columns:1fr}
+@media(max-width:640px){.mk-seg{grid-template-columns:1fr}.mk-am{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}.mk-gps .btn{width:100%;justify-content:center}}
+
+/* Wizard */
+.mk-wiz{display:none;padding:1rem 1.25rem;border:1px solid #e2e8f0;border-radius:14px;background:#fff;box-shadow:0 1px 2px rgba(15,23,42,.035)}
+.is-wiz .mk-wiz{display:block}
+.mk-wiz-top{display:flex;justify-content:space-between;gap:.75rem;align-items:baseline;flex-wrap:wrap;margin-bottom:.55rem}
+.mk-wiz-top strong{font-size:.8125rem;color:#0f766e;letter-spacing:.02em}
+.mk-wiz-top span{font-size:.9375rem;font-weight:700;color:#0f172a}
+.mk-wiz-bar{height:6px;border-radius:999px;background:#e2e8f0;overflow:hidden;margin-bottom:.9rem}
+.mk-wiz-bar i{display:block;height:100%;width:0;border-radius:inherit;background:linear-gradient(90deg,#14b8a6,#0f766e);transition:width .25s}
+.mk-wiz-steps{list-style:none;margin:0;padding:0;display:flex;gap:.25rem;overflow-x:auto;scrollbar-width:none}
+.mk-wiz-steps::-webkit-scrollbar{display:none}
+.mk-wiz-steps li{flex:1 1 0;min-width:0}
+.mk-wiz-s{display:flex;flex-direction:column;align-items:center;gap:.3rem;width:100%;padding:.3rem .15rem;border:0;background:transparent;cursor:default;font:inherit;color:#94a3b8}
+.mk-wiz-s b{display:grid;place-items:center;width:30px;height:30px;border-radius:50%;border:2px solid #cbd5e1;background:#fff;font-size:.78rem;font-weight:700;color:#64748b;transition:all .18s}
+.mk-wiz-s span{font-size:.72rem;font-weight:600;white-space:nowrap}
+.mk-wiz-s.is-visited{cursor:pointer;color:#475569}
+.mk-wiz-s.is-visited:hover b{border-color:#0f766e}
+.mk-wiz-s.is-done b{background:#0f766e;border-color:#0f766e;color:#fff}
+.mk-wiz-s.is-active{color:#0f766e}
+.mk-wiz-s.is-active b{border-color:#0f766e;color:#0f766e;box-shadow:0 0 0 4px rgba(15,118,110,.12)}
+.mk-wiz-s.is-err b{border-color:#dc2626;background:#fef2f2;color:#b91c1c}
+.mk-wiz-s:focus-visible{outline:3px solid rgba(20,184,166,.35);outline-offset:2px;border-radius:10px}
+.mk-form [aria-invalid="true"]{border-color:#dc2626!important;box-shadow:0 0 0 3px rgba(220,38,38,.12)}
+.mk-review-list{display:grid;gap:.6rem}
+.mk-rv{display:grid;grid-template-columns:130px minmax(0,1fr) auto;gap:.75rem;align-items:center;padding:.7rem .9rem;border:1px solid #e2e8f0;border-radius:11px;background:#f8fafc}
+.mk-rv small{font-size:.6875rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#64748b}
+.mk-rv strong{font-size:.875rem;color:#0f172a;font-weight:600;overflow-wrap:anywhere}
+.mk-rv strong.is-empty{color:#b45309;font-weight:500}
+.mk-rv button{border:1px solid #cbd5e1;background:#fff;color:#0f766e;font-size:.78rem;font-weight:700;border-radius:8px;padding:.3rem .7rem;cursor:pointer}
+.mk-rv button:hover{background:#f0fdfa;border-color:#5eb8ae}
+@media(max-width:640px){.mk-wiz{padding:.85rem 1rem}.mk-wiz-s span{display:none}.mk-wiz-s.is-active span{display:none}.mk-wiz-s b{width:28px;height:28px}.mk-rv{grid-template-columns:minmax(0,1fr) auto}.mk-rv small{grid-column:1/-1}}
+@media(prefers-reduced-motion:reduce){.mk-wiz-bar i,.mk-wiz-s b{transition:none}}
+</style>{% endblock %}
+{% block content %}
+<div class="mk-page">
+ <nav class="mk-crumbs" aria-label="Breadcrumb"><a href="{% url 'marketplace:seller_dashboard' %}">Seller Centre</a><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg><a href="{% url 'marketplace:seller_store_listings' store.id %}">Property listings</a><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg><b>{{ heading }}</b></nav>
+ <header class="mk-hero">
+  <div class="mk-hero-main">
+   <span class="mk-hero-icon"><svg viewBox="0 0 24 24"><path d="M4 21V9l8-5 8 5v12"/><path d="M9 21v-6h6v6"/></svg></span>
+   <div><h1>{{ heading }}</h1><p>A complete listing with clear photos and an accurate location gets the most enquiries.</p></div>
+  </div>
+  <div class="mk-actions">
+   <a class="btn btn-secondary" href="{% url 'marketplace:seller_store_listings' store.id %}">All listings</a>
+   {% if listing %}
+    {% if listing.is_public %}<a class="btn btn-secondary" href="{% url 'marketplace:listing_detail' listing.slug %}" target="_blank" rel="noopener">View public page ↗</a>{% endif %}
+    {% if listing.status == 'PENDING' and request.user.is_superuser %}<form method="post" action="{% url 'marketplace:seller_listing_action' store.id listing.pk %}">{% csrf_token %}<input type="hidden" name="action" value="approve"><input type="hidden" name="back" value="edit"><button class="btn btn-primary" type="submit">Approve &amp; publish</button></form>{% endif %}
+    {% if listing.status == 'DRAFT' or listing.status == 'REJECTED' or listing.status == 'ARCHIVED' or listing.status == 'PENDING' and auto_approve %}<form method="post" action="{% url 'marketplace:seller_listing_action' store.id listing.pk %}">{% csrf_token %}<input type="hidden" name="action" value="submit"><input type="hidden" name="back" value="edit"><button class="btn btn-primary" type="submit">Submit for publishing</button></form>{% endif %}
+   {% endif %}
+  </div>
+ </header>
+ {% if listing %}<div class="mk-note{% if listing.status == 'REJECTED' %} warn{% endif %}"><span>Status: <strong>{{ listing.get_status_display }}</strong>{% if listing.review_note %} — {{ listing.review_note }}{% endif %}{% if listing.status == 'PENDING' %} — we are checking your listing and it goes live as soon as it is approved.{% endif %}</span></div>{% endif %}
+
+ <form class="mk-form" id="ls-form" method="post" enctype="multipart/form-data" novalidate{% if listing %} data-edit="1"{% endif %}>{% csrf_token %}
+ {% if form.non_field_errors %}<div class="mk-form-errors" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+ <div class="mk-layout">
+  <div class="mk-main">
+
+   <nav class="mk-wiz" aria-label="Listing steps">
+    <div class="mk-wiz-top"><strong id="ls-count">Step 1 of 7</strong><span id="ls-name"></span></div>
+    <div class="mk-wiz-bar"><i id="ls-bar"></i></div>
+    <ol class="mk-wiz-steps" id="ls-steps"><li><button type="button" class="mk-wiz-s" data-go="0"><b>1</b><span>Type</span></button></li><li><button type="button" class="mk-wiz-s" data-go="1"><b>2</b><span>Price</span></button></li><li><button type="button" class="mk-wiz-s" data-go="2"><b>3</b><span>Location</span></button></li><li><button type="button" class="mk-wiz-s" data-go="3"><b>4</b><span>Details</span></button></li><li><button type="button" class="mk-wiz-s" data-go="4"><b>5</b><span>Photos</span></button></li><li><button type="button" class="mk-wiz-s" data-go="5"><b>6</b><span>Contact</span></button></li><li><button type="button" class="mk-wiz-s" data-go="6"><b>7</b><span>Review</span></button></li></ol>
+   </nav>
+
+ <section class="mk-sect" data-step="0">
+  <div class="mk-sect-h"><span class="mk-sect-ico"><svg viewBox="0 0 24 24"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.2"/></svg></span><div><h2>1. What are you listing?</h2><p>Choose whether it is for rent or sale, then describe it.</p></div></div>
+  <div class="mk-sect-b">
+    <div class="mk-field full"><label class="mk-label">{{ form.purpose.label }}<span class="mk-req" aria-hidden="true">*</span></label>
+     <div class="mk-seg" role="radiogroup">
+      {% for radio in form.purpose %}<label class="mk-choice-opt">{{ radio.tag }}<span class="mk-choice-card"><span class="mk-ch-ico">{% if radio.data.value == 'RENT' %}<svg viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="m10.8 12.2 9.2-9.2M16 7l3 3M14 9l2 2"/></svg>{% else %}<svg viewBox="0 0 24 24"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.2"/></svg>{% endif %}</span><span><strong>{{ radio.choice_label }}</strong><small>{% if radio.data.value == 'RENT' %}Tenants pay rent per month, year or day.{% else %}One-off sale of the property or land.{% endif %}</small></span><span class="mk-radio"></span></span></label>{% endfor %}
+     </div>{% for e in form.purpose.errors %}<small class="mk-error">{{ e }}</small>{% endfor %}</div>
+    <div class="mk-form-grid">
+     {% include 'marketplace/_mk_field.html' with field=form.property_type %}
+     {% include 'marketplace/_mk_field.html' with field=form.title %}
+     {% include 'marketplace/_mk_field.html' with field=form.description full=True %}
+    </div>
+  </div>
+ </section>
+
+ <section class="mk-sect" data-step="1">
+  <div class="mk-sect-h"><span class="mk-sect-ico"><svg viewBox="0 0 24 24"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span><div><h2>2. Price &amp; payment</h2><p>All prices are in Tanzanian shillings.</p></div></div>
+  <div class="mk-sect-b">
+    <div class="mk-form-grid">
+     <div class="mk-field"><label class="mk-label" for="{{ form.price.id_for_label }}">{{ form.price.label }}<span class="mk-req" aria-hidden="true">*</span></label><div class="mk-affix"><span>TSh</span>{{ form.price }}</div>{% for e in form.price.errors %}<small class="mk-error">{{ e }}</small>{% endfor %}</div>
+     {% include 'marketplace/_mk_field.html' with field=form.price_period %}
+    </div>
+    <label class="mk-switch" for="{{ form.negotiable.id_for_label }}"><span><strong>{{ form.negotiable.label }}</strong><small>Customers see that you are open to a better offer.</small></span>{{ form.negotiable }}<span class="mk-sw" aria-hidden="true"></span></label>
+    <label class="mk-switch" for="{{ form.installments.id_for_label }}"><span><strong>{{ form.installments.label }}</strong><small>Payment in instalments is possible.</small></span>{{ form.installments }}<span class="mk-sw" aria-hidden="true"></span></label>
+    {% include 'marketplace/_mk_field.html' with field=form.payment_terms full=True %}
+  </div>
+ </section>
+
+ <section class="mk-sect" data-step="2">
+  <div class="mk-sect-h"><span class="mk-sect-ico"><svg viewBox="0 0 24 24"><path d="M12 21s7-6.2 7-11.5a7 7 0 0 0-14 0C5 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg></span><div><h2>3. Location</h2><p>Accurate location helps customers find the property quickly.</p></div></div>
+  <div class="mk-sect-b">
+    <div class="mk-form-grid">
+     {% include 'marketplace/_mk_field.html' with field=form.region %}
+     {% include 'marketplace/_mk_field.html' with field=form.district %}
+     {% include 'marketplace/_mk_field.html' with field=form.ward %}
+     {% include 'marketplace/_mk_field.html' with field=form.street %}
+     {% include 'marketplace/_mk_field.html' with field=form.landmark full=True %}
+    </div>
+    <div class="mk-gps"><div><strong>GPS pin (optional)</strong><small id="ls-gps-msg">Adds an exact map pin so customers can navigate straight to it.</small></div><button type="button" class="btn btn-secondary" id="ls-gps"><svg viewBox="0 0 24 24"><path d="M12 21s7-6.2 7-11.5a7 7 0 0 0-14 0C5 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>Use my current location</button></div>
+    <div class="mk-form-grid">
+     {% include 'marketplace/_mk_field.html' with field=form.latitude %}
+     {% include 'marketplace/_mk_field.html' with field=form.longitude %}
+    </div>
+  </div>
+ </section>
+
+ <section class="mk-sect" data-step="3">
+  <div class="mk-sect-h"><span class="mk-sect-ico"><svg viewBox="0 0 24 24"><path d="M4 21V9l8-5 8 5v12"/><path d="M9 21v-6h6v6"/></svg></span><div><h2>4. Property details</h2><p>Size, rooms, ownership and what the property offers.</p></div></div>
+  <div class="mk-sect-b">
+    <div class="mk-form-grid">
+     {% include 'marketplace/_mk_field.html' with field=form.size_value %}
+     {% include 'marketplace/_mk_field.html' with field=form.size_unit %}
+     <div id="ls-house-fields" style="display:contents">
+      {% include 'marketplace/_mk_field.html' with field=form.bedrooms %}
+      {% include 'marketplace/_mk_field.html' with field=form.bathrooms %}
+     </div>
+     {% include 'marketplace/_mk_field.html' with field=form.title_type %}
+     <div class="mk-field" style="align-content:end"><label class="mk-switch" for="{{ form.surveyed.id_for_label }}"><span><strong>{{ form.surveyed.label }}</strong><small>The plot has been surveyed.</small></span>{{ form.surveyed }}<span class="mk-sw" aria-hidden="true"></span></label></div>
+    </div>
+    <p class="mk-sub-h">{{ form.amenities.label }}</p>
+    <div class="mk-am">{% for cb in form.amenities %}<label class="mk-am-opt">{{ cb.tag }}<span>{{ cb.choice_label }}</span></label>{% endfor %}</div>
+    {% for e in form.amenities.errors %}<small class="mk-error">{{ e }}</small>{% endfor %}
+  </div>
+ </section>
+
+ <section class="mk-sect" data-step="4">
+  <div class="mk-sect-h"><span class="mk-sect-ico"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></svg></span><div><h2>5. Photos</h2><p>Up to {{ max_images }} photos. The first one is the cover.</p></div></div>
+  <div class="mk-sect-b">
+    {% if images %}<div class="ls-imgs">
+     {% for im in images %}<div class="ls-img"><img src="{{ im.image.url }}" alt="Photo {{ forloop.counter }}">{% if forloop.first %}<span class="cov">Cover</span>{% endif %}
+      <div class="row">
+       {% if not forloop.first %}<button type="submit" form="img-cover-{{ im.pk }}">Make cover</button>{% endif %}
+       <button type="submit" form="img-del-{{ im.pk }}" class="is-del">Remove</button>
+      </div></div>{% endfor %}
+    </div>{% endif %}
+    <div class="mk-drop"><span class="mk-sect-ico"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5M12 3v12"/></svg></span><strong>Add photos</strong><input id="ls-files" type="file" name="images" accept="image/jpeg,image/png,image/webp" multiple><small>JPG, PNG or WebP, up to 8 MB each. Photos are resized automatically for fast loading on mobile data.</small></div>
+    <div id="ls-prev-grid"></div>
+  </div>
+ </section>
+
+ <section class="mk-sect" data-step="5">
+  <div class="mk-sect-h"><span class="mk-sect-ico"><svg viewBox="0 0 24 24"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/></svg></span><div><h2>6. How should customers reach you?</h2><p>Enquiries go to these numbers.</p></div></div>
+  <div class="mk-sect-b">
+    <div class="mk-form-grid">
+     {% include 'marketplace/_mk_field.html' with field=form.contact_phone %}
+     {% include 'marketplace/_mk_field.html' with field=form.whatsapp_phone %}
+    </div>
+  </div>
+ </section>
+
+
+
+ <section class="mk-sect" data-step="6">
+  <div class="mk-sect-h"><span class="mk-sect-ico"><svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span><div><h2>7. Review &amp; save</h2><p>Check everything below. Use Edit to fix a section, then save.</p></div></div>
+  <div class="mk-sect-b"><div class="mk-review-list" id="ls-review"></div></div>
+ </section>
+
+   <div class="mk-actionbar"><span id="ls-hint">Fields marked * are required.</span><div class="mk-actions"><a class="btn btn-secondary" id="ls-cancel" href="{% url 'marketplace:seller_store_listings' store.id %}">Cancel</a><button type="button" class="btn btn-secondary" id="ls-back" hidden>← Back</button><button type="button" class="btn btn-primary" id="ls-next" hidden>Next →</button><button class="btn btn-primary" id="ls-save" type="submit">Save listing</button></div></div>
+  </div>
+
+  <aside class="mk-aside">
+   <div class="mk-aside-card">
+    <h3><svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Listing checklist</h3>
+    <ul class="mk-checklist">
+     <li><i><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg></i><span><b>Clear headline</b><br>Type, size and area, e.g. “3-bedroom house, Mtumba”.</span></li>
+     <li><i><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg></i><span><b>Honest price</b><br>State the period and whether it is negotiable.</span></li>
+     <li><i><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg></i><span><b>Exact location</b><br>Region, district, ward and a GPS pin.</span></li>
+     <li><i><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg></i><span><b>Bright photos</b><br>Add several; the first one is the cover.</span></li>
+     <li><i><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg></i><span><b>Reachable contact</b><br>A phone that is answered, plus WhatsApp.</span></li>
+    </ul>
+   </div>
+   <div class="mk-aside-card is-tint">
+    <h3><svg viewBox="0 0 24 24"><path d="M4 21V9l8-5 8 5v12"/><path d="M9 21v-6h6v6"/></svg>Customers enquire directly</h3>
+    <p>Buyers and tenants call, WhatsApp or request a visit. There is no cart or stock for property listings.</p>
+   </div>
+  </aside>
+ </div>
+ </form>
+
+ {% for im in images %}
+ <form id="img-cover-{{ im.pk }}" method="post" action="{% url 'marketplace:seller_listing_image_action' store.id listing.pk im.pk %}">{% csrf_token %}<input type="hidden" name="action" value="cover"></form>
+ <form id="img-del-{{ im.pk }}" method="post" action="{% url 'marketplace:seller_listing_image_action' store.id listing.pk im.pk %}" onsubmit="return confirm('Remove this photo?')">{% csrf_token %}<input type="hidden" name="action" value="delete"></form>
+ {% endfor %}
+</div>
+<script>
+(function(){
+  var f=document.getElementById('ls-files'),g=document.getElementById('ls-prev-grid');
+  if(f)f.addEventListener('change',function(){g.innerHTML='';[].slice.call(f.files).slice(0,{{ max_images }}).forEach(function(file){var im=document.createElement('img');im.src=URL.createObjectURL(file);im.alt='';g.appendChild(im);});});
+  var t=document.getElementById('id_property_type'),h=document.getElementById('ls-house-fields');
+  function sync(){if(!t||!h)return;var land=t.value==='LAND'||t.value==='FARM';h.style.display=land?'none':'contents';}
+  if(t){t.addEventListener('change',sync);sync();}
+  var b=document.getElementById('ls-gps'),m=document.getElementById('ls-gps-msg');
+  if(b)b.addEventListener('click',function(){
+    if(!navigator.geolocation){m.textContent='Your browser cannot share location. Enter the coordinates manually.';return;}
+    m.textContent='Getting your location…';
+    navigator.geolocation.getCurrentPosition(function(p){
+      document.getElementById('id_latitude').value=p.coords.latitude.toFixed(7);
+      document.getElementById('id_longitude').value=p.coords.longitude.toFixed(7);
+      m.textContent='Location captured (accuracy about '+Math.round(p.coords.accuracy)+' m).';
+    },function(){m.textContent='Could not get your location. Allow location access or enter it manually.';},{enableHighAccuracy:true,timeout:15000});
+  });
+})();
+
+// ---- Wizard ----
+(function(){
+  var form=document.getElementById('ls-form'); if(!form) return;
+  var steps=[].slice.call(form.querySelectorAll('.mk-sect[data-step]'));
+  var items=[].slice.call(form.querySelectorAll('.mk-wiz-s'));
+  var names=['What are you listing?','Price & payment','Location','Property details','Photos','Contact','Review & save'];
+  var last=steps.length-1, edit=form.hasAttribute('data-edit'), cur=0, max=0, built=false;
+  var back=document.getElementById('ls-back'), next=document.getElementById('ls-next'), save=document.getElementById('ls-save'), hint=document.getElementById('ls-hint');
+  var count=document.getElementById('ls-count'), nm=document.getElementById('ls-name'), bar=document.getElementById('ls-bar'), rv=document.getElementById('ls-review');
+  form.classList.add('is-wiz');
+  function filled(el){ if(el.type==='radio') return !!form.querySelector('input[name="'+el.name+'"]:checked'); return (el.value||'').trim()!==''; }
+  function validate(i){
+    var ok=true, first=null;
+    [].slice.call(steps[i].querySelectorAll('[required]')).forEach(function(el){
+      var box=el.closest('.mk-field')||el.parentNode;
+      [].slice.call(box.querySelectorAll('.js-err')).forEach(function(e){e.remove();});
+      var msg='';
+      if(!filled(el)) msg='This field is required.';
+      else if(el.name==='price' && !(parseFloat(el.value)>0)) msg='Enter a price greater than zero.';
+      else if(el.name==='contact_phone' && el.value.replace(/\D/g,'').length<9) msg='Enter a valid phone number.';
+      if(msg){ ok=false; el.setAttribute('aria-invalid','true'); var m=document.createElement('small'); m.className='mk-error js-err'; m.textContent=msg; box.appendChild(m); first=first||el; }
+      else el.removeAttribute('aria-invalid');
+    });
+    if(first){ first.focus(); }
+    return ok;
+  }
+  function row(label,val,step){
+    var d=document.createElement('div'); d.className='mk-rv';
+    var s=document.createElement('small'); s.textContent=label;
+    var v=document.createElement('strong'); if(val){v.textContent=val;}else{v.textContent='Not provided'; v.className='is-empty';}
+    var b=document.createElement('button'); b.type='button'; b.textContent='Edit'; b.setAttribute('data-goto',step);
+    d.appendChild(s); d.appendChild(v); d.appendChild(b); rv.appendChild(d);
+  }
+  function val(name){ var e=form.elements[name]; return e&&e.value?e.value.trim():''; }
+  function seltext(name){ var e=form.elements[name]; return e&&e.options&&e.selectedIndex>=0?e.options[e.selectedIndex].text:''; }
+  function build(){
+    rv.innerHTML='';
+    var pr=form.querySelector('input[name="purpose"]:checked'), prl='';
+    if(pr){ var lab=pr.closest('label'); var st=lab&&lab.querySelector('strong'); prl=st?st.textContent:pr.value; }
+    row('Listing',[prl,seltext('property_type')].filter(Boolean).join(' · '),0);
+    row('Headline',val('title'),0);
+    var price=val('price'), priceTxt='';
+    if(price){ var num=parseFloat(price); priceTxt='TSh '+(isNaN(num)?price:num.toLocaleString('en-US'))+' '+seltext('price_period'); if(form.elements['negotiable']&&form.elements['negotiable'].checked) priceTxt+=' · negotiable'; if(form.elements['installments']&&form.elements['installments'].checked) priceTxt+=' · instalments'; }
+    row('Price',priceTxt,1);
+    row('Location',[val('ward'),val('street'),val('district'),val('region')].filter(Boolean).join(', '),2);
+    var det=[]; if(val('size_value')) det.push(val('size_value')+' '+seltext('size_unit'));
+    if(val('bedrooms')) det.push(val('bedrooms')+' bed'); if(val('bathrooms')) det.push(val('bathrooms')+' bath');
+    var am=form.querySelectorAll('.mk-am input:checked').length; if(am) det.push(am+' amenities');
+    row('Details',det.join(' · '),3);
+    var files=document.getElementById('ls-files'), n=({{ images|length }})+(files?files.files.length:0);
+    row('Photos',n?(n+(n===1?' photo':' photos')):'',4);
+    row('Contact',[val('contact_phone'),val('whatsapp_phone')?('WhatsApp '+val('whatsapp_phone')):''].filter(Boolean).join(' · '),5);
+    built=true;
+  }
+  function show(i,scroll){
+    cur=i; if(i>max) max=i;
+    steps.forEach(function(el,k){ el.hidden=(k!==i); });
+    items.forEach(function(it,k){
+      var b=it.querySelector('b');
+      it.classList.toggle('is-active',k===i); it.classList.toggle('is-done',k<i);
+      it.classList.toggle('is-visited',k<=max||edit);
+      if(k===i) it.setAttribute('aria-current','step'); else it.removeAttribute('aria-current');
+      b.textContent=(k<i&&!it.classList.contains('is-err'))?'\u2713':(k+1);
+    });
+    count.textContent='Step '+(i+1)+' of '+steps.length; nm.textContent=names[i];
+    bar.style.width=((i+1)/steps.length*100)+'%';
+    back.hidden=(i===0); next.hidden=(i===last);
+    save.hidden=!(i===last||edit);
+    save.textContent=(i===last)?'Save listing':'Save changes';
+    hint.textContent=(i===last)?'Looks good? Save your listing.':'Fields marked * are required.';
+    if(i===last) build();
+    if(scroll){ var top=form.querySelector('.mk-wiz'); if(top&&top.scrollIntoView) top.scrollIntoView({behavior:'smooth',block:'start'}); }
+  }
+  function goNext(){ if(validate(cur)) show(Math.min(cur+1,last),true); }
+  next.addEventListener('click',goNext);
+  back.addEventListener('click',function(){ show(Math.max(cur-1,0),true); });
+  items.forEach(function(it,k){ it.addEventListener('click',function(){ if(k<=max||edit) show(k,true); }); });
+  rv.addEventListener('click',function(e){ var b=e.target.closest('[data-goto]'); if(b) show(parseInt(b.getAttribute('data-goto'),10),true); });
+  form.addEventListener('keydown',function(e){
+    if(e.key!=='Enter') return; var t=e.target;
+    if(t.tagName==='TEXTAREA'||t.tagName==='BUTTON'||t.type==='submit'||t.type==='file') return;
+    e.preventDefault(); if(cur<last) goNext();
+  });
+  form.addEventListener('submit',function(e){
+    for(var k=0;k<=last;k++){ if(!validate(k)){ e.preventDefault(); items[k].classList.add('is-err'); show(k,true); validate(k); return; } items[k].classList.remove('is-err'); }
+  });
+  form.addEventListener('input',function(e){ var t=e.target; if(t.getAttribute&&t.getAttribute('aria-invalid')){ t.removeAttribute('aria-invalid'); var b=t.closest('.mk-field'); if(b) [].slice.call(b.querySelectorAll('.js-err')).forEach(function(x){x.remove();}); } });
+  // jump to the first step with a server-side error
+  var errStep=-1;
+  steps.forEach(function(el,k){ if(el.querySelector('.mk-error')){ items[k].classList.add('is-err'); if(errStep<0) errStep=k; } });
+  if(errStep>=0){ max=last; show(errStep,false); }
+  else if(form.querySelector('.mk-form-errors')){ max=last; show(last,false); }
+  else if(edit){ max=last; show(0,false); }
+  else show(0,false);
+})();
+</script>
+{% endblock %}

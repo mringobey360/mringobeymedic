@@ -1,0 +1,160 @@
+{% extends 'marketplace/base.html' %}{% load humanize %}
+{% block title %}{% if purpose == 'RENT' %}Houses & rooms for rent{% elif purpose == 'SALE' %}Property & land for sale{% else %}Properties{% endif %}{% endblock %}
+{% block head_extra %}<meta name="description" content="Browse houses, rooms, apartments, shop frames and plots for rent or sale across Tanzania. Photos, exact locations and direct contact with owners and agents.">
+<meta property="og:title" content="{% if purpose == 'RENT' %}Houses & rooms for rent{% elif purpose == 'SALE' %}Property & land for sale{% else %}Properties for rent & sale{% endif %} | SmartPOS"><meta property="og:type" content="website">{% include 'marketplace/_ls_styles.html' %}{% endblock %}
+{% block body %}
+{% include 'marketplace/_ls_sprite.html' %}
+<div class="ls-page">
+
+  <form id="ls-form" class="ls-search" method="get" action="" role="search" aria-label="Search properties">
+    <section class="ls-hero">
+      <div class="ls-hero-txt">
+        <h1>Find your next home, shop or plot</h1>
+        <p>Photos, exact locations and direct contact with owners and agents across Tanzania.</p>
+      </div>
+      <div class="ls-tabs" role="tablist" aria-label="Listing purpose">
+        <a role="tab" aria-selected="{% if not purpose %}true{% else %}false{% endif %}" class="{% if not purpose %}on{% endif %}" href="{% url 'marketplace:listings' %}{% if tab_qs %}?{{ tab_qs }}{% endif %}">All</a>
+        <a role="tab" aria-selected="{% if purpose == 'RENT' %}true{% else %}false{% endif %}" class="{% if purpose == 'RENT' %}on{% endif %}" href="{% url 'marketplace:listings_rent' %}{% if tab_qs %}?{{ tab_qs }}{% endif %}">For rent</a>
+        <a role="tab" aria-selected="{% if purpose == 'SALE' %}true{% else %}false{% endif %}" class="{% if purpose == 'SALE' %}on{% endif %}" href="{% url 'marketplace:listings_sale' %}{% if tab_qs %}?{{ tab_qs }}{% endif %}">For sale</a>
+      </div>
+      <div class="ls-bar">
+        <label class="ls-q"><svg aria-hidden="true"><use href="#ls-i-search"/></svg><span class="sr">Search</span><input name="q" value="{{ q }}" placeholder="Search area, street or keyword…" autocomplete="off" enterkeyhint="search"></label>
+        <button class="ls-go" type="submit">Search</button>
+      </div>
+    </section>
+
+    {% if purpose %}<input type="hidden" name="purpose" value="{{ purpose }}">{% endif %}
+    {% if ptype %}<input type="hidden" name="type" value="{{ ptype }}" id="ls-type-hidden">{% endif %}
+
+    <details class="ls-adv"{% if has_adv %} open{% endif %}>
+      <summary class="ls-adv-sum"><svg aria-hidden="true"><use href="#ls-i-sliders"/></svg>More filters{% if has_adv %} <b class="dot"></b>{% endif %}</summary>
+      <div class="ls-adv-grid">
+        <label>Region<select name="region"><option value="">All regions</option>{% for r in regions %}<option{% if r == region %} selected{% endif %}>{{ r }}</option>{% endfor %}</select></label>
+        <label>Min price (TSh)<input name="min" inputmode="numeric" value="{{ pmin }}" placeholder="0"></label>
+        <label>Max price (TSh)<input name="max" inputmode="numeric" value="{{ pmax }}" placeholder="Any"></label>
+        <label>Bedrooms<select name="beds"><option value="">Any</option>{% for n in '1234' %}<option value="{{ n }}"{% if beds == n %} selected{% endif %}>{{ n }}+</option>{% endfor %}</select></label>
+        <button class="ls-go ls-apply" type="submit">Apply filters</button>
+      </div>
+    </details>
+  </form>
+
+  <div class="ls-types-wrap"><nav class="ls-types" aria-label="Property type">{% for t in quick_types %}<a href="{{ t.url }}" class="{% if t.active %}on{% endif %}"{% if t.active %} aria-current="true"{% endif %}>{{ t.label }}</a>{% endfor %}</nav></div>
+  <div class="ls-active" id="ls-active" hidden aria-label="Active filters"></div>
+
+  <div class="ls-meta">
+    <div class="ls-count-line"><b>{{ total }}</b> propert{{ total|pluralize:"y,ies" }} found{% if q %} for <b>&ldquo;{{ q }}&rdquo;</b>{% endif %}</div>
+    <div class="ls-meta-r">
+      <label class="ls-sort">Sort
+        <select name="sort" form="ls-form" onchange="this.form.submit()" aria-label="Sort properties">
+          <option value="new"{% if sort == 'new' %} selected{% endif %}>Newest</option>
+          <option value="low"{% if sort == 'low' %} selected{% endif %}>Price: low to high</option>
+          <option value="high"{% if sort == 'high' %} selected{% endif %}>Price: high to low</option>
+        </select>
+      </label>
+      <div class="ls-view" role="group" aria-label="Layout">
+        <button type="button" data-view="grid" aria-pressed="true" aria-label="Grid view" title="Grid"><svg aria-hidden="true"><use href="#ls-i-grid"/></svg></button>
+        <button type="button" data-view="list" aria-pressed="false" aria-label="List view" title="List"><svg aria-hidden="true"><use href="#ls-i-list"/></svg></button>
+      </div>
+      <a class="ls-post" href="{% url 'marketplace:seller_listings' %}"><svg aria-hidden="true"><use href="#ls-i-plus"/></svg>Post property</a>
+    </div>
+  </div>
+
+  {% if active_filters %}
+  <div class="ls-active" aria-label="Active filters">
+    {% for f in active_filters %}<a class="ls-chip" href="{{ f.url }}" aria-label="Remove filter {{ f.label }}">{{ f.label }} <span aria-hidden="true">&times;</span></a>{% endfor %}
+    <a class="ls-clear" href="{{ clear_url }}">Clear all</a>
+  </div>
+  {% endif %}
+
+  {% if page.object_list %}
+  <div class="ls-grid" id="ls-grid">{% for l in page.object_list %}{% include 'marketplace/_listing_card.html' %}{% endfor %}</div>
+  {% if last_page > 1 %}
+  <nav class="ls-pager" aria-label="Pagination">
+    {% if page.has_previous %}<a class="pn" href="?{% if querystring %}{{ querystring }}&{% endif %}page={{ page.previous_page_number }}" rel="prev">&larr; Prev</a>{% endif %}
+    {% if page_window.0 > 1 %}<a href="?{% if querystring %}{{ querystring }}&{% endif %}page=1">1</a>{% if page_window.0 > 2 %}<span class="gap">…</span>{% endif %}{% endif %}
+    {% for n in page_window %}{% if n == page.number %}<span class="cur" aria-current="page">{{ n }}</span>{% else %}<a href="?{% if querystring %}{{ querystring }}&{% endif %}page={{ n }}">{{ n }}</a>{% endif %}{% endfor %}
+    {% if page_window|last < last_page %}{% if page_window|last < last_page|add:"-1" %}<span class="gap">…</span>{% endif %}<a href="?{% if querystring %}{{ querystring }}&{% endif %}page={{ last_page }}">{{ last_page }}</a>{% endif %}
+    {% if page.has_next %}<a class="pn" href="?{% if querystring %}{{ querystring }}&{% endif %}page={{ page.next_page_number }}" rel="next">Next &rarr;</a>{% endif %}
+  </nav>{% endif %}
+  {% if next_url %}
+  <div class="ls-more" id="ls-more" data-next="{{ next_url }}" hidden>
+    <p class="ls-shown" aria-live="polite">Showing <b id="ls-shown-n">{{ page.object_list|length }}</b> of <b>{{ total }}</b> properties</p>
+    <button type="button" class="ls-more-btn" id="ls-more-btn">Show more properties<svg aria-hidden="true"><use href="#ls-i-chev"/></svg></button>
+    <p class="ls-more-err" id="ls-more-err" hidden>Could not load more right now. Please try again.</p>
+  </div>{% endif %}
+  {% else %}
+  <div class="ls-empty">
+    <svg aria-hidden="true"><use href="#ls-i-search"/></svg>
+    <b>No properties match your search</b>
+    <p>Try a different region, widen the price range or remove some filters.</p>
+    <div class="ls-empty-act">{% if has_filters %}<a class="ls-btn-lite pri" href="{{ clear_url }}">Clear all filters</a>{% endif %}<a class="ls-btn-lite" href="{% url 'marketplace:seller_listings' %}">Post your property</a></div>
+  </div>
+  {% endif %}
+
+  <aside class="ls-cta-band" aria-label="Post your property">
+    <span class="ico" aria-hidden="true"><svg><use href="#ls-i-homeplus"/></svg></span>
+    <div class="tx"><b>Rent or sell your property?</b><span>Post with photos and reach tenants and buyers directly.<em class="lg"> Every listing gets a printable flyer with QR code.</em></span></div>
+    <a class="ls-btn-sm" href="{% url 'marketplace:seller_listings' %}"><svg aria-hidden="true"><use href="#ls-i-plus"/></svg>Post property</a>
+  </aside>
+</div>
+<script>
+(function(){
+  var d=document.querySelector('.ls-adv');
+  function sync(){if(!d)return;if(window.matchMedia('(min-width:861px)').matches){d.setAttribute('open','');}}
+  sync();window.addEventListener('resize',sync);
+  var tl=document.querySelector('.ls-types a.on');if(tl&&tl.scrollIntoView){try{tl.scrollIntoView({block:'nearest',inline:'center'});}catch(e){}}
+
+
+  /* Type chips: fade edges when the row scrolls (phones) */
+  var tw=document.querySelector('.ls-types-wrap'),tr=document.querySelector('.ls-types');
+  function edges(){if(!tw||!tr)return;tw.classList.toggle('can-left',tr.scrollLeft>6);tw.classList.toggle('can-right',tr.scrollLeft+tr.clientWidth<tr.scrollWidth-6);}
+  if(tr){tr.addEventListener('scroll',edges,{passive:true});window.addEventListener('resize',edges);setTimeout(edges,60);}
+
+  /* Active filter chips: each one removes just that filter */
+  var box=document.getElementById('ls-active');
+  if(box){
+    var sp=new URLSearchParams(location.search),labels={q:function(v){return '\u201C'+v+'\u201D';},region:function(v){return v;},min:function(v){return 'From TSh '+v;},max:function(v){return 'Up to TSh '+v;},beds:function(v){return v+'+ bedrooms';}};
+    var n=0,frag=document.createDocumentFragment();
+    Object.keys(labels).forEach(function(k){
+      var v=(sp.get(k)||'').trim();if(!v)return;n++;
+      var b=document.createElement('button');b.type='button';b.className='ls-fchip';b.setAttribute('aria-label','Remove filter '+labels[k](v));
+      b.appendChild(document.createTextNode(labels[k](v)+' '));
+      b.insertAdjacentHTML('beforeend','<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>');
+      b.addEventListener('click',function(){var u=new URLSearchParams(location.search);u.delete(k);u.delete('page');var qs=u.toString();location.href=location.pathname+(qs?'?'+qs:'');});
+      frag.appendChild(b);
+    });
+    if(n){var t=document.createElement('b');t.textContent='Filters:';box.appendChild(t);box.appendChild(frag);
+      var a=document.createElement('a');a.className='ls-fclear';a.href=location.pathname+(sp.get('type')?'?type='+encodeURIComponent(sp.get('type')):'');a.textContent='Clear all';box.appendChild(a);box.hidden=false;}
+  }
+
+  /* Grid / list layout (remembered on this device) */
+  var grid=document.getElementById('ls-grid'),KEY='ls-view';
+  var btns=[].slice.call(document.querySelectorAll('.ls-view button'));
+  function setView(v){if(!grid)return;grid.classList.toggle('is-list',v==='list');btns.forEach(function(b){b.setAttribute('aria-pressed',String(b.dataset.view===v));});}
+  var saved='grid';try{saved=localStorage.getItem(KEY)||'grid';}catch(e){}
+  setView(saved);
+  btns.forEach(function(b){b.addEventListener('click',function(){setView(b.dataset.view);try{localStorage.setItem(KEY,b.dataset.view);}catch(e){}});});
+
+  /* "Show more": loads the next batch in place; numbered pager stays as the no-JS fallback */
+  var more=document.getElementById('ls-more'),btn=document.getElementById('ls-more-btn'),err=document.getElementById('ls-more-err'),pager=document.querySelector('.ls-pager');
+  if(more&&btn&&grid&&window.fetch){
+    more.hidden=false;if(pager)pager.hidden=true;
+    var busy=false;
+    function count(){return grid.querySelectorAll('.ls-card').length;}
+    btn.addEventListener('click',function(){
+      var next=more.dataset.next;if(!next||busy)return;busy=true;btn.disabled=true;err.hidden=true;btn.firstChild.nodeValue='Loading…';
+      fetch(next+(next.indexOf('?')>-1?'&':'?')+'partial=1',{headers:{'X-Requested-With':'XMLHttpRequest','Accept':'application/json'},credentials:'same-origin'})
+        .then(function(r){if(!r.ok)throw new Error('http');return r.json();})
+        .then(function(j){
+          if(j.html)grid.insertAdjacentHTML('beforeend',j.html);
+          more.dataset.next=j.next||'';
+          document.getElementById('ls-shown-n').textContent=count();
+          if(!j.next){btn.hidden=true;}
+        })
+        .catch(function(){err.hidden=false;})
+        .then(function(){busy=false;btn.disabled=false;btn.firstChild.nodeValue='Show more properties';});
+    });
+  }
+})();
+</script>
+{% endblock %}

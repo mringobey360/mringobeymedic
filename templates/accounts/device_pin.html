@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Device PIN{% endblock %}
+{% block content %}
+<div class="max-w-3xl mx-auto">
+  <div class="mb-4 flex items-center gap-3">
+    <a href="{% url 'accounts:profile' %}" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-ink-200 bg-white text-ink-600 hover:bg-ink-50" aria-label="Back to profile">←</a>
+    <div class="min-w-0">
+      <h1 class="text-lg sm:text-xl font-bold tracking-tight text-ink-900">Device PIN</h1>
+      <p class="text-xs text-ink-500">{{ pin_length }} digits · quick sign-in on trusted devices</p>
+    </div>
+  </div>
+
+  <div class="grid gap-3 md:grid-cols-2">
+    <section class="card !p-4 sm:!p-5">
+      <div class="flex items-start gap-3">
+        <div class="h-9 w-9 shrink-0 rounded-lg bg-brand-50 text-brand-700 flex items-center justify-center">⌁</div>
+        <div><h2 class="text-sm font-semibold text-ink-900">Change PIN</h2><p class="mt-0.5 text-xs leading-4 text-ink-500">Confirm your password, then choose a new PIN.</p></div>
+      </div>
+      <form method="post" class="mt-4 space-y-3" autocomplete="off">
+        {% csrf_token %}<input type="hidden" name="action" value="change">
+        {% if form.non_field_errors %}<p class="text-xs text-red-600">{{ form.non_field_errors.0 }}</p>{% endif %}
+        {% for field in form %}
+        <div><label for="{{ field.id_for_label }}" class="mb-1 block text-xs font-semibold text-ink-700">{{ field.label }}</label>{{ field }}{% if field.errors %}<p class="mt-1 text-[11px] text-red-600">{{ field.errors.0 }}</p>{% endif %}</div>
+        {% endfor %}
+        <button type="submit" class="btn btn-primary w-full">Update PIN</button>
+      </form>
+      <p class="mt-3 rounded-lg bg-ink-50 px-3 py-2 text-[10px] leading-4 text-ink-500">Forgot it? Sign out → <b>Forgot PIN?</b> → use your username and password → create a new PIN.</p>
+    </section>
+
+    <section class="card !p-4 sm:!p-5">
+      <div class="flex items-start justify-between gap-3">
+        <div><h2 class="text-sm font-semibold text-ink-900">Trusted devices</h2><p class="mt-0.5 text-xs leading-4 text-ink-500">Browsers allowed to show your PIN pad.</p></div>
+        {% if devices|length > 1 %}<form method="post" data-confirm="Remove all other devices?"><input type="hidden" name="action" value="revoke_others">{% csrf_token %}<button class="text-[11px] font-semibold text-red-600">Remove others</button></form>{% endif %}
+      </div>
+      {% if devices %}
+      <ul class="mt-2 divide-y divide-ink-100">
+      {% for d in devices %}
+        <li class="flex items-center justify-between gap-2 py-2.5">
+          <div class="min-w-0"><p class="truncate text-xs font-semibold text-ink-900">{{ d.label|default:"Device" }}{% if current_device and d.pk == current_device.pk %}<span class="ml-1 rounded-full bg-brand-50 px-1.5 py-0.5 text-[9px] text-brand-700">This device</span>{% endif %}</p><p class="text-[10px] text-ink-500">{{ d.created_at|date:"d M Y" }} · {% if d.last_used_at %}used {{ d.last_used_at|timesince }} ago{% else %}not used{% endif %}</p></div>
+          <form method="post" data-confirm="Remove this device?"><input type="hidden" name="action" value="revoke"><input type="hidden" name="device_id" value="{{ d.pk }}">{% csrf_token %}<button class="text-[10px] font-semibold text-red-600">Remove</button></form>
+        </li>
+      {% endfor %}
+      </ul>
+      {% else %}<p class="mt-3 text-xs text-ink-500">No trusted devices yet.</p>{% endif %}
+    </section>
+  </div>
+</div>
+{% endblock %}

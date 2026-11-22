@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Edit Batch{% endblock %}
+{% block content %}
+{% include "inventory/_batch_form_styles.html" %}
+<div class="bf">
+    <div class="bf-head">
+        <h1 class="bf-title"><small>Edit stock batch</small>{{ product.name }}</h1>
+        <p class="bf-lead">Originally received: <strong>{{ batch.initial_quantity }} {{ product.get_unit_display }}</strong> on {{ batch.received_at|date:"d M Y" }}. Changing "Quantity Remaining" adjusts the stock count directly and is recorded in the stock movement history.</p>
+    </div>
+    {% if product.requires_expiry %}
+    <p class="bf-notice is-warn">This product requires an expiry date for every batch.</p>
+    {% endif %}
+    <form method="post" class="bf-form">
+        {% csrf_token %}
+        {% if form.non_field_errors %}<p class="bf-error">{{ form.non_field_errors.0 }}</p>{% endif %}
+        <div class="bf-grid">
+        {% for field in form %}
+            <div class="bf-field{% if field.name == 'note' %} is-wide{% endif %}{% if field.errors %} has-error{% endif %}">
+                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% if field.errors %}<p class="bf-error">{{ field.errors.0 }}</p>{% endif %}
+                {% if field.help_text %}<p class="bf-help">{{ field.help_text }}</p>{% endif %}
+            </div>
+        {% endfor %}
+        </div>
+        <div class="bf-actions">
+            <a href="{% url 'inventory:product_batches' product.pk %}" class="btn btn-secondary">Cancel</a>
+            <button type="submit" class="btn btn-primary">Save Changes</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'js/pm-inline-add.js' %}?v=2"></script>
+{% endblock %}

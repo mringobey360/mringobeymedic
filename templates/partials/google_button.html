@@ -1,0 +1,82 @@
+{% comment %}
+  Compact professional "Continue with Google" (Google Identity Services).
+  Context: google_enabled, google_client_id, google_nonce (accounts.google_auth.template_context).
+  Optional: google_url_name="link" to CONNECT Google to the signed-in account (profile page), google_label (signin_with | signup_with | continue_with).
+  The token is sent to the server and verified there (signature, audience, expiry, one-time nonce).
+{% endcomment %}
+{% if google_enabled %}
+<div class="spg" data-google-root data-client-id="{{ google_client_id }}" data-nonce="{{ google_nonce }}" data-csrf="{{ csrf_token }}"
+     data-url="{% if google_url_name == 'link' %}{% url 'accounts:google_link' %}{% else %}{% url 'accounts:google_auth' %}{% endif %}"
+     data-label="{{ google_label|default:'continue_with' }}">
+  <div class="spg__slot" data-google-slot>
+    <span class="spg__face" aria-hidden="true"><svg class="spg__g" width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.1C12.4 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.2 5.3-4.6 6.9l7.4 5.7c4.3-4 6.9-9.9 6.9-17.1z"/><path fill="#FBBC05" d="M10.5 28.7a14.5 14.5 0 0 1 0-9.4l-7.9-6.1a24 24 0 0 0 0 21.6l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.4-5.7c-2 1.4-4.6 2.3-8.5 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.9 6.1C6.5 42.6 14.6 48 24 48z"/></svg><b>{% if google_label == 'signup_with' %}Sign up with Google{% elif google_label == 'signin_with' %}Sign in with Google{% else %}Continue with Google{% endif %}</b></span>
+    <div class="spg__real" data-google-btn></div>
+  </div>
+  <p class="spg__err" data-google-err role="alert" hidden></p>
+  <p class="spg__busy" data-google-busy hidden><span class="spg__spin" aria-hidden="true"></span>Signing you in securely&hellip;</p>
+</div>
+<style>
+/* Custom-designed compact button. Google's real (secure) button is rendered invisibly on top of it,
+   so the click, the popup and the token check are exactly Google's own. */
+.spg{width:100%;display:flex;flex-direction:column;align-items:center;gap:.5rem}
+.spg__slot{position:relative;width:100%;max-width:260px;height:42px;margin:0 auto;border-radius:8px}
+.spg__face{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:.6rem;border:1px solid #dadce0;border-radius:8px;background:#fff;color:#1f2937;font-size:.875rem;font-weight:600;letter-spacing:.005em;white-space:nowrap;box-shadow:0 1px 2px rgba(15,23,42,.06);transition:background .15s ease,border-color .15s ease,box-shadow .15s ease}
+.spg__face b{font-weight:600}
+.spg__g{flex:none;display:block}
+.spg__real{position:absolute;inset:0;z-index:2;overflow:hidden;opacity:.01;cursor:pointer;border-radius:8px}
+.spg__real iframe{display:block;max-width:100%;transform-origin:0 0}
+.spg__slot:hover .spg__face{background:#f8fafc;border-color:#c4c7cc;box-shadow:0 2px 6px -1px rgba(15,23,42,.18)}
+.spg__slot:active .spg__face{background:#f1f5f9}
+.spg__slot:focus-within .spg__face{border-color:#0f766e;box-shadow:0 0 0 3px rgba(15,118,110,.22)}
+.spg__err{margin:0;font-size:.8125rem;line-height:1.4;color:#b91c1c;text-align:center;background:#fef2f2;border:1px solid #fecaca;border-radius:.5rem;padding:.45rem .75rem;width:100%;max-width:320px}
+.spg__busy{margin:0;display:flex;align-items:center;gap:.5rem;font-size:.75rem;color:#64748b}
+.spg__spin{width:12px;height:12px;border-radius:50%;border:2px solid #cbd5e1;border-top-color:#0f766e;animation:spg-spin .7s linear infinite}
+.spg--busy .spg__slot{opacity:.5;pointer-events:none}
+.sp-or{display:flex;align-items:center;gap:.75rem;margin:1.1rem auto;max-width:320px;font-size:.6875rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#94a3b8}
+.sp-or::before,.sp-or::after{content:"";flex:1;height:1px;background:#e2e8f0}
+@keyframes spg-spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spg__spin,.spg__face{animation:none!important;transition:none!important}}
+html[data-theme="dark"] .spg__face{background:#102333;border-color:#395366;color:#e2e8f0}
+html[data-theme="dark"] .spg__slot:hover .spg__face{background:#163047}
+html[data-theme="dark"] .sp-or::before,html[data-theme="dark"] .sp-or::after{background:#294052}
+</style>
+<script>
+(function () {
+  var root = document.querySelector('[data-google-root]');
+  if (!root) return;
+  var slot = root.querySelector('[data-google-btn]'), box = root.querySelector('[data-google-slot]'), err = root.querySelector('[data-google-err]'), busy = root.querySelector('[data-google-busy]');
+  function show(msg) { err.textContent = msg || ''; err.hidden = !msg; }
+  function setBusy(on) { root.classList.toggle('spg--busy', on); busy.hidden = !on; }
+  function onCredential(resp) {
+    show(''); setBusy(true);
+    fetch(root.dataset.url, {
+      method: 'POST', credentials: 'same-origin',
+      headers: {'Content-Type': 'application/json', 'X-CSRFToken': root.dataset.csrf, 'X-Requested-With': 'XMLHttpRequest'},
+      body: JSON.stringify({credential: resp.credential})
+    }).then(function (r) { return r.json().catch(function () { return {ok: false, error: 'Unexpected response. Please try again.'}; }); })
+      .then(function (d) {
+        if (d.ok && d.redirect) { window.location.href = d.redirect; return; }
+        setBusy(false); show(d.error || 'Google sign-in failed. Please try again.');
+        if (d.error && /expired|refresh/i.test(d.error)) setTimeout(function () { window.location.reload(); }, 1800);
+      }).catch(function () { setBusy(false); show('Network problem. Check your connection and try again.'); });
+  }
+  function draw() {
+    // Google's button (min 200px) is drawn at the visible button's width and scaled to its 42px height, then hidden on top of ours.
+    var w = Math.floor(Math.min(400, Math.max(200, box.clientWidth || 260)));
+    slot.innerHTML = '';
+    google.accounts.id.renderButton(slot, {type: 'standard', theme: 'outline', size: 'large', text: root.dataset.label || 'continue_with', shape: 'rectangular', logo_alignment: 'left', width: w});
+    var f = slot.querySelector('iframe'); if (f) { f.style.transform = 'scaleY(1.06)'; }
+  }
+  function init() {
+    if (!window.google || !google.accounts || !google.accounts.id) return;
+    google.accounts.id.initialize({client_id: root.dataset.clientId, callback: onCredential, nonce: root.dataset.nonce, ux_mode: 'popup', auto_select: false, cancel_on_tap_outside: true});
+    draw();
+    var t; window.addEventListener('resize', function () { clearTimeout(t); t = setTimeout(draw, 200); });
+  }
+  var s = document.createElement('script');
+  s.src = 'https://accounts.google.com/gsi/client'; s.async = true; s.defer = true; s.onload = init;
+  s.onerror = function () { slot.innerHTML = ''; box.style.opacity = '.55'; show('Could not load Google. Check your internet connection, or sign in with your username.'); };
+  document.head.appendChild(s);
+})();
+</script>
+{% endif %}

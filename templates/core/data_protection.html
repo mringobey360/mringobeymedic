@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}Data Protection &amp; Backup{% endblock %}
+{% block content %}
+<div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-6">
+    <div>
+        <h1 class="text-2xl font-bold text-ink-900 tracking-tight mb-1">Data Protection &amp; Backup</h1>
+        <p class="text-sm text-ink-500">Protect your business data with a private, easy-to-read backup.</p>
+    </div>
+    <span class="badge bg-brand-50 text-brand-700">{{ backups|length }}/{{ backup_retention }} backups kept</span>
+</div>
+
+{% if request.user.is_superuser %}
+<div class="card mb-6 border border-red-200 bg-red-50/40">
+    <h2 class="font-semibold text-red-900 mb-2">Platform recovery — Superadmin only</h2>
+    <p class="text-sm text-red-800 mb-4">This is a full-system database + media archive for disaster recovery. It may contain data from every business and sensitive system configuration. Do not share it with shop owners.</p>
+    <a href="{% url 'trigger_full_backup' %}" class="btn bg-red-700 text-white hover:bg-red-800">Download Full System Backup</a>
+</div>
+{% else %}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+    <div class="card lg:col-span-2">
+        <div class="flex items-start gap-3">
+            <div class="w-10 h-10 rounded-xl bg-brand-50 text-brand-700 flex items-center justify-center shrink-0">✓</div>
+            <div>
+                <h2 class="font-semibold text-ink-900">My Business Data Backup</h2>
+                <p class="text-sm text-ink-500 mt-1">This backup contains only the branches you manage. It is designed to be understandable in Excel and safe to keep for your business records.</p>
+            </div>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5">
+            <div class="rounded-xl bg-ink-50 p-3"><p class="text-xs text-ink-500">Branches</p><p class="text-lg font-semibold text-ink-900">{{ request.user.managed_pharmacies.count }}</p></div>
+            <div class="rounded-xl bg-ink-50 p-3"><p class="text-xs text-ink-500">Your backups</p><p class="text-lg font-semibold text-ink-900">{{ backups|length }}</p></div>
+            <div class="rounded-xl bg-ink-50 p-3"><p class="text-xs text-ink-500">Format</p><p class="text-lg font-semibold text-ink-900">ZIP</p></div>
+            <div class="rounded-xl bg-ink-50 p-3"><p class="text-xs text-ink-500">Readable files</p><p class="text-lg font-semibold text-ink-900">CSV + JSON</p></div>
+        </div>
+        <form method="post" action="{% url 'trigger_backup' %}" class="mt-5" id="create-backup-form">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-primary" id="create-backup-btn">⬇ Create My Backup</button>
+        </form>
+        <p class="text-xs text-ink-500 mt-3">A new backup is stored securely and appears in your backup history. The latest {{ backup_retention }} backups are retained.</p>
+    </div>
+
+    <div class="card">
+        <h2 class="font-semibold text-ink-900 mb-3">What is included?</h2>
+        <ul class="space-y-2 text-sm text-ink-700">
+            <li>✓ Products &amp; stock batches</li>
+            <li>✓ Sales &amp; sale items</li>
+            <li>✓ Customers &amp; debts</li>
+            <li>✓ Employees &amp; branch information</li>
+            <li>✓ Stock movement history</li>
+            <li>✓ Your SMS usage/subscriptions</li>
+            <li>✓ Branch chat attachments</li>
+        </ul>
+        <div class="mt-4 rounded-xl bg-amber-50 border border-amber-100 p-3 text-xs text-amber-800">
+            Passwords, OTPs, SMS provider API keys and other authentication secrets are never included.
+        </div>
+    </div>
+</div>
+
+<div class="card mb-6">
+    <h2 class="font-semibold text-ink-900 mb-2">Backup history</h2>
+    <p class="text-sm text-ink-500 mb-4">Only your own backup records are shown here. Older backups are automatically removed after the retention limit.</p>
+    {% if backups %}
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead><tr class="text-left text-ink-500 border-b border-ink-100"><th class="py-2 pr-4">Created</th><th class="py-2 pr-4">File</th><th class="py-2 pr-4">Size</th><th class="py-2 pr-4">Records</th><th class="py-2 text-right">Actions</th></tr></thead>
+            <tbody>
+            {% for backup in backups %}
+            <tr class="border-b border-ink-100 last:border-0">
+                <td class="py-3 pr-4 whitespace-nowrap">{{ backup.created_at|date:"d M Y, H:i" }}</td>
+                <td class="py-3 pr-4 font-medium text-ink-800">{{ backup.filename }}</td>
+                <td class="py-3 pr-4 whitespace-nowrap">{{ backup.size_mb|floatformat:2 }} MB</td>
+                <td class="py-3 pr-4">{% with c=backup.record_counts %}{{ c.products|default:0 }} products · {{ c.sales|default:0 }} sales · {{ c.customers|default:0 }} customers{% endwith %}</td>
+                <td class="py-3 text-right whitespace-nowrap">
+                    <a href="{% url 'download_user_backup' backup.pk %}" class="text-brand-700 font-medium mr-3">Download</a>
+                    <form method="post" action="{% url 'delete_user_backup' backup.pk %}" class="inline" onsubmit="return confirm('Delete this backup file? This cannot be undone.')">
+                        {% csrf_token %}<button class="text-red-600 font-medium">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="rounded-xl border border-dashed border-ink-200 p-8 text-center text-sm text-ink-500">No backup has been created yet.</div>
+    {% endif %}
+</div>
+
+<div class="card">
+    <h2 class="font-semibold text-ink-900 mb-2">Important security note</h2>
+    <p class="text-sm text-ink-600">Keep downloaded backups in a secure place. A backup can contain customer names, phone numbers, sales and debt history. For complete server recovery, the platform Superadmin should use the separate Full System Backup or managed PostgreSQL backups.</p>
+</div>
+
+{% endif %}
+
+<script>
+(function () {
+    const form = document.getElementById('create-backup-form');
+    const btn = document.getElementById('create-backup-btn');
+    if (!form || !btn) return;
+    form.addEventListener('submit', function () {
+        btn.disabled = true;
+        btn.textContent = 'Preparing backup…';
+    });
+})();
+</script>
+{% endblock %}

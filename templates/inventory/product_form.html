@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Add Product{% endblock %}
+{% block content %}
+<div class="max-w-2xl">
+    <h1 class="text-2xl font-bold text-ink-900 tracking-tight mb-1">Register New Product</h1>
+    <p class="text-sm text-ink-500 mb-5">Every new product starts with an opening batch — its first delivery's quantity, price, and (optionally) expiry date.</p>
+
+    <form method="post" enctype="multipart/form-data" class="space-y-5">
+        {% csrf_token %}
+
+        <div class="card">
+            <h2 class="font-semibold text-ink-900 mb-4">1. Product Details</h2>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {% for field in product_form %}
+                {% if field.name == 'image' %}
+                <div data-field="image" class="sm:col-span-2">{% include 'inventory/_product_image_field.html' with f=product_form %}</div>
+                {% elif field.name != 'remove_image' %}
+                <div data-field="{{ field.name }}" class="{% if field.name == 'name' %}sm:col-span-2{% endif %}">
+                    <label class="block text-sm font-medium mb-1">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.errors %}<p class="text-xs text-red-600 mt-1">{{ field.errors.0 }}</p>{% endif %}
+                </div>
+                {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="card">
+            <h2 class="font-semibold text-ink-900 mb-4">2. Opening Batch</h2>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {% for field in batch_form %}
+                <div class="{% if field.name == 'note' %}sm:col-span-2{% endif %}">
+                    <label class="block text-sm font-medium mb-1">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.help_text %}<p class="text-xs text-ink-400 mt-1">{{ field.help_text }}</p>{% endif %}
+                    {% if field.errors %}<p class="text-xs text-red-600 mt-1">{{ field.errors.0 }}</p>{% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="flex gap-3">
+            <button type="submit" class="btn btn-primary">Register Product</button>
+            <a href="{% url 'inventory:product_list' %}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+<script>
+(function () {
+  var typeSel = document.getElementById('id_discount_type');
+  if (!typeSel) return;
+  function wrap(name) { var el = document.querySelector('[data-field="' + name + '"]'); return el; }
+  function sync() {
+    var amount = typeSel.value === 'AMOUNT';
+    ['min_discount_percent', 'max_discount_percent'].forEach(function (n) { var w = wrap(n); if (w) w.classList.toggle('hidden', amount); });
+    ['min_discount_amount', 'max_discount_amount'].forEach(function (n) { var w = wrap(n); if (w) w.classList.toggle('hidden', !amount); });
+  }
+  typeSel.addEventListener('change', sync);
+  sync();
+})();
+</script>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>window.PM_BARCODE_CHECK_URL = "{% url 'inventory:barcode_check_api' %}";{% if product %} window.PM_BARCODE_EXCLUDE_ID = "{{ product.pk }}";{% endif %}</script>
+<script src="{% static 'js/pm-scanner.js' %}?v=2"></script>
+<script src="{% static 'js/pm-scan-fields.js' %}?v=1"></script>
+<script src="{% static 'js/pm-inline-add.js' %}?v=2"></script>
+{% endblock %}

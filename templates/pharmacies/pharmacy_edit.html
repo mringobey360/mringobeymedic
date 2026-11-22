@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}Branch Settings{% endblock %}
+{% block content %}
+<div class="max-w-5xl mx-auto pb-8">
+  <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
+    <div>
+      <div class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-brand-700 mb-2">
+        <span>Management</span><span class="text-ink-300">/</span><span>Branch Settings</span>
+      </div>
+      <h1 class="text-2xl font-extrabold text-ink-950">Branch Settings</h1>
+      <p class="text-sm text-ink-500 mt-1">Manage safe business and receipt details for <strong>{{ pharmacy.name }}</strong>.</p>
+    </div>
+    <div class="flex flex-wrap gap-2"><a href="{% url 'pharmacies:workplace_location' pharmacy.pk %}" class="btn btn-secondary">Workplace Location</a><a href="{% url 'pharmacies:receipt_design_branch' pharmacy.pk %}" class="btn btn-secondary">Receipt Design</a><a href="{% url 'pharmacies:list' %}" class="btn btn-secondary">← Back to Branches</a></div>
+  </div>
+
+  <div class="grid lg:grid-cols-3 gap-5">
+    <div class="lg:col-span-2 space-y-5">
+      <form method="post" enctype="multipart/form-data" id="branch-settings-form" class="space-y-5">
+        {% csrf_token %}
+        {% if form.non_field_errors %}
+        <div class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{{ form.non_field_errors }}</div>
+        {% endif %}
+
+        <section class="card">
+          <div class="flex items-start gap-3 pb-4 border-b border-ink-100">
+            <div class="w-10 h-10 rounded-xl bg-brand-50 text-brand-700 flex items-center justify-center shrink-0">🏪</div>
+            <div><h2 class="font-bold text-ink-950">Business identity</h2><p class="text-xs text-ink-500 mt-0.5">These details appear across the branch workspace and receipts.</p></div>
+          </div>
+          <div class="grid sm:grid-cols-2 gap-4 pt-5">
+            {% for field in form %}
+              {% if field.name == 'name' or field.name == 'location' or field.name == 'phone_number' or field.name == 'email' %}
+              <div class="{% if field.name == 'location' %}sm:col-span-2{% endif %}">
+                <label class="block text-sm font-semibold text-ink-800 mb-1.5">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}<p class="text-xs text-ink-400 mt-1">{{ field.help_text }}</p>{% endif %}
+                {% if field.errors %}<p class="text-xs text-red-600 mt-1">{{ field.errors.0 }}</p>{% endif %}
+              </div>
+              {% endif %}
+            {% endfor %}
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="flex items-start gap-3 pb-4 border-b border-ink-100">
+            <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center shrink-0">🧾</div>
+            <div><h2 class="font-bold text-ink-950">Receipt branding</h2><p class="text-xs text-ink-500 mt-0.5">Customize what customers see on printed or downloaded receipts.</p></div>
+          </div>
+          <div class="space-y-4 pt-5">
+            {% for field in form %}
+              {% if field.name == 'logo' or field.name == 'receipt_header' or field.name == 'receipt_footer' %}
+              <div>
+                <label class="block text-sm font-semibold text-ink-800 mb-1.5">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}<p class="text-xs text-ink-400 mt-1">{{ field.help_text }}</p>{% endif %}
+                {% if field.errors %}<p class="text-xs text-red-600 mt-1">{{ field.errors.0 }}</p>{% endif %}
+              </div>
+              {% endif %}
+            {% endfor %}
+            {% if pharmacy.logo %}<div class="flex items-center gap-3 rounded-xl bg-ink-50 border border-ink-100 p-3"><img src="{{ pharmacy.logo.url }}" alt="Current branch logo" class="w-14 h-14 rounded-lg object-contain bg-white border border-ink-100"><div><p class="text-sm font-semibold">Current logo</p><p class="text-xs text-ink-500">Upload a new image above to replace it.</p></div></div>{% endif %}
+          </div>
+        </section>
+
+        <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+          <a href="{% url 'pharmacies:list' %}" class="btn btn-secondary text-center">Cancel</a>
+          <button type="submit" class="btn btn-primary min-w-44" id="save-branch-settings">Save Changes</button>
+        </div>
+      </form>
+    </div>
+
+    <aside class="space-y-5">
+      <section class="card border-brand-100 bg-gradient-to-br from-brand-50 to-white">
+        <div class="flex items-center justify-between gap-3">
+          <div><p class="text-xs font-bold uppercase tracking-wider text-brand-700">Current plan</p><h2 class="text-xl font-extrabold text-ink-950 mt-1">{% if addon %}{{ addon.get_package_tier_display }}{% elif subscription %}{{ subscription.get_tier_display }}{% else %}Included plan{% endif %}</h2></div>
+          {% if addon %}<span class="badge {% if addon.status == 'ACTIVE' %}bg-emerald-100 text-emerald-700{% elif addon.status == 'PENDING_PAYMENT' %}bg-amber-100 text-amber-700{% else %}bg-red-100 text-red-700{% endif %}">{{ addon.get_status_display }}</span>{% endif %}
+        </div>
+        {% if not addon and subscription %}
+        <div class="mt-4 rounded-xl bg-white border border-ink-100 divide-y divide-ink-100 text-sm">
+          <div class="flex justify-between gap-3 px-3 py-2.5"><span class="text-ink-500">Billing</span><strong>{{ subscription.get_plan_display }}</strong></div>
+          <div class="flex justify-between gap-3 px-3 py-2.5"><span class="text-ink-500">Status</span><strong>{{ subscription.get_status_display }}</strong></div>
+          {% if subscription.end_date %}<div class="flex justify-between gap-3 px-3 py-2.5"><span class="text-ink-500">Valid until</span><strong>{{ subscription.end_date|date:'d M Y' }}</strong></div>{% endif %}
+        </div>
+        {% endif %}
+        {% if addon %}
+        <div class="mt-4 rounded-xl bg-white border border-ink-100 divide-y divide-ink-100 text-sm">
+          <div class="flex justify-between gap-3 px-3 py-2.5"><span class="text-ink-500">Billing</span><strong>{{ addon.get_billing_plan_display }}</strong></div>
+          <div class="flex justify-between gap-3 px-3 py-2.5"><span class="text-ink-500">Amount</span><strong>TZS {{ addon.billing_amount|floatformat:"0g" }}</strong></div>
+          {% if addon.next_billing_date %}<div class="flex justify-between gap-3 px-3 py-2.5"><span class="text-ink-500">Next billing</span><strong>{{ addon.next_billing_date|date:'d M Y' }}</strong></div>{% endif %}
+        </div>
+        {% endif %}
+        {% if not request.user.is_assistant_role %}<a href="{% url 'hq:packages_center' %}" class="btn btn-primary w-full mt-4 text-center">View Plans &amp; Upgrade</a>{% else %}<div class="rounded-xl bg-ink-50 border border-ink-100 p-3 mt-4 text-xs text-ink-600">Plan and billing changes are controlled by the Shop Owner. You can manage operational branch settings without changing billing.</div>{% endif %}
+        <p class="text-[11px] text-ink-400 mt-2">Plan changes use the existing secure payment and verification flow; this page never changes subscription entitlement directly.</p>
+      </section>
+
+      <section class="card">
+        <div class="flex items-start gap-3"><div class="w-9 h-9 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center">✓</div><div><h3 class="font-bold text-ink-950">Protected settings</h3><p class="text-xs text-ink-500 mt-1">Important operational controls are intentionally not editable here.</p></div></div>
+        <ul class="mt-4 space-y-2.5 text-xs text-ink-600">
+          <li>• Attendance geofence and verification policy</li>
+          <li>• Meal/attendance timing rules</li>
+          <li>• Receipt/sale numbering counters</li>
+          <li>• Subscription billing and package entitlement</li>
+          <li>• Regulatory identifiers</li>
+        </ul>
+        <p class="mt-4 pt-4 border-t border-ink-100 text-xs text-ink-400">If one of these needs to change, use the appropriate management flow or contact platform support.</p>
+      </section>
+
+      <section class="card bg-ink-50 border-ink-100">
+        <div class="flex items-start justify-between gap-3"><div><h3 class="font-bold text-sm text-ink-900">Workplace GPS</h3><p class="text-xs text-ink-500 mt-1">Attendance location is managed on a dedicated page.</p></div>{% if pharmacy.location_captured_at %}<span class="badge bg-emerald-100 text-emerald-700">Configured</span>{% else %}<span class="badge bg-amber-100 text-amber-700">Needs setup</span>{% endif %}</div>
+        {% if pharmacy.location_captured_at %}<p class="text-xs text-ink-500 mt-3">Last verified {{ pharmacy.location_captured_at|date:'d M Y H:i' }}{% if pharmacy.location_accuracy_m %} · accuracy ±{{ pharmacy.location_accuracy_m|floatformat:0 }}m{% endif %}</p>{% else %}<p class="text-xs text-amber-700 mt-3">No verified branch GPS point is recorded.</p>{% endif %}
+        <a href="{% url 'pharmacies:workplace_location' pharmacy.pk %}" class="btn btn-secondary w-full mt-4 text-center">Manage Workplace Location</a>
+      </section>
+    </aside>
+  </div>
+</div>
+<script>
+(function(){
+  const form=document.getElementById('branch-settings-form'); const btn=document.getElementById('save-branch-settings');
+  if(!form||!btn)return;
+  form.addEventListener('submit',function(){btn.disabled=true;btn.textContent='Saving…';});
+})();
+</script>
+{% endblock %}

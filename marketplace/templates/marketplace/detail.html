@@ -1,0 +1,177 @@
+{% extends 'marketplace/base.html' %}{% load humanize cart_tags social_tags %}
+{% block title %}{{ product.name }} · SmartPOS Marketplace{% endblock %}
+{% block head_extra %}{% if product.image %}<link rel="preload" as="image" href="{{ product.image.url }}" fetchpriority="high">{% elif gallery %}<link rel="preload" as="image" href="{{ gallery.0.image.url }}" fetchpriority="high">{% endif %}{% endblock %}
+{% block body %}
+{% with qty=cart|get_item:product.pk %}
+<div class="sp-page">
+  <nav class="sp-crumbs" aria-label="Breadcrumb">
+    <a class="sp-back" href="{% url 'marketplace:catalog' %}" aria-label="Back to marketplace"><svg class="i"><use href="#i-back"/></svg></a>
+    <a href="{% url 'marketplace:catalog' %}">Marketplace</a><span class="sep">/</span>
+    {% if seller_store %}<a href="{% url 'marketplace:seller_store_public' seller_store.slug %}">{{ seller_store.public_name }}</a><span class="sep">/</span>{% elif product.seller_name %}<a href="{% url 'marketplace:catalog' %}?seller={{ product.seller_name|urlencode }}">{{ product.seller_name }}</a><span class="sep">/</span>{% endif %}
+    <b>{{ product.name }}</b>
+  </nav>
+
+  <div class="sp-detail">
+    <div class="sp-gallery">
+      {% if product.has_trailer %}
+      <div class="mv-stage" data-mv-media>
+        <video class="mv-video" controls muted loop playsinline preload="metadata" controlslist="nodownload noplaybackrate" disablepictureinpicture oncontextmenu="return false" {% if product.image %}poster="{{ product.image.url }}"{% endif %} data-src="{% url 'marketplace:trailer' product.slug %}" aria-label="{{ product.name }} trailer"></video>
+        <span class="mv-badges"><span class="mv-badge">Trailer</span>{% if product.movie_quality_label %}<span class="mv-badge q">{{ product.movie_quality }}</span>{% endif %}</span>
+        <button class="mv-sound" type="button" aria-label="Turn trailer sound on" aria-pressed="false"><svg class="off" viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="m16 9 5 6M21 9l-5 6"/></svg><svg class="on" viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg></button>
+      </div>
+      {% endif %}
+      <div class="frame">{% if product.image %}<img id="pd-big" src="{{ product.image.url }}" alt="{{ product.name }}" width="800" height="800" fetchpriority="high" decoding="async">{% elif gallery %}<img id="pd-big" src="{{ gallery.0.image.url }}" alt="{{ product.name }}" width="800" height="800" fetchpriority="high" decoding="async">{% else %}<span class="sp-card-ph"><svg class="i"><use href="#i-image"/></svg></span>{% endif %}</div>
+      {% if gallery %}<div class="mk-thumbs" id="pd-thumbs" role="group" aria-label="Product photos">{% if product.image %}<button type="button" class="mk-thumb" data-src="{{ product.image.url }}" aria-label="Photo 1" aria-current="true"><img src="{{ product.image.url }}" alt="" width="64" height="64" decoding="async"></button>{% endif %}{% for g in gallery %}<button type="button" class="mk-thumb" data-src="{{ g.image.url }}" aria-label="Photo {{ forloop.counter|add:1 }}"{% if not product.image and forloop.first %} aria-current="true"{% endif %}><img src="{{ g.image.url }}" alt="" width="64" height="64" loading="lazy" decoding="async"></button>{% endfor %}</div>
+      <script>(function(){
+        var b=document.getElementById('pd-big'),t=document.getElementById('pd-thumbs');if(!b||!t)return;
+        var frame=b.parentNode,seq=0;
+        t.addEventListener('click',function(e){
+          var x=e.target.closest('button.mk-thumb');if(!x)return;
+          [].forEach.call(t.querySelectorAll('.mk-thumb'),function(y){y.setAttribute('aria-current',y===x?'true':'false');});
+          var src=x.dataset.src;if(!src||b.getAttribute('src')===src)return;
+          /* keep the current photo on screen until the new one is fully ready (no blank flash on slow data) */
+          var my=++seq,pre=new Image();frame.classList.add('is-switching');
+          pre.onload=pre.onerror=function(){if(my!==seq)return;b.src=src;frame.classList.remove('is-switching');};
+          pre.src=src;
+        });
+        var slides=[].slice.call(t.querySelectorAll('.mk-thumb')),active=slides.findIndex(function(x){return x.getAttribute('aria-current')==='true';});if(active<0)active=0;
+        var autoTimer=null;
+        function showNext(){if(slides.length<2)return;active=(active+1)%slides.length;slides[active].click();}
+        function startAuto(){if(autoTimer)clearInterval(autoTimer);if(slides.length>1)autoTimer=setInterval(function(){if(!document.hidden&&!frame.matches(':hover'))showNext();},4200);}
+        t.addEventListener('click',function(e){if(e.target.closest('.mk-thumb')){active=slides.indexOf(e.target.closest('.mk-thumb'));startAuto();}});
+        frame.addEventListener('mouseenter',function(){if(autoTimer)clearInterval(autoTimer);});frame.addEventListener('mouseleave',startAuto);startAuto();
+      })();</script>{% endif %}
+    </div>
+
+    <section class="sp-info mp-product-card" data-product-id="{{ product.pk }}" data-name="{{ product.name }}" data-in-cart="{{ qty }}">
+      <h1>{{ product.name }}</h1>
+      {% include 'marketplace/_rate_line.html' %}
+      <div class="sp-seller-row">
+        {% if seller_store %}<span class="sp-avatar">{% if seller_store.logo %}<img src="{{ seller_store.logo.url }}" alt="">{% else %}{{ seller_store.public_name|slice:":1"|upper }}{% endif %}</span><a href="{% url 'marketplace:seller_store_public' seller_store.slug %}">{{ seller_store.public_name }}</a><svg class="i sp-ver"><use href="#i-verified"/></svg>
+        {% elif product.seller_name %}<span class="sp-avatar">{{ product.seller_name|slice:":1"|upper }}</span><a href="{% url 'marketplace:catalog' %}?seller={{ product.seller_name|urlencode }}">{{ product.seller_name }}</a>
+        {% else %}<span class="sp-avatar">S</span><span>SmartPOS Marketplace</span><svg class="i sp-ver"><use href="#i-verified"/></svg>{% endif %}
+        {% if product.category %}<span class="dot">· {{ product.category.name }}</span>{% endif %}
+      </div>
+      {% if seller_store %}{% social_links seller_store caption='Follow' %}{% endif %}
+      <div class="sp-price">TSh {{ product.price|floatformat:0|intcomma }}{% if product.discount_percent %} <small style="font-size:.6em;font-weight:500;color:#94a3b8;text-decoration:line-through">TSh {{ product.compare_at_price|floatformat:0|intcomma }}</small> <span style="font-size:.55em;background:#dc2626;color:#fff;border-radius:6px;padding:2px 7px;vertical-align:middle">-{{ product.discount_percent }}%</span>{% endif %}</div>
+      {% if product.is_digital %}{% if product.in_stock %}<p class="sp-stock">Digital download{% if product.digital_format %} · {{ product.digital_format }}{% endif %}{% if product.digital_file_size %} · {{ product.digital_file_size|filesizeformat }}{% endif %} · Instant access after payment</p>{% else %}<p class="sp-stock out">Currently unavailable</p>{% endif %}
+      {% elif product.in_stock %}<p class="sp-stock">In stock ({{ product.stock }} available)</p>{% else %}<p class="sp-stock out">Sold out</p>{% endif %}
+
+      {% if product.is_movie %}
+      <div class="mv-info">
+        <div class="mv-chips">{% if product.movie_quality_label %}<span class="q">{{ product.movie_quality_label }}</span>{% endif %}{% if product.movie_year %}<span>{{ product.movie_year }}</span>{% endif %}{% if product.movie_duration %}<span>{{ product.movie_duration }}</span>{% endif %}{% for g in product.movie_genre_list %}<span>{{ g }}</span>{% endfor %}</div>
+        <p class="mv-lock"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg><span>The full movie is locked. Your download link is unlocked automatically after your payment is confirmed.</span></p>
+      </div>
+      {% endif %}
+      <div class="sp-buy">
+        {% if product.in_stock %}
+        <button class="sp-btn primary" type="button" data-buy-now>Buy now</button>
+        <div class="sp-row">
+          <form class="mp-add-form" method="post" action="{% url 'marketplace:add_cart' product.pk %}"{% if qty %} hidden{% endif %}>{% csrf_token %}<input type="hidden" name="quantity" value="1"><button class="sp-btn outline" type="submit"><svg class="i"><use href="#i-cart"/></svg> Add to cart</button></form>
+          <div class="mp-quantity-row"{% if not qty %} hidden{% endif %}><button class="mp-qty-btn" type="button" data-operation="decrement" aria-label="Remove one">−</button><output class="mp-qty-value" aria-live="polite">{{ qty|default:0 }}</output><button class="mp-qty-btn" type="button" data-operation="increment" aria-label="Add one"{% if qty >= product.max_cart_qty %} disabled{% endif %}>+</button></div>
+          <button class="sp-btn square" type="button" data-share aria-label="Share this product"><svg class="i"><use href="#i-share"/></svg></button>
+        </div>
+        {% else %}
+        <div class="sp-row"><button class="sp-btn" type="button" disabled>Currently unavailable</button><button class="sp-btn square" type="button" data-share aria-label="Share this product"><svg class="i"><use href="#i-share"/></svg></button></div>
+        {% endif %}
+      </div>
+
+      {% seller_phone product as phone %}{% whatsapp_url product as wa %}
+      {% if phone %}<div class="sp-contact"><span class="lbl">Contact seller</span><a class="sp-chip" href="tel:+{{ phone }}"><svg class="i"><use href="#i-phone"/></svg> Call</a>{% if wa %}<a class="sp-chip wa" href="{{ wa }}" target="_blank" rel="noopener"><svg class="i"><use href="#i-whatsapp"/></svg> WhatsApp</a>{% endif %}</div>{% endif %}
+
+      {% if product.has_preview_panel %}{% include 'marketplace/_preview_panel.html' %}{% endif %}
+      <div class="sp-desc"><h2>Description</h2><p>{{ product.description|linebreaksbr }}</p></div>
+      <div class="sp-trust"><div><svg class="i"><use href="#i-shield"/></svg><b>Secure payment</b>Mobile money checkout</div><div><svg class="i"><use href="#i-truck"/></svg><b>Delivery</b>Arranged with seller</div><div><svg class="i"><use href="#i-box"/></svg><b>Order tracking</b>Using your Ticket ID</div></div>
+    </section>
+  </div>
+
+  <section class="mk-reviews" id="reviews" aria-labelledby="reviews-h" data-submit-url="{% url 'marketplace:submit_review' product.slug %}" data-page-url="{% url 'marketplace:reviews_page' product.slug %}">
+    {% include 'marketplace/_reviews_block.html' %}
+  </section>
+
+  {% if related_products %}
+  <section class="sp-related" aria-labelledby="related-h">
+    <div class="sp-sec-head"><h2 id="related-h">{{ related_heading }}</h2>{% if seller_store %}<a class="sp-pill-btn" href="{% url 'marketplace:seller_store_public' seller_store.slug %}">View shop</a>{% elif product.seller_name %}<a class="sp-pill-btn" href="{% url 'marketplace:catalog' %}?seller={{ product.seller_name|urlencode }}">View shop</a>{% endif %}</div>
+    <div class="sp-grid">{% for item in related_products %}{% include 'marketplace/_product_card.html' with product=item %}{% endfor %}</div>
+  </section>
+  {% endif %}
+</div>
+{% endwith %}
+
+{% if product.has_preview and product.preview_kind == 'pdf' %}{% include 'marketplace/_preview_modal.html' %}{% endif %}
+
+<div class="mk-tm-back" id="mk-rv-dialog" aria-hidden="true">
+  <div class="mk-tm mk-rv-sheet" role="dialog" aria-modal="true" aria-labelledby="mk-rv-title">
+    <div class="mk-tm-head"><span class="mk-tm-ico"><svg class="i"><use href="#i-star"/></svg></span><div><h2 id="mk-rv-title">Rate this product</h2><p>{{ product.name|truncatechars:42 }}</p></div><button type="button" class="mk-tm-x" data-rv-close aria-label="Close"><svg class="i"><use href="#i-x"/></svg></button></div>
+    <form class="mk-rv-form" id="mk-rv-form" method="post" action="{% url 'marketplace:submit_review' product.slug %}" data-no-loading novalidate>
+      <div class="mk-tm-body">
+        <div class="mk-tm-alert" id="mk-rv-alert" role="alert"><svg class="i"><use href="#i-x"/></svg><span><b></b><em style="font-style:normal"></em></span></div>
+        <fieldset class="mk-star-in" aria-label="Your rating"><legend class="sr">Your rating</legend>
+          <div class="mk-star-row">
+            <input type="radio" name="rating" id="rv5" value="5"><label for="rv5" title="Excellent">&#9733;<span class="sr">5 stars</span></label>
+            <input type="radio" name="rating" id="rv4" value="4"><label for="rv4" title="Good">&#9733;<span class="sr">4 stars</span></label>
+            <input type="radio" name="rating" id="rv3" value="3"><label for="rv3" title="Okay">&#9733;<span class="sr">3 stars</span></label>
+            <input type="radio" name="rating" id="rv2" value="2"><label for="rv2" title="Poor">&#9733;<span class="sr">2 stars</span></label>
+            <input type="radio" name="rating" id="rv1" value="1"><label for="rv1" title="Very poor">&#9733;<span class="sr">1 star</span></label>
+          </div>
+          <output class="mk-star-word" id="mk-rv-word" aria-live="polite">Tap a star to rate</output>
+        </fieldset>
+        <div class="mk-rv-fields">
+          <div class="mk-fld"><label for="rv-ref">Ticket ID</label><input id="rv-ref" name="reference" placeholder="SP-7CA55820" autocomplete="off" autocapitalize="characters" spellcheck="false" required></div>
+          <div class="mk-fld"><label for="rv-phone">Checkout phone</label><input id="rv-phone" name="phone" type="tel" inputmode="tel" placeholder="0712345678" autocomplete="tel" required></div>
+        </div>
+        <div class="mk-fld mk-fld-comment"><label for="rv-comment">Your review <span>(optional)</span></label><textarea id="rv-comment" name="comment" rows="2" maxlength="1000" placeholder="Quality, delivery, value for money..."></textarea><small class="mk-rv-count"><span id="mk-rv-chars">0</span>/1000</small></div>
+        <p class="mk-tm-hint"><svg class="i"><use href="#i-shield"/></svg><span>Only customers who paid for this product can rate it. Your Ticket ID is in the payment SMS. Rating again with the same order updates your review.</span></p>
+      </div>
+      <div class="mk-rv-foot"><button class="sp-pay-btn" type="submit" id="mk-rv-submit">Submit review</button></div>
+    </form>
+  </div>
+</div>
+<script>
+(function(){
+  var sec=document.getElementById('reviews'),dlg=document.getElementById('mk-rv-dialog'),form=document.getElementById('mk-rv-form');if(!sec||!dlg||!form)return;
+  var alertEl=document.getElementById('mk-rv-alert'),word=document.getElementById('mk-rv-word'),chars=document.getElementById('mk-rv-chars'),
+      tokenEl=document.querySelector('#sp-csrf [name=csrfmiddlewaretoken]'),token=tokenEl?tokenEl.value:'',last=null,sending=false;
+  var WORDS={5:'Excellent',4:'Good',3:'Okay',2:'Poor',1:'Very poor'};
+  function say(t,m,info){alertEl.classList.toggle('info',!!info);alertEl.querySelector('b').textContent=t;alertEl.querySelector('em').textContent=m;alertEl.classList.add('on');}
+  function hush(){alertEl.classList.remove('on');}
+  function open(ref){last=document.activeElement;if(ref)form.elements.reference.value=ref;hush();dlg.classList.add('on');dlg.setAttribute('aria-hidden','false');document.body.classList.add('mk-tm-lock');
+    setTimeout(function(){(form.elements.reference.value?form.elements.phone:form.elements.reference).focus();},60);}
+  function close(){dlg.classList.remove('on');dlg.setAttribute('aria-hidden','true');document.body.classList.remove('mk-tm-lock');if(last&&last.focus)try{last.focus();}catch(e){}}
+  document.addEventListener('click',function(e){
+    if(e.target.closest('[data-review-open]')){e.preventDefault();open();return;}
+    if(e.target===dlg||e.target.closest('[data-rv-close]')){e.preventDefault();close();return;}
+    var more=e.target.closest('[data-review-more]');
+    if(more){e.preventDefault();var list=document.getElementById('mk-rv-list'),n=list&&list.dataset.next;if(!n)return;
+      more.disabled=true;more.textContent='Loading...';
+      fetch(sec.dataset.pageUrl+'?page='+n,{credentials:'same-origin',headers:{'Accept':'application/json'}}).then(function(r){return r.json();}).then(function(d){
+        list.insertAdjacentHTML('beforeend',d.html);list.dataset.next=d.has_next?d.next_page:'';
+        if(!d.has_next)more.parentNode.hidden=true;more.disabled=false;more.textContent='Show more reviews';
+      }).catch(function(){more.disabled=false;more.textContent='Show more reviews';if(window.SP)SP.toast('Could not load more reviews. Try again.','error');});}
+  });
+  document.addEventListener('keydown',function(e){if(e.key==='Escape'&&dlg.classList.contains('on'))close();});
+  form.addEventListener('change',function(e){if(e.target.name==='rating'){word.textContent=WORDS[e.target.value]||'';hush();}});
+  form.addEventListener('focusin',function(e){var el=e.target;if(el.matches('input[type=tel],input[type=text],input:not([type]),textarea'))setTimeout(function(){try{el.scrollIntoView({block:'center',behavior:'smooth'});}catch(x){}},320);});
+  form.elements.comment.addEventListener('input',function(){chars.textContent=this.value.length;});
+  form.addEventListener('submit',function(e){
+    e.preventDefault();if(sending)return;hush();
+    var r=form.querySelector('input[name=rating]:checked');
+    if(!r){say('Choose a star rating','Tap the stars to tell us how you rate this product.',true);return;}
+    if(!form.elements.reference.value.trim()){say('Enter your Ticket ID','It is in your payment confirmation SMS, e.g. SP-7CA55820.',true);form.elements.reference.focus();return;}
+    if(form.elements.phone.value.replace(/\D/g,'').length<9){say('Check your phone number','Use the same number you entered at checkout.',true);form.elements.phone.focus();return;}
+    sending=true;var btn=document.getElementById('mk-rv-submit');if(window.SP)SP.busy(btn,true);
+    fetch(form.action,{method:'POST',credentials:'same-origin',headers:{'X-Requested-With':'XMLHttpRequest','Accept':'application/json','X-CSRFToken':token,'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:new URLSearchParams(new FormData(form)).toString()})
+      .then(function(res){return res.json().catch(function(){return{ok:false,message:'Unexpected response. Please try again.'};});})
+      .then(function(d){
+        if(!d.ok){say('Could not submit review',d.message||'Please try again.');return;}
+        sec.innerHTML=d.block;var line=document.querySelector('[data-rate-line]');if(line)line.outerHTML=d.line;
+        form.reset();word.textContent='Tap a star to rate';chars.textContent='0';close();
+        if(window.SP)SP.toast(d.message);var n=sec.querySelector('.mk-rv-new');if(n)n.scrollIntoView({block:'center',behavior:'smooth'});
+      }).catch(function(){say('Connection problem','We could not reach the server. Check your internet connection and try again.');})
+      .then(function(){sending=false;if(window.SP)SP.busy(btn,false);});
+  });
+  /* arriving from Track Order: ?review=SP-XXXX opens the dialog with the Ticket ID filled in */
+  try{var q=new URLSearchParams(location.search).get('review');if(q){setTimeout(function(){open(q);},350);}}catch(e){}
+})();
+</script>
+{% endblock %}

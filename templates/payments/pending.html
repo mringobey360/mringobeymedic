@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Payment Status{% endblock %}
+{% block content %}
+<div class="min-h-[70vh] flex items-center justify-center py-10 px-4 bg-ink-50/60">
+  <div class="w-full max-w-md bg-white rounded-3xl shadow-xl ring-1 ring-ink-900/5 overflow-hidden">
+
+    <div class="bg-brand-700 text-white px-6 py-5 text-center">
+      <p class="text-xs font-semibold uppercase tracking-wider text-white/70">{{ txn.get_purpose_display }}</p>
+      <p class="text-3xl font-extrabold mt-1">{{ txn.currency }} {{ txn.amount|floatformat:0|intcomma }}</p>
+    </div>
+
+    <div class="p-7 text-center" id="payment-status-box"
+         data-check-url="{% url 'payments:status_check' txn.merchant_reference %}"
+         data-final-url="{{ final_url }}"
+         data-manual-url="{{ manual_url }}"
+         data-redirect-url="{{ txn.redirect_url }}"
+         data-status="{{ txn.status }}">
+
+      {% if txn.status == 'COMPLETED' %}
+        {% include "payments/_state_completed.html" %}
+      {% elif txn.status == 'FAILED' or txn.status == 'CANCELLED' or txn.status == 'INVALID' or txn.status == 'REVERSED' %}
+        {% include "payments/_state_failed.html" %}
+      {% else %}
+        {% include "payments/_state_waiting.html" %}
+      {% endif %}
+
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var box = document.getElementById('payment-status-box');
+  var status = box.dataset.status;
+
+  // First arrival straight from "Pay now": send the browser to the Pesapal
+  // checkout page once. Coming back later (Pesapal's own return redirect,
+  // or a manual reload) never re-triggers this, so there's no redirect loop.
+  var params = new URLSearchParams(window.location.search);
+  if (params.get('open') === '1' && status === 'SUBMITTED' && box.dataset.redirectUrl) {
+    var clean = window.location.pathname;
+    window.history.replaceState({}, '', clean);
+    window.location.replace(box.dataset.redirectUrl);
+    return;
+  }
+
+  if (status === 'COMPLETED' || status === 'FAILED' || status === 'CANCELLED' || status === 'INVALID' || status === 'REVERSED') {
+    if (status === 'COMPLETED') {
+      setTimeout(function () { window.location.href = box.dataset.finalUrl; }, 1800);
+    }
+    return;
+  }
+
+  var attempts = 0;
+  var maxAttempts = 120; // ~6 minutes at 3s intervals
+
+  function poll() {
+    attempts += 1;
+    fetch(box.dataset.checkUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.is_final) {
+          window.location.reload();
+          return;
+        }
+        if (attempts < maxAttempts) {
+          setTimeout(poll, 3000);
+        }
+      })
+      .catch(function () {
+        if (attempts < maxAttempts) { setTimeout(poll, 4000); }
+      });
+  }
+
+  setTimeout(poll, 3000);
+})();
+</script>
+{% endblock %}

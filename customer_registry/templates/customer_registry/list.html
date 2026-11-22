@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block title %}Customer Registry{% endblock %}
+{% block content %}
+<div class="pro">
+  <div class="pro-head">
+    <div class="pro-head-main">
+      <p class="pro-eyebrow">Customer Management</p>
+      <h1 class="pro-title">Customer Registry</h1>
+      <p class="pro-sub">Keep clean customer contacts for branch communication and premium marketing campaigns.</p>
+    </div>
+    <div class="pro-tools">
+      <a href="{% url 'customer_registry:create' %}" class="btn btn-primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Register Customer</a>
+      <a href="{% url 'customer_registry:bulk' %}" class="btn btn-secondary">Bulk Registration</a>
+    </div>
+  </div>
+
+  <div class="pro-kpis k3">
+    <div class="pro-kpi acc"><span class="pro-kpi-l">Customers shown</span><span class="pro-kpi-v" id="customers-shown">{{ total_count }}</span></div>
+    <div class="pro-kpi info"><span class="pro-kpi-l">Registration</span><span class="pro-kpi-v sm">Manager + Employees</span><span class="pro-kpi-n">Contacts are branch-specific.</span></div>
+    <div class="pro-kpi {% if premium_marketing %}ok{% else %}warn{% endif %}"><span class="pro-kpi-l">Marketing SMS</span><span class="pro-kpi-v sm">{% if premium_marketing %}Premium active{% else %}Package required{% endif %}</span><span class="pro-kpi-n">{% if premium_marketing %}Ready for campaigns.{% else %}Activate a paid package to send campaigns.{% endif %}</span></div>
+  </div>
+
+  <form method="get" id="customer-search-form" class="pro-toolbar" data-no-global-loading>
+    <label class="pro-search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input class="form-input" id="customer-search-input" name="q" value="{{ q }}" placeholder="Search customer name or phone number" autocomplete="off" aria-label="Search customers">
+    </label>
+    <select class="form-input" id="customer-status-select" name="status" aria-label="Customer status">
+      <option value="active" {% if status == 'active' %}selected{% endif %}>Active customers</option>
+      <option value="inactive" {% if status == 'inactive' %}selected{% endif %}>Inactive customers</option>
+      <option value="all" {% if status == 'all' %}selected{% endif %}>All customers</option>
+    </select>
+    <noscript><button class="btn btn-secondary">Search</button></noscript>
+  </form>
+
+  {% if user.is_admin_role %}
+  <form method="post" id="bulk-delete-form" action="{% url 'customer_registry:bulk_delete' %}" data-confirm="Delete selected customers?" data-confirm-detail="The selected customers will be permanently removed. Existing SMS campaign history will be preserved.">
+    {% csrf_token %}
+    <input type="hidden" name="all_matching" id="all-matching-input" value="0">
+    <input type="hidden" name="q" value="{{ q }}" id="bulk-q-input">
+    <input type="hidden" name="status" value="{{ status }}" id="bulk-status-input">
+  </form>
+  {% endif %}
+
+  <div id="customer-results-wrap">{% include "customer_registry/_results.html" %}</div>
+
+  {% if premium_marketing %}
+  <section class="pro-panel"><div class="pro-panel-b" style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:1rem">
+    <div><p class="pro-eyebrow">Premium feature</p><h2 style="margin:0;font-size:1rem;font-weight:700">Customer Marketing SMS</h2><p class="pro-sub" style="margin-top:.25rem">Send approved campaigns to active customers with delivery tracking.</p></div>
+    <a href="{% url 'customer_registry:campaign_create' %}" class="btn btn-primary">Create SMS Campaign</a>
+  </div></section>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+  var form = document.getElementById('customer-search-form');
+  var input = document.getElementById('customer-search-input');
+  var statusSel = document.getElementById('customer-status-select');
+  var wrap = document.getElementById('customer-results-wrap');
+  var timer = null, controller = null;
+
+  // ---------- Bulk selection (delegated: survives live-search refreshes) ----------
+  var allMatching = document.getElementById('all-matching-input');
+  function els() {
+    return {
+      bar: document.getElementById('bulk-bar'),
+      count: document.getElementById('bulk-count'),
+      page: document.getElementById('select-all-page'),
+      matchBtn: document.getElementById('bulk-select-all-matching'),
+      results: document.getElementById('customer-results')
+    };
+  }
+  function rows() { return Array.prototype.slice.call(document.querySelectorAll('.row-check')); }
+  function refreshBulk() {
+    var e = els(); if (!e.bar) return;
+    var checked = rows().filter(function (c) { return c.checked; }).length;
+    var total = e.results ? parseInt(e.results.dataset.total || '0', 10) : 0;
+    var onPage = rows().length;
+    var everyOnPage = onPage > 0 && checked === onPage;
+    if (e.page) { e.page.checked = everyOnPage; e.page.indeterminate = checked > 0 && !everyOnPage; }
+    var isAll = allMatching.value === '1';
+    e.count.textContent = isAll ? total : checked;
+    e.bar.classList.toggle('hidden', checked === 0 && !isAll);
+    e.bar.classList.toggle('flex', checked > 0 || isAll);
+    if (e.matchBtn) {
+      var canOffer = everyOnPage && total > onPage && !isAll;
+      e.matchBtn.classList.toggle('hidden', !canOffer);
+    }
+    var bulkForm = document.getElementById('bulk-delete-form');
+    if (bulkForm) {
+      var n = isAll ? total : checked;
+      bulkForm.dataset.confirmDetail = n + ' customer' + (n === 1 ? '' : 's') + ' will be permanently removed from the customer registry. Existing SMS campaign history will be preserved.';
+      bulkForm.dataset.confirm = 'Delete ' + n + ' selected customer' + (n === 1 ? '' : 's') + '?';
+      document.getElementById('bulk-q-input').value = input.value.trim();
+      document.getElementById('bulk-status-input').value = statusSel.value;
+    }
+  }
+  function resetSelection() { allMatching.value = '0'; rows().forEach(function (c) { c.checked = false; }); }
+
+  document.addEventListener('change', function (ev) {
+    if (ev.target.id === 'select-all-page') {
+      rows().forEach(function (c) { c.checked = ev.target.checked; });
+      if (!ev.target.checked) allMatching.value = '0';
+      refreshBulk();
+    } else if (ev.target.classList && ev.target.classList.contains('row-check')) {
+      allMatching.value = '0';
+      refreshBulk();
+    }
+  });
+  document.addEventListener('click', function (ev) {
+    if (ev.target.id === 'bulk-select-all-matching') { allMatching.value = '1'; refreshBulk(); ev.target.classList.add('hidden'); }
+    if (ev.target.id === 'bulk-clear') { resetSelection(); refreshBulk(); }
+  });
+
+  // ---------- Live search (no Search button needed) ----------
+  function currentUrl() {
+    var params = new URLSearchParams(new FormData(form));
+    return window.location.pathname + '?' + params.toString();
+  }
+  function load(url) {
+    if (controller) controller.abort();
+    controller = new AbortController();
+    wrap.style.opacity = '0.55';
+    fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' }, signal: controller.signal, credentials: 'same-origin' })
+      .then(function (r) { if (!r.ok) throw new Error('bad'); return r.text(); })
+      .then(function (html) {
+        wrap.innerHTML = html;
+        wrap.style.opacity = '';
+        resetSelection();
+        var res = document.getElementById('customer-results');
+        var shown = document.getElementById('customers-shown');
+        if (res && shown) shown.textContent = res.dataset.total;
+        history.replaceState(null, '', url);
+        refreshBulk();
+      })
+      .catch(function (err) { if (err.name !== 'AbortError') { wrap.style.opacity = ''; window.location.href = url; } });
+  }
+  function schedule(delay) { clearTimeout(timer); timer = setTimeout(function () { load(currentUrl()); }, delay); }
+  input.addEventListener('input', function () { schedule(300); });
+  statusSel.addEventListener('change', function () { schedule(0); });
+  form.addEventListener('submit', function (e) { e.preventDefault(); schedule(0); });
+  refreshBulk();
+})();
+</script>
+{% endblock %}

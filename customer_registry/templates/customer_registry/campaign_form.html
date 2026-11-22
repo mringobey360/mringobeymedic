@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}Customer Marketing SMS{% endblock %}
+{% block content %}
+<div class="page-shell max-w-6xl">
+  <div class="page-header !mb-4">
+    <div><p class="eyebrow">Customer Marketing</p><h1 class="page-title">Send Marketing SMS</h1><p class="page-subtitle">The campaign title, customer name and branch contact are added automatically. Billing is based on the final personalised SMS segments.</p></div>
+    <a href="{% url 'customer_registry:campaign_list' %}" class="btn btn-secondary">Campaign History</a>
+  </div>
+
+  <div class="grid md:grid-cols-3 gap-3 mb-4">
+    <div class="card !p-4"><p class="text-xs font-semibold text-ink-500 uppercase tracking-wide">Available Credits</p><p id="credit-balance" class="text-2xl font-extrabold mt-1">{{ marketing_subscription.credits_remaining|default:0|floatformat:0 }}</p></div>
+    <div class="card !p-4"><p class="text-xs font-semibold text-ink-500 uppercase tracking-wide">Active Customers</p><p class="text-2xl font-extrabold mt-1">{{ customers|length }}</p></div>
+    <div class="card !p-4"><p class="text-xs font-semibold text-ink-500 uppercase tracking-wide">Billing</p><p class="font-bold mt-1">1 segment = 1 credit</p><p class="text-xs text-ink-500">Long messages use extra credits.</p></div>
+  </div>
+
+  {% if not business_phone %}
+  <div class="card !p-4 mb-4 border-amber-200 bg-amber-50"><p class="font-semibold text-amber-900">Business contact number required</p><p class="text-sm text-amber-800 mt-1">Set the office/customer-service phone number for <strong>{{ branch_name }}</strong> before sending a campaign. The number will appear automatically in every customer SMS.</p></div>
+  {% endif %}
+
+  <form method="post" id="campaign-form" class="grid lg:grid-cols-[minmax(0,1fr)_320px] gap-4">
+    {% csrf_token %}
+    <section class="card !p-5 space-y-4">
+      <div>
+        <label class="block text-sm font-medium mb-1">Campaign title</label>
+        <input required name="title" id="campaign-title" class="form-input" maxlength="120" placeholder="Weekend Beauty Offer" value="{{ form_data.title|default:'' }}">
+        <p class="text-xs text-ink-500 mt-1">This title appears automatically at the top of every SMS.</p>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium mb-2">Who should receive this SMS?</label>
+        <div class="grid sm:grid-cols-3 gap-2">
+          <label class="rounded-lg border p-3 cursor-pointer hover:border-brand-300"><input type="radio" name="audience" value="ALL_ACTIVE" {% if not form_data.audience or form_data.audience == 'ALL_ACTIVE' %}checked{% endif %}> <strong>All active</strong><span class="block text-xs text-ink-500 mt-1">Every active customer in this branch.</span></label>
+          <label class="rounded-lg border p-3 cursor-pointer hover:border-brand-300"><input type="radio" name="audience" value="SELECTED" {% if form_data.audience == 'SELECTED' %}checked{% endif %}> <strong>Selected</strong><span class="block text-xs text-ink-500 mt-1">Choose specific customers.</span></label>
+          <label class="rounded-lg border p-3 cursor-pointer hover:border-brand-300"><input type="radio" name="audience" value="EXTRA_ONLY" {% if form_data.audience == 'EXTRA_ONLY' %}checked{% endif %}> <strong>Extra numbers</strong><span class="block text-xs text-ink-500 mt-1">Unregistered numbers only.</span></label>
+        </div>
+      </div>
+
+      <div id="customer-picker" class="hidden">
+        <div class="flex items-center gap-2 mb-2"><input id="customer-search" class="form-input" placeholder="Search name or phone"><span id="selected-count" class="text-xs font-semibold text-ink-500 whitespace-nowrap">0 selected</span></div>
+        <div class="border rounded-lg overflow-hidden"><div class="max-h-64 overflow-y-auto divide-y">{% for c in customers %}<label class="customer-row flex items-center gap-3 px-3 py-2.5 hover:bg-ink-50" data-search="{{ c.name|lower }} {{ c.phone }}" data-first-name="{{ c.name|default:'Customer'|first }}"><input type="checkbox" name="customer_ids" value="{{ c.pk }}" class="customer-check accent-teal-700" {% if c.pk|stringformat:"s" in form_data.selected_ids %}checked{% endif %}><span><strong class="text-sm">{{ c.name }}</strong><span class="block text-xs text-ink-400">{{ c.phone }}</span></span></label>{% endfor %}</div></div>
+      </div>
+
+      <div id="extra-numbers" class="rounded-lg border border-ink-100 p-3">
+        <div class="flex items-center justify-between gap-3"><div><label for="extra-input" class="block text-sm font-medium">Extra phone numbers <span class="text-ink-400 font-normal">(optional)</span></label><p class="text-xs text-ink-500 mt-0.5">Use 0712 345 678 or +255712345678.</p></div><button type="button" id="extra-clear" class="hidden text-xs font-semibold text-red-600">Clear</button></div>
+        <div id="extra-box" class="mt-2 flex flex-wrap items-center gap-1.5 rounded-lg border border-ink-200 bg-white px-2 py-1.5 focus-within:border-brand-400"><div id="extra-chips" class="contents"></div><input id="extra-input" type="text" inputmode="tel" autocomplete="off" class="flex-1 min-w-[12rem] border-0 outline-none bg-transparent text-sm py-1" placeholder="0712 345 678, +255713456789"></div>
+        <div class="mt-1 flex items-center justify-between gap-2 text-xs"><p id="extra-status" class="text-ink-500">No extra numbers added.</p><p id="extra-error" class="hidden text-red-600 font-medium"></p></div>
+        <p class="mt-1 text-[11px] text-ink-400"><code>{name}</code> remains available for advanced messages; automatic personalisation is already ON.</p>
+        <div id="extra-hidden"></div>{{ form_data.extra_phones|default:""|json_script:"extra-initial" }}
+      </div>
+
+      <div>
+        <div class="flex items-center justify-between mb-1"><label class="block text-sm font-medium">Message</label><span id="char-counter" class="text-xs text-ink-500">0 characters</span></div>
+        <textarea required name="message" id="message" rows="5" maxlength="1000" class="form-input" placeholder="Tunayo offer maalum wiki hii. Karibu {{ branch_name }} kwa huduma bora.">{{ form_data.message|default:'' }}</textarea>
+        <div class="mt-2 rounded-lg bg-ink-50 border border-ink-100 p-2.5 text-xs text-ink-600"><strong>Automatic format:</strong> Campaign title → “Habari {name}!” → your message → branch contact → “Asante kwa kutuamini.”</div>
+      </div>
+    </section>
+
+    <aside class="card !p-5 h-fit lg:sticky lg:top-24">
+      <h2 class="font-semibold">Live SMS Preview</h2>
+      <div class="mt-2 rounded-lg border bg-ink-50 p-3 text-sm leading-5 whitespace-pre-line" id="sms-preview">Campaign title
+Habari Customer! Your message will appear here.
+Kwa huduma/maelezo zaidi: {{ business_phone|default:'Branch office number' }}
+Asante kwa kutuamini.</div>
+      <div class="mt-4 space-y-2 text-sm">
+        <div class="flex justify-between"><span class="text-ink-500">Recipients</span><strong id="recipient-count">{{ customers|length }}</strong></div>
+        <div class="flex justify-between"><span class="text-ink-500">Segments / recipient</span><strong id="segment-count">1</strong></div>
+        <div class="flex justify-between"><span class="text-ink-500">Credits required</span><strong id="credit-estimate">{{ customers|length }}</strong></div>
+        <div id="balance-warning" class="hidden rounded-lg bg-red-50 text-red-700 border border-red-100 p-2.5 text-xs"></div>
+      </div>
+      <button id="queue-btn" class="btn btn-primary w-full mt-4" {% if not business_phone %}disabled{% endif %}>Send Marketing SMS</button>
+      <p class="text-[11px] text-ink-400 mt-2">Credits are reserved using the final personalised message. Failed sends automatically release reserved credits.</p>
+    </aside>
+  </form>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+ const title=document.getElementById('campaign-title'), msg=document.getElementById('message'), preview=document.getElementById('sms-preview');
+ const balance={{ marketing_subscription.credits_remaining|default:0 }};
+ const phoneValue="{{ business_phone|default:''|escapejs }}";
+ const picker=document.getElementById('customer-picker'), rows=[...document.querySelectorAll('.customer-row')], checks=[...document.querySelectorAll('.customer-check')];
+ const gsmBasic=new Set("@£$¥èéùìòÇ\nØø\rÅåΔ_ΦΓΛΩΠΨΣΘΞÆæßÉ !\"#¤%&'()*+,-./0123456789:;<=>?¡ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÑÜ§¿abcdefghijklmnopqrstuvwxyzäöñüà"), gsmExt=new Set("^{}\\[~]|€");
+ function gsm7(s){for(const ch of s){if(!gsmBasic.has(ch)&&!gsmExt.has(ch))return false;}return true;}
+ function segments(s){return gsm7(s)?(s.length<=160?1:Math.ceil(s.length/153)):(s.length<=70?1:Math.ceil(s.length/67));}
+ function firstName(row){return row?.dataset.firstName||'Customer';}
+ function finalText(name){
+   const t=(title.value||'Campaign title').trim(); const body=(msg.value||'Your message will appear here.').trim().replaceAll('{name}',name||'Customer');
+   return [t,`Habari ${name||'Customer'}! ${body}`,phoneValue?`Kwa huduma/maelezo zaidi: ${phoneValue}`:'', 'Asante kwa kutuamini.'].filter(Boolean).join('\n');
+ }
+ function audience(){return document.querySelector('input[name="audience"]:checked').value;}
+ // Extra phone chips
+ const box=document.getElementById('extra-box'), chipsEl=document.getElementById('extra-chips'), input=document.getElementById('extra-input'), hiddenEl=document.getElementById('extra-hidden'), statusEl=document.getElementById('extra-status'), errorEl=document.getElementById('extra-error'), clearBtn=document.getElementById('extra-clear');
+ let extras=[], invalid=[]; const MAX_EXTRA=500;
+ function normalize(raw){let v=(raw||'').trim().replace(/[\s\-().]/g,'');if(!v)return null;if(v.startsWith('+')){const d=v.slice(1);return /^\d{9,14}$/.test(d)?'+'+d:null;}if(!/^\d+$/.test(v))return null;if(v.length===9&&/^[67]/.test(v))v='0'+v;if(v.startsWith('0')&&v.length===10)return '+255'+v.slice(1);if(v.startsWith('255')&&v.length===12)return '+'+v;if(v.length>=9&&v.length<=14)return '+'+v;return null;}
+ function pretty(p){const m=/^\+255(\d{3})(\d{3})(\d{3})$/.exec(p);return m?('+255 '+m[1]+' '+m[2]+' '+m[3]):p;}
+ function addToken(t){t=(t||'').trim();if(!t)return;const p=normalize(t);if(p){if(!extras.includes(p)){if(extras.length<MAX_EXTRA)extras.push(p);}else{errorEl.textContent=pretty(p)+' is already added.';errorEl.classList.remove('hidden');}}else if(!invalid.includes(t))invalid.push(t);}
+ function commit(){const raw=input.value;input.value='';raw.split(/[,;\n\t]+/).forEach(addToken);render();}
+ function render(){chipsEl.innerHTML='';hiddenEl.innerHTML='';extras.forEach((p,i)=>{const chip=document.createElement('span');chip.className='inline-flex items-center gap-1 rounded-full bg-brand-50 border border-brand-200 text-brand-800 text-xs font-medium pl-2.5 pr-1 py-1';const b=document.createElement('button');b.type='button';b.textContent=pretty(p);b.addEventListener('click',()=>{extras.splice(i,1);input.value=p;render();input.focus();});const x=document.createElement('button');x.type='button';x.className='w-4 h-4 rounded-full';x.innerHTML='&times;';x.addEventListener('click',()=>{extras.splice(i,1);render();});chip.append(b,x);chipsEl.appendChild(chip);const h=document.createElement('input');h.type='hidden';h.name='extra_phones';h.value=p;hiddenEl.appendChild(h);});invalid.forEach((t,i)=>{const chip=document.createElement('span');chip.className='inline-flex items-center gap-1 rounded-full bg-red-50 border border-red-200 text-red-700 text-xs font-medium pl-2.5 pr-1 py-1';const b=document.createElement('button');b.type='button';b.textContent=t;b.addEventListener('click',()=>{invalid.splice(i,1);input.value=t;render();input.focus();});const x=document.createElement('button');x.type='button';x.innerHTML='&times;';x.addEventListener('click',()=>{invalid.splice(i,1);render();});chip.append(b,x);chipsEl.appendChild(chip);});statusEl.textContent=extras.length?`${extras.length} extra number${extras.length===1?'':'s'} added.`:'No extra numbers added.';if(invalid.length){errorEl.textContent=`${invalid.length} invalid number${invalid.length===1?'':'s'} - fix or remove before sending.`;errorEl.classList.remove('hidden');}else errorEl.classList.add('hidden');clearBtn.classList.toggle('hidden',!(extras.length||invalid.length));update();}
+ input.addEventListener('keydown',e=>{if(['Enter',',',';'].includes(e.key)){e.preventDefault();commit();}});input.addEventListener('blur',()=>{if(input.value.trim())commit();});clearBtn.addEventListener('click',()=>{extras=[];invalid=[];render();});
+ try{const init=JSON.parse(document.getElementById('extra-initial').textContent);if(Array.isArray(init))init.forEach(addToken);}catch(e){}
+
+ function update(){
+   const mode=audience(); picker.classList.toggle('hidden',mode!=='SELECTED');
+   const targets=mode==='ALL_ACTIVE'?rows:(mode==='SELECTED'?checks.filter(c=>c.checked).map(c=>c.closest('.customer-row')):[]);
+   const segs=targets.map(r=>segments(finalText(firstName(r))));
+   const extraSeg=segments(finalText('Customer')); extras.forEach(()=>segs.push(extraSeg));
+   const total=segs.reduce((a,b)=>a+b,0), n=segs.length;
+   document.getElementById('recipient-count').textContent=n.toLocaleString(); document.getElementById('segment-count').textContent=n&&new Set(segs).size===1?segs[0]:(n?'Varies':'1'); document.getElementById('credit-estimate').textContent=total.toLocaleString(); document.getElementById('char-counter').textContent=(msg.value||'').length+' characters';
+   preview.textContent=finalText(targets[0]?firstName(targets[0]):'Customer');
+   document.getElementById('selected-count').textContent=checks.filter(c=>c.checked).length+' selected';
+   const warning=document.getElementById('balance-warning'),btn=document.getElementById('queue-btn');
+   const blocked=invalid.length>0||!msg.value.trim()||!title.value.trim()||n===0||!phoneValue;
+   if(total>balance){warning.textContent=`This campaign needs ${total.toLocaleString()} credits, but only ${balance.toLocaleString()} are available.`;warning.classList.remove('hidden');btn.disabled=true;}else{warning.classList.add('hidden');btn.disabled=blocked;}
+   btn.classList.toggle('opacity-50',btn.disabled);btn.classList.toggle('cursor-not-allowed',btn.disabled);
+ }
+ document.querySelectorAll('input[name="audience"]').forEach(r=>r.addEventListener('change',update));checks.forEach(c=>c.addEventListener('change',update));msg.addEventListener('input',update);title.addEventListener('input',update);document.getElementById('customer-search').addEventListener('input',e=>{const q=e.target.value.toLowerCase();rows.forEach(r=>r.classList.toggle('hidden',!r.dataset.search.includes(q)));});
+ render(); update();
+});
+</script>
+{% endblock %}

@@ -1,0 +1,178 @@
+{% extends 'base.html' %}
+{% block title %}Record Expense{% endblock %}
+{% block content %}
+{% include "expenses/_expense_styles.html" %}
+<div class="xp xp-narrow">
+
+  {# ───────── Header ───────── #}
+  <header>
+    <a href="{% url 'expenses:list' %}" class="xp-back">
+      <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+      Back to expenses
+    </a>
+    <h1 class="xp-title">Record business expense</h1>
+    <p class="xp-sub">Use this for LUKU, water, transport, repairs and other legitimate shop expenses.</p>
+  </header>
+
+  <form method="post" enctype="multipart/form-data" class="xp-layout" id="expense-form" novalidate>
+    {% csrf_token %}
+
+    <div class="xp-stack">
+      {% if form.non_field_errors %}
+      <div role="alert" class="xp-alert">{{ form.non_field_errors }}</div>
+      {% endif %}
+
+      {# Expense details #}
+      <section class="xp-card">
+        <div class="xp-card-head">
+          <div><h2 class="xp-card-title">Expense details</h2><p class="xp-card-note">What was paid, and when.</p></div>
+        </div>
+        <div class="xp-card-body xp-fields">
+          <div>
+            <label for="{{ form.expense_date.id_for_label }}" class="xp-label">{{ form.expense_date.label }}</label>
+            {{ form.expense_date }}
+            {% for error in form.expense_date.errors %}<p class="xp-err">{{ error }}</p>{% endfor %}
+          </div>
+          <div>
+            <label for="{{ form.category.id_for_label }}" class="xp-label">{{ form.category.label }}</label>
+            {{ form.category }}
+            {% for error in form.category.errors %}<p class="xp-err">{{ error }}</p>{% endfor %}
+          </div>
+          <div class="xp-span">
+            <label for="{{ form.title.id_for_label }}" class="xp-label">{{ form.title.label }}</label>
+            {{ form.title }}
+            {% for error in form.title.errors %}<p class="xp-err">{{ error }}</p>{% endfor %}
+          </div>
+          <div class="xp-span">
+            <label for="{{ form.description.id_for_label }}" class="xp-label">{{ form.description.label }} <em>(optional)</em></label>
+            {{ form.description }}
+            {% for error in form.description.errors %}<p class="xp-err">{{ error }}</p>{% endfor %}
+          </div>
+        </div>
+      </section>
+
+      {# Amount & payment #}
+      <section class="xp-card">
+        <div class="xp-card-head">
+          <div><h2 class="xp-card-title">Amount &amp; payment</h2><p class="xp-card-note">How much was paid and where the money came from.</p></div>
+        </div>
+        <div class="xp-card-body xp-fields">
+          <div>
+            <label for="{{ form.amount.id_for_label }}" class="xp-label">{{ form.amount.label }}</label>
+            {{ form.amount }}
+            {% for error in form.amount.errors %}<p class="xp-err">{{ error }}</p>{% endfor %}
+          </div>
+          <div>
+            <label for="{{ form.payment_source.id_for_label }}" class="xp-label">{{ form.payment_source.label }}</label>
+            {{ form.payment_source }}
+            {% for error in form.payment_source.errors %}<p class="xp-err">{{ error }}</p>{% endfor %}
+          </div>
+          <div id="cash-control-note" class="xp-note xp-span" hidden>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>
+            <span><strong>Cash control:</strong> this amount reduces the branch’s expected cash only after manager approval.</span>
+          </div>
+          <div class="xp-span">
+            <label for="{{ form.reference.id_for_label }}" class="xp-label">{{ form.reference.label }} <em>(optional)</em></label>
+            {{ form.reference }}
+            {% for error in form.reference.errors %}<p class="xp-err">{{ error }}</p>{% endfor %}
+          </div>
+        </div>
+      </section>
+
+      {# Receipt #}
+      <section class="xp-card">
+        <div class="xp-card-head">
+          <div><h2 class="xp-card-title">Receipt</h2><p class="xp-card-note">Attach a photo or scan so the expense can be verified.</p></div>
+        </div>
+        <div class="xp-card-body xp-file">
+          <label for="{{ form.receipt.id_for_label }}" class="xp-label">{{ form.receipt.label }} <em>(optional)</em></label>
+          {{ form.receipt }}
+          {% for error in form.receipt.errors %}<p class="xp-err">{{ error }}</p>{% endfor %}
+          {% if form.receipt.help_text %}<p class="xp-help">{{ form.receipt.help_text }}</p>{% endif %}
+        </div>
+      </section>
+
+      <div class="xp-submitbar">
+        <a href="{% url 'expenses:list' %}" class="btn btn-secondary">Cancel</a>
+        <button class="btn btn-primary" type="submit" id="expense-submit">Submit expense</button>
+      </div>
+    </div>
+
+    {# ───────── Side panel ───────── #}
+    <aside class="xp-aside" aria-label="Expense summary and guidance">
+      <div class="xp-card">
+        <div class="xp-card-head"><h2 class="xp-card-title">Summary</h2></div>
+        <div class="xp-card-body">
+          <dl style="margin:0">
+            <div class="xp-sum-row"><dt>Date</dt><dd id="sum-date">—</dd></div>
+            <div class="xp-sum-row"><dt>Category</dt><dd id="sum-category">—</dd></div>
+            <div class="xp-sum-row"><dt>Paid from</dt><dd id="sum-source">—</dd></div>
+          </dl>
+          <div class="xp-sum-total"><span>Total</span><strong id="sum-amount">TZS 0</strong></div>
+          <p class="xp-help" id="sum-status" style="margin-top:.75rem">Submitted expenses wait for manager approval.</p>
+        </div>
+      </div>
+      <div class="xp-card">
+        <div class="xp-card-head"><h2 class="xp-card-title">Good practice</h2></div>
+        <div class="xp-card-body">
+          <ul class="xp-tips">
+            <li>Use a clear title, for example “LUKU – October”.</li>
+            <li>Add the transaction reference for mobile money or bank payments.</li>
+            <li>Attach the receipt photo whenever you have one.</li>
+          </ul>
+        </div>
+      </div>
+    </aside>
+  </form>
+</div>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var amount = $('{{ form.amount.id_for_label }}');
+  var source = $('{{ form.payment_source.id_for_label }}');
+  var category = $('{{ form.category.id_for_label }}');
+  var date = $('{{ form.expense_date.id_for_label }}');
+  var note = $('cash-control-note');
+  var form = $('expense-form');
+  var submit = $('expense-submit');
+
+  function label(sel) {
+    if (!sel || sel.selectedIndex < 0 || !sel.value) return '—';
+    return sel.options[sel.selectedIndex].text;
+  }
+  function refresh() {
+    var n = amount ? parseFloat(String(amount.value).replace(/,/g, '')) : NaN;
+    $('sum-amount').textContent = 'TZS ' + (isFinite(n) && n > 0 ? n.toLocaleString('en-US', {maximumFractionDigits: 2}) : '0');
+    $('sum-category').textContent = label(category);
+    $('sum-source').textContent = label(source);
+    if (date && date.value) {
+      var d = new Date(date.value + 'T00:00:00');
+      $('sum-date').textContent = isNaN(d) ? date.value : d.toLocaleDateString('en-GB', {day: 'numeric', month: 'short', year: 'numeric'});
+    }
+    if (note && source) note.hidden = source.value !== 'CASH_SALES';
+  }
+  [amount, source, category, date].forEach(function (el) {
+    if (!el) return;
+    el.addEventListener('input', refresh);
+    el.addEventListener('change', refresh);
+  });
+  refresh();
+
+  // Keep the whole dropdown list in view when it opens (every option is shown, so it can be tall).
+  document.addEventListener('click', function (e) {
+    var trigger = e.target.closest ? e.target.closest('.xp .custom-select-trigger') : null;
+    if (!trigger) return;
+    setTimeout(function () {
+      var menu = trigger.parentNode.querySelector('.custom-select-menu');
+      if (menu && trigger.parentNode.classList.contains('open')) menu.scrollIntoView({block: 'nearest', behavior: 'smooth'});
+    }, 30);
+  });
+
+  // Prevent double submission on slow mobile networks.
+  if (form && submit) form.addEventListener('submit', function () {
+    submit.disabled = true; submit.textContent = 'Submitting…';
+  });
+})();
+</script>
+{% endblock %}

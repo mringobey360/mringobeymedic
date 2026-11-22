@@ -1,0 +1,16 @@
+SmartPOS V66 - Marketplace Track Order Recovery
+
+Changes:
+- Track Order accepts the full order UUID, public SP-XXXXXXXX Ticket ID, and legacy alphanumeric payment references.
+- Public Ticket ID lookup is performed in the database using a UUID-to-text cast, removing the previous hard limit that searched only the newest 5,000 orders.
+- Checkout phone verification remains mandatory before any order details or digital download links are shown.
+- Paid, non-cancelled digital orders are checked for missing download grants and grants are provisioned idempotently.
+- Track Order form provides a clear checking state and clearer recovery guidance when no matching order is found.
+- Existing SMS confirmation flow and SmartPOS watermarked receipt flow from V65 are retained.
+
+Validation:
+- Python syntax compilation passed for marketplace/views.py, marketplace/orders.py, marketplace/tests.py.
+- Added a regression test for the public SP Ticket ID format.
+- Django tests could not run in this build environment because Django is not installed here.
+- Deploy to a staging environment first and test with a real paid test order before production rollout.
+- No new database fields were added by this fix; existing pending model migration warnings should be reviewed separately before running makemigrations/migrate.

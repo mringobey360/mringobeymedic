@@ -1,0 +1,122 @@
+{% extends 'base.html' %}
+{% load humanize %}
+{% block title %}{% if is_trial_ended %}Free Trial Ended{% else %}Subscription Required{% endif %} - SmartPOS{% endblock %}
+{% block content %}
+{% if is_trial_ended %}
+<div class="py-6 sm:py-10">
+  <div class="w-full max-w-4xl mx-auto">
+    <div class="bg-white rounded-3xl shadow-xl ring-1 ring-ink-900/5 overflow-hidden">
+      <div class="relative px-6 sm:px-10 pt-9 pb-8 text-center border-b border-ink-100 bg-gradient-to-br from-brand-50 via-white to-white">
+        <div class="mx-auto w-16 h-16 rounded-2xl bg-brand-600 text-white flex items-center justify-center mb-5 shadow-lg shadow-brand-600/25">
+          <svg class="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.4 5.2 5.6.7-4.1 3.9 1.1 5.6L12 15.6 7 18.4l1.1-5.6L4 8.9l5.6-.7z"/></svg>
+        </div>
+        <p class="text-xs font-bold uppercase tracking-[.18em] text-brand-700 mb-2">Free trial ended</p>
+        <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-ink-900">Your 30-day free trial has ended. Pay to continue</h1>
+        <p class="mt-3 text-sm sm:text-base leading-6 text-ink-500 max-w-xl mx-auto">
+          Thank you for using SmartPOS. Your sales, stock and customer records are safely kept. Pick a plan to unlock your system and carry on exactly where you stopped.
+        </p>
+        <div class="mt-5 inline-flex items-center gap-2 rounded-full bg-red-50 text-red-700 border border-red-100 px-3.5 py-1.5 text-xs font-semibold">
+          <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+          Access locked{% if subscription %} since {{ subscription.end_date|date:"d M Y" }}{% endif %}
+        </div>
+      </div>
+
+      <div class="px-6 sm:px-10 py-7">
+        {% if request.user.is_admin_role %}
+        <div class="grid sm:grid-cols-3 gap-4">
+          {% for plan in upgrade_plans %}
+          <div class="relative rounded-2xl border-2 {% if plan.popular %}border-brand-600 bg-brand-50/40{% else %}border-ink-100{% endif %} p-5 flex flex-col">
+            {% if plan.popular %}<span class="absolute -top-2.5 left-5 rounded-full bg-brand-700 text-white px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide">Most popular</span>{% endif %}
+            <p class="font-bold text-ink-900">{{ plan.label }}</p>
+            <p class="text-xs text-ink-500 mt-1 leading-5">{{ plan.blurb }}</p>
+            <p class="mt-4 text-2xl font-extrabold text-brand-700 whitespace-nowrap">TZS {{ plan.monthly|floatformat:0|intcomma }}<span class="text-xs font-medium text-ink-400"> / month</span></p>
+            <p class="text-xs text-ink-500 mt-1">TZS {{ plan.yearly|floatformat:0|intcomma }} / year{% if plan.saving %} &middot; save TZS {{ plan.saving|floatformat:0|intcomma }}{% endif %}</p>
+            <ul class="mt-4 space-y-1.5 text-xs text-ink-700">
+              <li class="flex gap-2"><svg class="w-4 h-4 text-brand-600 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"/></svg>{{ plan.branches }}</li>
+              <li class="flex gap-2"><svg class="w-4 h-4 text-brand-600 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"/></svg>{{ plan.users }}</li>
+              <li class="flex gap-2"><svg class="w-4 h-4 text-brand-600 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"/></svg>POS, stock, sales, debts &amp; reports</li>
+              {% if plan.reports %}<li class="flex gap-2"><svg class="w-4 h-4 text-brand-600 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"/></svg>Intelligent daily reports</li>{% endif %}
+            </ul>
+            <a href="{% url 'hq:packages_center' %}?renew=1" class="mt-5 btn {% if plan.popular %}btn-primary{% else %}btn-secondary{% endif %} w-full justify-center">Upgrade to {{ plan.label }}</a>
+          </div>
+          {% endfor %}
+        </div>
+        <p class="text-center text-xs text-ink-500 mt-4">Need more than 5 branches? The Enterprise plan is available with custom setup &mdash; contact support.</p>
+        <div class="mt-6 grid sm:grid-cols-3 gap-3 text-xs text-ink-600">
+          <div class="rounded-xl bg-ink-50 border border-ink-100 p-3.5"><strong class="text-ink-800">Your data is safe.</strong> Nothing is ever deleted.</div>
+          <div class="rounded-xl bg-ink-50 border border-ink-100 p-3.5"><strong class="text-ink-800">Instant unlock.</strong> Pay online and access returns straight away.</div>
+          <div class="rounded-xl bg-ink-50 border border-ink-100 p-3.5"><strong class="text-ink-800">Same account.</strong> Paying keeps everything you recorded during the trial.</div>
+        </div>
+        <div class="mt-6 flex flex-col sm:flex-row gap-3">
+          <a href="{% url 'accounts:logout' %}" data-confirm="Log out of SmartPOS?" data-confirm-detail="You will be signed out of this device." data-confirm-accept="Log out" data-confirm-busy="Signing out…" class="btn btn-secondary flex-1 justify-center">Log out</a>
+          <a href="{% url 'hq:packages_center' %}?renew=1" class="btn btn-primary flex-1 justify-center">Choose a plan &amp; upgrade</a>
+        </div>
+        {% else %}
+        <div class="rounded-2xl border border-brand-100 bg-brand-50/70 p-5 text-center">
+          <p class="text-sm font-semibold text-ink-900">Only the account owner can upgrade</p>
+          <p class="text-sm text-ink-600 mt-1 leading-6">This business&rsquo; free trial has ended. Please ask the account owner to sign in and upgrade, then you can continue working.</p>
+        </div>
+        <div class="mt-6"><a href="{% url 'accounts:logout' %}" data-confirm="Log out of SmartPOS?" data-confirm-detail="You will be signed out of this device." data-confirm-accept="Log out" data-confirm-busy="Signing out…" class="btn btn-secondary w-full justify-center">Log out</a></div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% else %}
+<div class="min-h-[70vh] flex items-center justify-center py-8">
+    <div class="w-full max-w-2xl">
+        <div class="bg-white rounded-3xl shadow-xl ring-1 ring-ink-900/5 overflow-hidden">
+            <div class="px-6 sm:px-10 pt-9 pb-7 text-center border-b border-ink-100">
+                <div class="mx-auto w-16 h-16 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center mb-5">
+                    <svg class="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/><path d="M7 15h3"/>
+                    </svg>
+                </div>
+                <p class="text-xs font-bold uppercase tracking-[.18em] text-red-600 mb-2">Subscription Access</p>
+                <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-ink-900">Your subscription has ended</h1>
+                <p class="mt-3 text-sm sm:text-base leading-6 text-ink-500 max-w-lg mx-auto">
+                    Access to SmartPOS is temporarily locked. Your business data is securely retained and will remain available when your subscription is renewed.
+                </p>
+            </div>
+
+            <div class="px-6 sm:px-10 py-7">
+                {% if subscription %}
+                <div class="grid sm:grid-cols-3 gap-3 mb-6">
+                    <div class="rounded-xl bg-ink-50 border border-ink-100 p-4">
+                        <p class="text-[11px] uppercase tracking-wide font-semibold text-ink-500">Plan</p>
+                        <p class="mt-1 text-sm font-bold text-ink-900">{{ subscription.get_plan_display }}</p>
+                    </div>
+                    <div class="rounded-xl bg-ink-50 border border-ink-100 p-4">
+                        <p class="text-[11px] uppercase tracking-wide font-semibold text-ink-500">Ended</p>
+                        <p class="mt-1 text-sm font-bold text-ink-900">{{ subscription.end_date|date:"d M Y" }}</p>
+                    </div>
+                    <div class="rounded-xl bg-red-50 border border-red-100 p-4">
+                        <p class="text-[11px] uppercase tracking-wide font-semibold text-red-600">Status</p>
+                        <p class="mt-1 text-sm font-bold text-red-700">{% if days_expired %}Expired {{ days_expired }} day{{ days_expired|pluralize }} ago{% else %}Access locked{% endif %}</p>
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="rounded-2xl border border-brand-100 bg-brand-50/70 p-5 mb-6">
+                    <div class="flex gap-3">
+                        <div class="w-9 h-9 rounded-lg bg-white text-brand-700 flex items-center justify-center shrink-0 ring-1 ring-brand-100">
+                            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><path d="M17 7.5A5 5 0 0012 5a5 5 0 00-5 5c0 3 2.2 4.2 5 5s5 2 5 5a5 5 0 01-5 4 5 5 0 01-5-2.5"/></svg>
+                        </div>
+                        <div>
+                            <p class="text-sm font-semibold text-ink-900">How to restore access</p>
+                            <p class="text-sm text-ink-600 mt-1 leading-6">Contact the SmartPOS administrator for renewal instructions. Once payment is confirmed, your access can be restored without creating a new pharmacy account.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex flex-col sm:flex-row gap-3">
+                    <a href="{% url 'accounts:logout' %}" data-confirm="Log out of SmartPOS?" data-confirm-detail="You will be signed out of this device." data-confirm-accept="Log out" data-confirm-busy="Signing out…" class="btn btn-secondary flex-1">Log out</a>
+                    {% if request.user.is_admin_role %}<a href="{% url 'accounts:request_renewal' %}" class="btn btn-primary flex-1">Request Renewal</a>{% else %}<a href="{% url 'hq:signup' %}" class="btn btn-nav btn-primary flex-1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>View subscription plans</a>{% endif %}
+                </div>
+                <p class="text-center text-xs text-ink-400 mt-4">Your records are not deleted when access is locked.</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

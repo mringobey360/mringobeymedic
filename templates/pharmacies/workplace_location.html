@@ -1,0 +1,719 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Workplace Location · {{ pharmacy.name }}{% endblock %}
+{% block content %}
+<div class="max-w-6xl mx-auto pb-10">
+  <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 mb-6">
+    <div>
+      <div class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-brand-700 mb-2">
+        <span>Management</span><span class="text-ink-300">/</span><span>Workplace Location</span>
+      </div>
+      <h1 class="text-2xl font-extrabold text-ink-950">Workplace Location &amp; Attendance</h1>
+      <p class="text-sm text-ink-500 mt-1">Set the official GPS anchor used when employees verify attendance at <strong>{{ pharmacy.name }}</strong>.</p>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      <a href="{% url 'pharmacies:edit' pharmacy.pk %}" class="btn btn-secondary">← Branch Settings</a>
+      <a href="{% url 'pharmacies:list' %}" class="btn btn-secondary">All Branches</a>
+    </div>
+  </div>
+
+  <div class="grid lg:grid-cols-3 gap-5">
+    <div class="lg:col-span-2">
+      <form method="post" id="workplace-location-form" class="space-y-5">
+      <section class="card border-brand-100 bg-gradient-to-br from-brand-50 to-white">
+        <div class="flex items-start justify-between gap-4">
+          <div class="flex items-start gap-3">
+            <div class="w-11 h-11 rounded-xl bg-brand-100 text-brand-700 flex items-center justify-center shrink-0">
+              <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 21s7-6.2 7-12A7 7 0 1 0 5 9c0 5.8 7 12 7 12Z"/><circle cx="12" cy="9" r="2.5"/></svg>
+            </div>
+            <div><h2 class="font-bold text-ink-950">Official branch GPS</h2><p class="text-xs text-ink-500 mt-1">Set the official branch point from any supported phone, tablet, or computer browser. For device GPS, allow precise location; computers without GPS may need verified map coordinates.</p></div>
+          </div>
+          {% if has_gps %}<span class="badge bg-emerald-100 text-emerald-700">GPS configured</span>{% else %}<span class="badge bg-amber-100 text-amber-700">GPS not configured</span>{% endif %}
+        </div>
+
+        <div id="gps-status" class="mt-5 rounded-xl border border-ink-100 bg-white p-4 text-sm text-ink-600" role="status">
+          {% if pharmacy.location_captured_at %}
+            Last verified {{ pharmacy.location_captured_at|date:'d M Y H:i' }}{% if pharmacy.location_accuracy_m %} · accuracy ±{{ pharmacy.location_accuracy_m|floatformat:0 }}m{% endif %}{% if pharmacy.location_captured_by %} · by {% firstof pharmacy.location_captured_by.get_full_name pharmacy.location_captured_by.username %}{% endif %}
+          {% else %}No verified device GPS point has been recorded yet.{% endif %}
+        </div>
+
+        <div id="gps-preflight" class="hidden mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900"></div>
+
+        <div class="mt-4 grid sm:grid-cols-2 gap-3">
+          <div class="rounded-xl bg-white border border-ink-100 p-4"><div class="text-xs text-ink-400">Latitude</div><div class="font-semibold text-ink-900 mt-1" id="current-lat">{{ pharmacy.latitude|default:'—' }}</div></div>
+          <div class="rounded-xl bg-white border border-ink-100 p-4"><div class="text-xs text-ink-400">Longitude</div><div class="font-semibold text-ink-900 mt-1" id="current-lon">{{ pharmacy.longitude|default:'—' }}</div></div>
+        </div>
+
+        <section class="mt-5 rounded-2xl border border-ink-100 bg-white p-4">
+          <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+            <div><h3 class="font-bold text-ink-950">Branch location map</h3><p class="text-xs text-ink-500 mt-1">Review the pin on the map. You can click the exact branch entrance or drag the pin to fine-tune it. Map-picked coordinates are saved as Manual, not falsely labelled as device GPS.</p></div>
+            <a id="branch-map-open" class="text-xs font-semibold text-brand-700 underline shrink-0" target="_blank" rel="noopener">Open in Google Maps</a>
+          </div>
+          <div id="branch-location-map" class="mt-3 w-full rounded-xl border border-ink-100" style="height:340px; min-height:280px" role="application" aria-label="Interactive branch location map"></div>
+          <div class="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-ink-500"><span id="map-point-status">Loading interactive map…</span><button type="button" id="use-map-point" class="btn btn-secondary">Use map pin coordinates</button></div>
+          <p class="mt-2 text-xs text-amber-800">Important: zoom in and place the pin on the actual premises/entrance. Map selection does not prove an employee is physically present; attendance still uses its own verification rules.</p>
+        </section>
+
+        <div class="mt-5">
+          {% csrf_token %}
+          <input type="hidden" name="latitude" id="id_latitude" value="{{ pharmacy.latitude|default_if_none:'' }}">
+          <input type="hidden" name="longitude" id="id_longitude" value="{{ pharmacy.longitude|default_if_none:'' }}">
+          <input type="hidden" name="gps_capture_confirmed" id="gps-capture-confirmed" value="0">
+          <input type="hidden" name="location_captured_device" id="location-captured-device" value="0">
+          <input type="hidden" name="location_capture_accuracy" id="location-capture-accuracy" value="">
+
+          <div id="gps-live" class="hidden mb-4 rounded-2xl border border-ink-100 bg-white p-4" aria-live="polite">
+            <div class="flex items-end justify-between gap-3">
+              <div>
+                <div class="text-xs text-ink-400">Best accuracy so far</div>
+                <div class="text-3xl font-extrabold text-ink-950 leading-none mt-1"><span id="live-acc">—</span></div>
+              </div>
+              <div class="text-right">
+                <span id="live-quality" class="badge bg-ink-100 text-ink-600">Searching…</span>
+                <div class="text-xs text-ink-400 mt-1"><span id="live-time">0</span>s · <span id="live-count">0</span> readings</div>
+              </div>
+            </div>
+            <div class="mt-3 h-2 rounded-full bg-ink-100 overflow-hidden"><div id="live-bar" class="h-full rounded-full bg-ink-300 transition-all duration-500" style="width:4%"></div></div>
+            <p id="live-phase" class="text-xs font-semibold text-ink-700 mt-3"></p>
+            <p id="live-hint" class="text-xs text-ink-500 mt-1">Keep this screen open and stay still. The phone improves its position over the next 10–60 seconds.</p>
+            <div id="live-coordinates" class="hidden mt-3 rounded-lg border border-ink-100 bg-slate-50 p-3 text-xs">
+              <div class="font-semibold text-ink-700">Latest best coordinate estimate</div>
+              <div class="mt-1 font-mono break-all"><span id="live-lat">—</span>, <span id="live-lon">—</span></div>
+              <div class="mt-2 flex flex-wrap gap-2">
+                <a id="live-map-link" class="font-semibold text-brand-700 underline" target="_blank" rel="noopener">Review estimate in Google Maps</a>
+                <button type="button" id="use-estimate-manual" class="btn btn-secondary">Use for manual verification</button>
+              </div>
+              <p class="mt-2 text-amber-800">This estimate is not accepted as verified GPS when accuracy is too weak. Only use the manual option after checking the exact branch entrance/premises on the map; the saved source will be marked Manual.</p>
+            </div>
+          </div>
+
+          <div class="flex flex-col sm:flex-row gap-2">
+            <button type="button" id="capture-gps" class="btn btn-primary">Capture Branch GPS</button>
+            <button type="button" id="use-best" class="btn btn-secondary hidden">Use best reading</button>
+            <button type="button" id="cancel-gps" class="btn btn-secondary hidden">Cancel</button>
+            <button type="button" id="confirm-gps" class="btn btn-secondary" disabled>Confirm &amp; Save GPS</button>
+          </div>
+          <p class="text-xs text-ink-400 mt-2">The system accepts automatic GPS readings only when accuracy is 250m or better; for attendance, 50m or better is ideal. If the signal stays weak, the estimate is drawn on the map so you can pin the exact premises (saved as Manual). Your browser must allow <strong>precise</strong> location access.</p>
+          <div id="gps-preview" class="hidden mt-4 rounded-xl border border-brand-100 bg-brand-50 p-4 text-sm"></div>
+          <div id="gps-help" class="hidden mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900">
+            <div class="font-semibold text-sm mb-2">How to get a better GPS signal</div>
+            <ol class="list-decimal pl-4 space-y-1.5">
+              <li>Go outside, or stand next to an open door or window, away from tall buildings and metal roofs.</li>
+              <li>Device Settings &rarr; Location: turn it <strong>On</strong>. On Android, enable <strong>Google Location Accuracy / Improve Location Accuracy</strong>; on iPhone/iPad, allow Precise Location for the browser.</li>
+              <li>When the browser asks, choose <strong>Precise</strong> location (not Approximate).</li>
+              <li>Avoid in-app browsers. Use an up-to-date Chrome, Safari, Edge, or Firefox. Keep Wi-Fi enabled where available; desktop computers may estimate location from Wi-Fi and may not have a GPS sensor.</li>
+              <li>Wait 30&ndash;60 seconds after switching location on, then tap Capture again.</li>
+            </ol>
+          </div>
+
+          <details id="manual-box" class="mt-4 rounded-xl border border-ink-100 bg-white">
+            <summary class="cursor-pointer select-none px-4 py-3 text-sm font-semibold text-ink-700">Still no good signal? Enter coordinates manually</summary>
+            <div class="px-4 pb-4 text-xs text-ink-500 space-y-3">
+              <p>Open Google Maps, press and hold on the exact spot of the branch, then copy the coordinates (or paste the Google Maps link) here.</p>
+              <div class="flex flex-col sm:flex-row gap-2">
+                <input type="text" id="manual-coords" class="form-input" placeholder="-6.1630000, 35.7516000" autocomplete="off" inputmode="text">
+                <button type="button" id="manual-apply" class="btn btn-secondary shrink-0">Use these coordinates</button>
+              </div>
+              <p id="manual-error" class="hidden text-red-600"></p>
+              <p class="text-amber-800">Manual points are recorded as <strong>Manual</strong> (no accuracy value) and stay visible in the branch audit trail. Prefer device GPS whenever possible.</p>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="flex items-start gap-3 pb-4 border-b border-ink-100">
+          <div class="w-10 h-10 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center">⚙</div>
+          <div><h2 class="font-bold text-ink-950">Attendance policy</h2><p class="text-xs text-ink-500 mt-1">Operational controls are kept here instead of the ordinary branch branding page.</p></div>
+        </div>
+        <div class="grid sm:grid-cols-2 gap-4 pt-5">
+          {% for field in form %}
+            {% if field.name != 'latitude' and field.name != 'longitude' and not field.name|slice:':15' == 'attendance_sms_' %}
+            <div class="{% if field.name == 'attendance_lunch_rescan_required' or field.name == 'attendance_qr_requires_location' %}sm:col-span-2{% endif %}">
+              <label class="block text-sm font-semibold text-ink-800 mb-1.5">{{ field.label }}</label>
+              {% if field.name == 'attendance_lunch_rescan_required' %}<div class="flex items-center gap-2">{{ field }}<span class="text-sm text-ink-700">Require an additional attendance verification during lunch</span></div>{% elif field.name == 'attendance_qr_requires_location' %}<div class="flex items-center gap-2">{{ field }}<span class="text-sm text-ink-700">Employees must be at the workplace (device GPS) to scan the branch QR</span></div>{% else %}{{ field }}{% endif %}
+              {% if field.help_text %}<p class="text-xs text-ink-400 mt-1">{{ field.help_text }}</p>{% endif %}
+              {% if field.errors %}<p class="text-xs text-red-600 mt-1">{{ field.errors.0 }}</p>{% endif %}
+            </div>
+            {% endif %}
+          {% endfor %}
+        </div>
+
+        <div class="mt-6 rounded-2xl border border-ink-100 bg-ink-50/60 p-4">
+          <div class="flex items-start gap-3">
+            <div class="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">✉</div>
+            <div>
+              <h3 class="font-bold text-ink-950">Owner SMS alerts</h3>
+              <p class="text-xs text-ink-500 mt-1">The branch owner receives a short SMS about employee attendance. Each SMS uses one credit from your SMS allowance, so the recommended mode only alerts you when something needs attention.</p>
+            </div>
+          </div>
+          <div class="grid sm:grid-cols-2 gap-4 pt-4">
+            <div class="sm:col-span-2">
+              <label class="block text-sm font-semibold text-ink-800 mb-1.5">{{ form.attendance_sms_mode.label }}</label>
+              {{ form.attendance_sms_mode }}
+              {% if form.attendance_sms_mode.errors %}<p class="text-xs text-red-600 mt-1">{{ form.attendance_sms_mode.errors.0 }}</p>{% endif %}
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-ink-800 mb-1.5">Work starts at</label>
+              {{ form.attendance_sms_work_start }}
+              {% if form.attendance_sms_work_start.errors %}<p class="text-xs text-red-600 mt-1">{{ form.attendance_sms_work_start.errors.0 }}</p>{% endif %}
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-ink-800 mb-1.5">Work ends at</label>
+              {{ form.attendance_sms_work_end }}
+              {% if form.attendance_sms_work_end.errors %}<p class="text-xs text-red-600 mt-1">{{ form.attendance_sms_work_end.errors.0 }}</p>{% endif %}
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-ink-800 mb-1.5">Tolerance (minutes)</label>
+              {{ form.attendance_sms_grace_minutes }}
+              <p class="text-xs text-ink-400 mt-1">{{ form.attendance_sms_grace_minutes.help_text }}</p>
+              {% if form.attendance_sms_grace_minutes.errors %}<p class="text-xs text-red-600 mt-1">{{ form.attendance_sms_grace_minutes.errors.0 }}</p>{% endif %}
+            </div>
+          </div>
+        </div>
+
+        {% if form.non_field_errors %}<div class="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{{ form.non_field_errors }}</div>{% endif %}
+        <div class="mt-5 pt-4 border-t border-ink-100 flex justify-end">
+          <button type="submit" class="btn btn-primary">Save Attendance Policy</button>
+        </div>
+      </section>
+      </form>
+
+    </div>
+
+    <aside class="space-y-5">
+      <section class="card">
+        <h3 class="font-bold text-ink-950">Recommended setup</h3>
+        <ol class="mt-4 space-y-3 text-xs text-ink-600">
+          <li><strong>1.</strong> Stand inside the branch.</li>
+          <li><strong>2.</strong> Use a supported browser with location permission enabled. For computers without a GPS sensor, verify the branch pin manually.</li>
+          <li><strong>3.</strong> Capture the GPS point.</li>
+          <li><strong>4.</strong> Confirm the reading and save.</li>
+          <li><strong>5.</strong> Test one employee's Verify &amp; Start Workday flow.</li>
+        </ol>
+      </section>
+
+      <section class="card bg-amber-50 border-amber-100">
+        <h3 class="font-bold text-amber-950">Important</h3>
+        <p class="text-xs text-amber-800 mt-2">Employee location is checked only when they verify attendance or presence. The system does not continuously track employees.</p>
+        <p class="text-xs text-amber-800 mt-2">Do not use IP address as a replacement for GPS.</p>
+      </section>
+
+      <section class="card">
+        <h3 class="font-bold text-ink-950">Current controls</h3>
+        <div class="mt-3 space-y-2 text-xs text-ink-600">
+          <div class="flex justify-between gap-3"><span>Geofence</span><strong>{{ pharmacy.geofence_radius_m }}m</strong></div>
+          <div class="flex justify-between gap-3"><span>Presence interval</span><strong>{{ pharmacy.presence_check_interval_minutes }} min</strong></div>
+          <div class="flex justify-between gap-3"><span>Scan needs workplace GPS</span><strong>{% if pharmacy.attendance_qr_requires_location %}Required{% else %}Off{% endif %}</strong></div>
+          <div class="flex justify-between gap-3"><span>Lunch rescan</span><strong>{% if pharmacy.attendance_lunch_rescan_required %}Required{% else %}Optional{% endif %}</strong></div>
+          <div class="flex justify-between gap-3"><span>Outside grace</span><strong>{{ pharmacy.attendance_outside_grace_minutes }} min</strong></div>
+        </div>
+      </section>
+    </aside>
+  </div>
+</div>
+<script>
+/* Resilient Leaflet loader: local copy (static/vendor/leaflet/) -> unpkg -> jsDelivr -> cdnjs.
+   Sets window.__leafletState to loading|ready|failed and fires 'leaflet-ready' / 'leaflet-failed'. */
+(function(){
+  window.__leafletState='loading';
+  var base=[
+    {css:'{% static "vendor/leaflet/leaflet.css" %}', js:'{% static "vendor/leaflet/leaflet.js" %}'},
+    {css:'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css', js:'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'},
+    {css:'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css', js:'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js'},
+    {css:'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css', js:'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js'}
+  ], i=0;
+  function done(ok){ window.__leafletState=ok?'ready':'failed'; document.dispatchEvent(new Event(ok?'leaflet-ready':'leaflet-failed')); }
+  function next(){
+    if(window.L&&window.L.map){ done(true); return; }
+    if(i>=base.length){ done(false); return; }
+    var src=base[i++], l=document.createElement('link'), sc=document.createElement('script'), settled=false;
+    l.rel='stylesheet'; l.href=src.css; document.head.appendChild(l);
+    function fail(){ if(settled) return; settled=true; try{sc.remove();l.remove();}catch(e){} next(); }
+    sc.onload=function(){ if(settled) return; settled=true; if(window.L&&window.L.map) done(true); else next(); };
+    sc.onerror=fail; setTimeout(fail,8000);
+    sc.src=src.js; document.head.appendChild(sc);
+  }
+  next();
+})();
+</script>
+<script>
+(function(){
+  'use strict';
+  var $=function(id){return document.getElementById(id);};
+  var capture=$('capture-gps'), confirmBtn=$('confirm-gps'), useBest=$('use-best'), cancelBtn=$('cancel-gps');
+  var status=$('gps-status'), preview=$('gps-preview'), live=$('gps-live'), help=$('gps-help');
+  var latInput=$('id_latitude'), lonInput=$('id_longitude');
+  var accInput=$('location-capture-accuracy'), deviceInput=$('location-captured-device'), confirmedInput=$('gps-capture-confirmed');
+  var form=$('workplace-location-form');
+  var livePhase=$('live-phase'), liveAcc=$('live-acc'), liveQuality=$('live-quality'), liveTime=$('live-time'), liveCount=$('live-count'), liveBar=$('live-bar'), liveHint=$('live-hint');
+  var liveCoordinates=$('live-coordinates'), liveLat=$('live-lat'), liveLon=$('live-lon'), liveMapLink=$('live-map-link'), useEstimateManual=$('use-estimate-manual');
+
+  var MAX_ACCEPT=250, EXCELLENT=30, GOOD=100, MAX_WAIT_MS=120000, SETTLE_MS=7000, MIN_SETTLE_ELAPSED=12000, WEAK_STOP_ELAPSED=60000, WEAK_STALL_MS=25000, WATCHDOG_MS=20000, MAX_RESTARTS=5;
+  // Computers/laptops have no GPS chip: they guess from Wi-Fi/IP and are often 100 m to several km off.
+  var UA=navigator.userAgent||'', isDesktop=!/Android|iPhone|iPad|iPod|Mobile/i.test(UA) && !(navigator.maxTouchPoints>1);
+  var GEOFENCE={{ pharmacy.geofence_radius_m|default:150 }};
+  // OpenStreetMap-backed interactive map. A map pin is a manual reference point,
+  // kept distinct from a device-reported GPS fix for audit/security.
+  var branchMap=null, branchMarker=null, mapPoint=null;
+  function validPoint(lat,lon){return isFinite(lat)&&isFinite(lon)&&Math.abs(lat)<=90&&Math.abs(lon)<=180;}
+  function updateMapPoint(lat,lon,zoom){
+    if(!validPoint(Number(lat),Number(lon))) return;
+    mapPoint={lat:Number(lat),lon:Number(lon)};
+    if(branchMarker){branchMarker.setLatLng([mapPoint.lat,mapPoint.lon]);}
+    else if(branchMap){branchMarker=L.marker([mapPoint.lat,mapPoint.lon],{draggable:true}).addTo(branchMap);branchMarker.bindPopup('Branch location pin');branchMarker.on('dragend',function(){var p=branchMarker.getLatLng();updateMapPoint(p.lat,p.lng,16);});}
+    if(branchMap){branchMap.setView([mapPoint.lat,mapPoint.lon],zoom||Math.max(branchMap.getZoom(),16));}
+    else {
+      var mapEl=$('branch-location-map');
+      if(mapEl){
+        var frame=mapEl.querySelector('iframe[data-manual-map-fallback="1"]');
+        if(!frame){ mapEl.innerHTML=''; frame=document.createElement('iframe'); frame.setAttribute('data-manual-map-fallback','1'); frame.title='Selected workplace location on Google Maps'; frame.loading='lazy'; frame.style.cssText='width:100%;height:100%;min-height:280px;border:0;border-radius:.75rem;'; mapEl.appendChild(frame); }
+        frame.src='https://maps.google.com/maps?q='+encodeURIComponent(mapPoint.lat+','+mapPoint.lon)+'&z='+(zoom||16)+'&output=embed';
+      }
+    }
+    var text=mapPoint.lat.toFixed(7)+', '+mapPoint.lon.toFixed(7);
+    $('map-point-status').textContent='Selected map point: '+text;
+    $('branch-map-open').href='https://www.google.com/maps?q='+mapPoint.lat+','+mapPoint.lon;
+  }
+  function initBranchMap(){
+    var el=$('branch-location-map'); if(!el) return;
+    if(!window.L){$('map-point-status').textContent='Interactive map could not load on this network. Use "Review estimate in Google Maps", long-press the exact entrance, copy the coordinates and paste them under "Enter coordinates manually" below.'; var mb=$('manual-box'); if(mb) mb.open=true; return;}
+    var initialLat=parseFloat(latInput.value), initialLon=parseFloat(lonInput.value), hasPoint=validPoint(initialLat,initialLon);
+    if(el.querySelector('iframe[data-manual-map-fallback="1"]')) el.innerHTML='';
+    branchMap=L.map(el,{scrollWheelZoom:false}).setView(hasPoint?[initialLat,initialLon]:[-6.369,34.888],hasPoint?17:6);
+    var TILE_SOURCES=[
+      {url:'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',opt:{maxZoom:19,attribution:'&copy; OpenStreetMap contributors'}},
+      {url:'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',opt:{maxZoom:19,subdomains:'abcd',attribution:'&copy; OpenStreetMap contributors &copy; CARTO'}},
+      {url:'https://tile.openstreetmap.de/{z}/{x}/{y}.png',opt:{maxZoom:18,attribution:'&copy; OpenStreetMap contributors'}}
+    ], tileIdx=0, tileErrors=0, tileLoaded=false, tiles=null;
+    function useTiles(i){
+      if(tiles){ branchMap.removeLayer(tiles); }
+      tileErrors=0; tiles=L.tileLayer(TILE_SOURCES[i].url,TILE_SOURCES[i].opt).addTo(branchMap);
+      tiles.on('tileerror',function(){
+        tileErrors++;
+        if(tileErrors>=3 && !tileLoaded){
+          if(tileIdx<TILE_SOURCES.length-1){ tileIdx++; $('map-point-status').textContent='Switching to a backup map provider…'; useTiles(tileIdx); }
+          else { $('map-point-status').textContent='Map tiles are not loading (network, firewall or content blocker). Use "Review estimate in Google Maps" and enter the coordinates manually.'; var mb=$('manual-box'); if(mb) mb.open=true; }
+        }
+      });
+      tiles.on('tileload',function(){ tileLoaded=true; if(!branchCircle) $('map-point-status').textContent='Map ready. Zoom in and click or drag the pin to the exact branch entrance.'; });
+    }
+    useTiles(0);
+    setTimeout(function(){ if(!tileLoaded && $('map-point-status').textContent.indexOf('Loading')===0){ $('map-point-status').textContent='Map is slow to load on this connection. You can wait, or use Google Maps and the manual coordinates box below.'; } },10000);
+    if(hasPoint) updateMapPoint(initialLat,initialLon,17);
+    branchMap.on('click',function(e){updateMapPoint(e.latlng.lat,e.latlng.lng,Math.max(branchMap.getZoom(),16));});
+    setTimeout(function(){branchMap.invalidateSize();},250);
+    $('use-map-point').addEventListener('click',function(){
+      if(!mapPoint){$('map-point-status').textContent='Zoom into the branch and click its exact position on the map first.';return;}
+      $('manual-coords').value=mapPoint.lat.toFixed(7)+', '+mapPoint.lon.toFixed(7);
+      $('manual-box').open=true; $('manual-apply').click();
+      $('map-point-status').textContent='Map coordinates copied to the Manual verification workflow. Confirm the pin is on the exact premises, then confirm and save below.';
+    });
+  }
+  function startMap(){
+    if(window.__leafletState==='loading'){
+      document.addEventListener('leaflet-ready',function(){ initBranchMap(); },{once:true});
+      document.addEventListener('leaflet-failed',function(){ initBranchMap(); },{once:true});
+    } else initBranchMap();
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',startMap); else startMap();
+  var watchId=null, lowWatchId=null, tick=null, wakeLock=null, oneShotTimer=null, readings=[], branchCircle=null;
+  var startedAt=0, lastImprove=0, count=0, best=null, reading=null, lastGeoError=null, oneShotRequested=false, captureActive=false, lastReadingAt=0, restarts=0, recovered=false;
+
+  var BOX='mt-5 rounded-xl border p-4 text-sm ';
+  var TONES={
+    info:BOX+'border-brand-100 bg-brand-50 text-brand-800',
+    ok:BOX+'border-emerald-200 bg-emerald-50 text-emerald-800',
+    warn:BOX+'border-amber-200 bg-amber-50 text-amber-900',
+    error:BOX+'border-red-200 bg-red-50 text-red-700'
+  };
+  function setStatus(kind,msg){status.textContent=msg; status.className=TONES[kind]||TONES.info;}
+  function quality(acc){
+    if(acc<=EXCELLENT) return {label:'Excellent',badge:'badge bg-emerald-100 text-emerald-700',bar:'bg-emerald-500'};
+    if(acc<=GOOD) return {label:'Good',badge:'badge bg-emerald-100 text-emerald-700',bar:'bg-emerald-400'};
+    if(acc<=MAX_ACCEPT) return {label:'Acceptable',badge:'badge bg-amber-100 text-amber-700',bar:'bg-amber-400'};
+    return {label:'Too weak',badge:'badge bg-red-100 text-red-700',bar:'bg-red-400'};
+  }
+  function barWidth(acc){ if(acc<=10) return 100; if(acc>=400) return 6; return Math.max(6, Math.round(100-(acc/400)*94)); }
+
+  function releaseWake(){ try{ if(wakeLock){wakeLock.release(); wakeLock=null;} }catch(e){} }
+  function stopWatch(){
+    captureActive=false;
+    if(watchId!==null){ try{navigator.geolocation.clearWatch(watchId);}catch(e){} watchId=null; }
+    if(lowWatchId!==null){ try{navigator.geolocation.clearWatch(lowWatchId);}catch(e){} lowWatchId=null; }
+    if(tick){ clearInterval(tick); tick=null; }
+    if(oneShotTimer){ clearTimeout(oneShotTimer); oneShotTimer=null; }
+    releaseWake();
+  }
+  function idleUI(label){
+    capture.disabled=false; capture.textContent=label||'Capture Branch GPS';
+    useBest.classList.add('hidden'); cancelBtn.classList.add('hidden');
+  }
+  function resetReading(){
+    reading=null; confirmBtn.disabled=true; preview.classList.add('hidden'); confirmedInput.value='0';
+  }
+
+  function renderLive(){
+    var elapsed=Math.round((Date.now()-startedAt)/1000);
+    liveTime.textContent=elapsed; liveCount.textContent=count;
+    if(livePhase){
+      var left=Math.max(0,Math.round(MAX_WAIT_MS/1000)-elapsed);
+      var ph=!best ? 'Step 1 of 3: contacting the device location service' : (best.acc>GOOD ? 'Step 2 of 3: locking onto GPS satellites' : 'Step 3 of 3: refining accuracy, hold still');
+      livePhase.textContent=ph+'  (auto-stops in '+left+'s)';
+    }
+    if(!best){ liveAcc.textContent='—'; return; }
+    var q=quality(best.acc);
+    liveAcc.textContent='±'+Math.round(best.acc)+' m';
+    liveLat.textContent=best.lat.toFixed(7); liveLon.textContent=best.lon.toFixed(7);
+    liveMapLink.href='https://www.google.com/maps?q='+best.lat.toFixed(7)+','+best.lon.toFixed(7);
+    // Do not move the operator's selected branch pin while GPS readings arrive.
+    // Live device estimates are shown separately and can be reviewed via Google Maps.
+    liveCoordinates.classList.remove('hidden');
+    // Keep the main coordinate cards in sync on every supported screen size/device.
+    $('current-lat').textContent=best.lat.toFixed(7);
+    $('current-lon').textContent=best.lon.toFixed(7);
+    liveQuality.className=q.badge; liveQuality.textContent=q.label;
+    liveBar.className='h-full rounded-full transition-all duration-500 '+q.bar; liveBar.style.width=barWidth(best.acc)+'%';
+    if(best.acc<=MAX_ACCEPT){
+      useBest.classList.remove('hidden');
+      liveHint.textContent=best.acc<=GOOD ? 'Good signal. Hold still a moment while it settles…' : 'Signal is usable but still improving. Waiting for a better fix…';
+    } else {
+      liveHint.textContent='Low-accuracy location estimate (±'+Math.round(best.acc)+' m). This may be Wi-Fi/network positioning, not a precise GPS fix. Move outdoors, keep Location enabled, and wait for accuracy to improve. The map pin will not move automatically.';
+    }
+  }
+
+  function finish(reason){
+    stopWatch(); live.classList.add('hidden');
+    if(best && best.acc<=MAX_ACCEPT){ accept(best, reason); return; }
+    var acc=best?Math.round(best.acc):null;
+    var noFixMessage='No coordinates were received from the device. Check site Location permission (Allow), phone Location/GPS and Precise Location. This device may not have a GPS sensor. Computers often estimate location from Wi-Fi/network data; if accuracy remains weak, verify the branch pin on the map and use the audited manual-coordinate workflow.';
+    if(lastGeoError===1) noFixMessage='Location permission is blocked. Allow Location for this site, enable Precise Location, reload, and try again.';
+    else if(lastGeoError===2) noFixMessage='The device reports that location is unavailable. Turn on Location/GPS and Google Location Accuracy, then try outdoors or near an open window.';
+    else if(lastGeoError===3) noFixMessage='The location request timed out without a position. Keep the page open, enable device Location, and retry on a phone with Precise Location enabled.';
+    setStatus('error', acc ? 'Location capture stopped: best reported accuracy is ±'+acc+' m; this setup requires 250 m or better. This is only a device-reported estimate and may be network-derived. It has not been saved as verified device location. The estimate is now drawn on the map as a circle: click the exact premises inside it for audited Manual setup, or retry outdoors with Precise Location enabled.' : noFixMessage);
+    if(isDesktop){ status.textContent+=' This device looks like a computer. Computers have no GPS chip and only estimate from Wi-Fi/IP, so precise capture is not possible here. Open this page on your phone, stand outside at the branch entrance and capture there; or use the map pin below.'; }
+    help.classList.remove('hidden'); resetReading(); idleUI('Try Again');
+    try{ var mbx=$('manual-box'); if(mbx && !(best && best.acc<=MAX_ACCEPT)) mbx.open=true; }catch(e){}
+    if(best){ live.classList.remove('hidden'); liveCoordinates.classList.remove('hidden'); showEstimateOnMap(best); }
+
+  }
+
+  function accept(b, reason){
+    reading=b;
+    latInput.value=b.lat.toFixed(7); lonInput.value=b.lon.toFixed(7);
+    accInput.value=b.acc.toFixed(2); deviceInput.value='1'; confirmedInput.value='0';
+    var q=quality(b.acc);
+    var note='';
+    if(b.acc>GOOD) note+='<div class="mt-2 text-xs text-amber-800">Accuracy is lower than ideal. For the most reliable attendance results, step outside and capture again.</div>';
+    if(b.acc>GEOFENCE) note+='<div class="mt-2 text-xs text-amber-800">This accuracy (±'+Math.round(b.acc)+'m) is larger than your geofence radius ('+GEOFENCE+'m). Employees standing inside could be marked outside — capture again or increase the geofence radius. <button type="button" id="apply-radius" class="font-semibold underline">Set radius to '+Math.min(2000,Math.ceil(b.acc*1.5/10)*10)+' m</button></div>';
+    preview.classList.remove('hidden');
+    preview.innerHTML='<div class="flex items-center justify-between gap-2"><strong>GPS reading ready</strong><span class="'+q.badge+'">'+q.label+'</span></div>'+
+      '<div class="mt-1 text-xs">'+b.lat.toFixed(7)+', '+b.lon.toFixed(7)+' · accuracy ±'+Math.round(b.acc)+'m · '+b.n+' readings</div>'+
+      '<a class="mt-2 inline-block text-xs font-semibold text-brand-700 underline" target="_blank" rel="noopener" href="https://www.google.com/maps?q='+b.lat.toFixed(7)+','+b.lon.toFixed(7)+'">Check this point on the map</a>'+note;
+    var ar=$('apply-radius'); if(ar) ar.addEventListener('click',function(){ var g=$('id_geofence_radius_m'); if(g){ g.value=Math.min(2000,Math.ceil(b.acc*1.5/10)*10); ar.textContent='Radius updated (save to apply)'; } });
+    help.classList.add('hidden');
+    setStatus(b.acc<=GOOD?'ok':'warn','Reading captured. Review it, then confirm to save this branch location.');
+    confirmBtn.disabled=false; idleUI('Capture Again');
+  }
+
+  function onPosition(pos){
+    if(!captureActive) return;
+    var c=pos.coords, lat=Number(c.latitude), lon=Number(c.longitude), acc=Number(c.accuracy);
+    if(!isFinite(lat)||!isFinite(lon)||!isFinite(acc)||acc<=0) return;
+    // Ignore stale cached positions delivered from before this capture started.
+    if(pos.timestamp && pos.timestamp < startedAt-2000 && Date.now()-startedAt<10000) return;
+    lastReadingAt=Date.now();
+    count++;
+    readings.push({lat:lat,lon:lon,acc:acc});
+    if(readings.length>60) readings.shift();
+    var minAcc=Infinity; readings.forEach(function(r){ if(r.acc<minAcc) minAcc=r.acc; });
+    if(!best || minAcc<best.acc) lastImprove=Date.now();
+    // Inverse-variance weighted centroid of the readings within 2x of the best one:
+    // reduces scatter (multipath, indoors) while the reported accuracy stays the
+    // conservative best single-reading value (never over-claimed).
+    var sw=0, sl=0, so=0, lim=minAcc*2;
+    readings.forEach(function(r){ if(r.acc<=lim){ var w=1/(r.acc*r.acc); sw+=w; sl+=w*r.lat; so+=w*r.lon; } });
+    best={lat:sl/sw, lon:so/sw, acc:minAcc, n:count};
+    renderLive();
+  }
+
+  // Start (or restart) the high-accuracy watcher. Some browsers stop delivering after a
+  // timeout error, so we re-register it instead of waiting forever.
+  function startHighWatch(){
+    if(watchId!==null){ try{navigator.geolocation.clearWatch(watchId);}catch(e){} watchId=null; }
+    try{ watchId=navigator.geolocation.watchPosition(onPosition,onError,{enableHighAccuracy:true,maximumAge:0,timeout:45000}); }catch(e){}
+  }
+  // Network/Wi-Fi/cell watcher runs in parallel: it answers quickly indoors and gives
+  // the operator a usable estimate to place on the map when GPS cannot lock.
+  function startLowWatch(){
+    try{ lowWatchId=navigator.geolocation.watchPosition(onPosition,function(){},{enableHighAccuracy:false,maximumAge:3000,timeout:30000}); }catch(e){}
+  }
+
+  // Show a weak device estimate on the map as an accuracy circle (the pin is NOT moved).
+  function showEstimateOnMap(b){
+    if(!b||!branchMap||!window.L) return;
+    try{
+      if(branchCircle){ branchMap.removeLayer(branchCircle); branchCircle=null; }
+      branchCircle=L.circle([b.lat,b.lon],{radius:Math.max(b.acc,10),color:'#b45309',weight:2,fillColor:'#f59e0b',fillOpacity:0.15}).addTo(branchMap);
+      branchMap.fitBounds(branchCircle.getBounds(),{maxZoom:17,padding:[20,20]});
+      $('map-point-status').textContent='Device estimate shown as an amber circle (±'+Math.round(b.acc)+' m). The branch is somewhere inside it: zoom in, click the exact entrance, then use "Use map point" (saved as Manual).';
+      var el=$('branch-location-map'); if(el&&el.scrollIntoView) el.scrollIntoView({behavior:'smooth',block:'center'});
+    }catch(e){}
+  }
+
+  // Pre-flight diagnostics: tell the operator the real cause before they waste a capture.
+  function runPreflight(){
+    var box=$('gps-preflight'); if(!box) return;
+    var issues=[], ua=navigator.userAgent||'';
+    if(window.isSecureContext===false) issues.push('This page is not on HTTPS, so the browser will refuse location. Open it using https://.');
+    if(/FBAN|FBAV|Instagram|Line\/|Snapchat|TikTok|MicroMessenger|; wv\)|WhatsApp/i.test(ua)) issues.push('You appear to be inside an in-app browser (WhatsApp/Facebook/etc.). These often block precise location. Open this page in Chrome or Safari directly.');
+    if(!navigator.geolocation) issues.push('This browser does not support location services.');
+    if(isDesktop) issues.push('<strong>You are on a computer.</strong> Laptops/desktops have no GPS chip; they estimate from Wi-Fi/IP and are often 100 m to several km off. For a precise fix open this page on your <strong>phone</strong> and capture outside at the branch entrance. <button type="button" id="gps-copy-link" class="underline font-semibold">Copy page link for my phone</button>');
+    function show(extra){
+      var all=issues.slice(); if(extra) all.push(extra);
+      if(!all.length){ box.classList.add('hidden'); return; }
+      box.innerHTML='<div class="font-semibold mb-1">Before you capture</div><ul class="list-disc pl-4 space-y-1">'+all.map(function(t){return '<li>'+t+'</li>';}).join('')+'</ul>';
+      box.classList.remove('hidden');
+      var cl=$('gps-copy-link');
+      if(cl) cl.addEventListener('click',function(){
+        var u=location.href;
+        if(navigator.share){ navigator.share({title:'Branch GPS capture',url:u}).catch(function(){}); }
+        else if(navigator.clipboard){ navigator.clipboard.writeText(u).then(function(){cl.textContent='Link copied. Send it to your phone';}).catch(function(){}); }
+      });
+    }
+    show();
+    try{
+      if(navigator.permissions&&navigator.permissions.query){
+        navigator.permissions.query({name:'geolocation'}).then(function(r){
+          function upd(){ show(r.state==='denied' ? 'Location is BLOCKED for this site. Tap the icon beside the address bar, set Location to Allow, enable Precise, then reload.' : null); }
+          upd(); r.onchange=upd;
+        }).catch(function(){});
+      }
+    }catch(e){}
+  }
+  runPreflight();
+
+  function onError(err){
+    lastGeoError=err && err.code ? err.code : 0;
+    if(err && err.code===1){
+      stopWatch(); live.classList.add('hidden'); help.classList.remove('hidden');
+      setStatus('error','Location permission is blocked. In Chrome, open the site permissions from the icon beside the address bar, set Location to Allow, enable Precise location on your phone, then reload this page.');
+      resetReading(); idleUI('Try Again'); return;
+    }
+    if(err && (err.code===3 || err.code===2) && captureActive){ setTimeout(function(){ if(captureActive) startHighWatch(); },err.code===2?3000:500); }
+    if(!best){
+      if(err && err.code===2){
+        liveHint.textContent='The device cannot determine its location yet. Turn Location/GPS on, enable Google Location Accuracy, turn Wi-Fi on, and move near an open sky or window.';
+      } else if(err && err.code===3){
+        liveHint.textContent='The device took too long to return a position. Still trying live GPS; keep this page open and check that Location is enabled.';
+      } else {
+        liveHint.textContent='Waiting for the device location service. Keep this page visible and allow location access if the browser asks.';
+      }
+    }
+  }
+
+  capture.addEventListener('click', function(){
+    if(!navigator.geolocation){ setStatus('error','This browser does not support web location. Update the browser or use the manual verified-coordinate workflow.'); help.classList.remove('hidden'); return; }
+    if(window.isSecureContext===false){ setStatus('error','Browser location requires a secure HTTPS connection. Open this page using https:// and try again.'); return; }
+    stopWatch(); resetReading(); help.classList.add('hidden');
+    best=null; readings=[]; count=0; lastGeoError=null; oneShotRequested=false; captureActive=true; restarts=0; recovered=false; lastReadingAt=0; startedAt=Date.now(); lastImprove=startedAt;
+    capture.disabled=true; capture.textContent='Searching for GPS…';
+    cancelBtn.classList.remove('hidden'); useBest.classList.add('hidden');
+    live.classList.remove('hidden'); liveBar.style.width='4%'; liveBar.className='h-full rounded-full bg-ink-300 transition-all duration-500';
+    liveQuality.className='badge bg-ink-100 text-ink-600'; liveQuality.textContent='Searching…'; renderLive();
+    setStatus('info','Requesting a fresh high-accuracy location from the device. Keep this page visible. The browser may use GPS, Wi-Fi or network positioning; accuracy is measured and weak estimates will not be certified as GPS.');
+    try{ if(navigator.wakeLock&&navigator.wakeLock.request){ navigator.wakeLock.request('screen').then(function(l){wakeLock=l;}).catch(function(){}); } }catch(e){}
+    // Start continuous high-accuracy updates and a one-shot request in parallel.
+    // Some browsers/devices deliver the one-shot result even when watchPosition
+    // does not produce an initial fix promptly.
+    startHighWatch(); startLowWatch();
+    try {
+      navigator.geolocation.getCurrentPosition(onPosition,onError,{enableHighAccuracy:true,maximumAge:0,timeout:25000});
+    } catch (geoStartError) { lastGeoError=0; }
+    tick=setInterval(function(){
+      renderLive();
+      var now=Date.now(), elapsed=now-startedAt;
+      if(!count && elapsed>=15000 && !oneShotRequested){
+        oneShotRequested=true;
+        liveHint.textContent='No position has arrived yet. Requesting a fresh device location again; check the browser permission and device Location setting.';
+        try { navigator.geolocation.getCurrentPosition(onPosition,onError,{enableHighAccuracy:true,maximumAge:10000,timeout:20000}); } catch(retryError) {}
+      }
+      if(!count && elapsed>=30000){
+        if(lastGeoError===1){ finish('permission'); return; }
+        liveHint.textContent='Still no coordinates. Check browser/site Location permission and device Location settings. Computers without GPS may not provide a precise point; use the manual verified-coordinate workflow if needed.';
+      }
+      // Watchdog: some phones silently stop delivering. Re-register the watchers instead of waiting forever.
+      if(now-Math.max(lastReadingAt,startedAt)>=WATCHDOG_MS && restarts<MAX_RESTARTS){
+        restarts++; lastReadingAt=now;
+        startHighWatch(); if(lowWatchId!==null){ try{navigator.geolocation.clearWatch(lowWatchId);}catch(e){} lowWatchId=null; } startLowWatch();
+        try { navigator.geolocation.getCurrentPosition(onPosition,onError,{enableHighAccuracy:true,maximumAge:0,timeout:30000}); } catch(re) {}
+        liveHint.textContent='The location service went quiet, so the search was restarted automatically (attempt '+restarts+'). Keep this page open and stay in the open.';
+      }
+      // Tiered acceptance: finish faster when the fix is already excellent/good and stable.
+      var stall=now-lastImprove;
+      if(best && best.acc<=EXCELLENT && count>=3 && elapsed>=5000 && stall>=3000){ finish('excellent'); return; }
+      if(best && best.acc<=GOOD && count>=4 && elapsed>=10000 && stall>=5000){ finish('good'); return; }
+      if(best && best.acc<=MAX_ACCEPT && elapsed>=MIN_SETTLE_ELAPSED && stall>=SETTLE_MS){ finish('settled'); return; }
+      // Avoid leaving the owner on an endless-looking spinner when the device
+      // only provides a weak network/Wi-Fi estimate. Stop after 45 seconds and
+      // direct the user to the map/manual audit workflow; never mislabel a weak
+      // estimate as verified device GPS.
+      // One automatic recovery attempt before giving up on a weak (network-only) signal.
+      if(best && best.acc>MAX_ACCEPT && !recovered && elapsed>=30000 && stall>=15000){
+        recovered=true; startHighWatch();
+        try { navigator.geolocation.getCurrentPosition(onPosition,onError,{enableHighAccuracy:true,maximumAge:0,timeout:30000}); } catch(re2) {}
+        liveHint.textContent='Signal is still weak ('+Math.round(best.acc)+' m). Trying once more: move away from walls and metal roofs, face open sky, keep the phone steady.';
+      }
+      if(best && best.acc>MAX_ACCEPT && elapsed>=WEAK_STOP_ELAPSED && stall>=WEAK_STALL_MS){ finish('weak-signal'); return; }
+      if(elapsed>=MAX_WAIT_MS){ finish('timeout'); }
+    },500);
+  });
+
+  useBest.addEventListener('click', function(){ if(best&&best.acc<=MAX_ACCEPT) finish('manual-stop'); });
+  cancelBtn.addEventListener('click', function(){
+    stopWatch(); live.classList.add('hidden'); idleUI('Capture Branch GPS');
+    setStatus('info','Capture cancelled.');
+  });
+  document.addEventListener('visibilitychange', function(){
+    // Browsers pause location while the tab is hidden: restart the search when the owner comes back.
+    if(document.visibilityState==='visible' && captureActive){ lastReadingAt=Date.now(); startHighWatch(); liveHint.textContent='Welcome back. The location search was resumed. Keep this page open.'; }
+    if(document.visibilityState==='visible' && watchId!==null && navigator.wakeLock && !wakeLock){
+      navigator.wakeLock.request('screen').then(function(l){wakeLock=l;}).catch(function(){});
+    }
+  });
+
+  // ---- Manual fallback ----
+  function parseCoords(text){
+    text=String(text||'').trim(); if(!text) return null;
+    var m=text.match(/@(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/) || text.match(/(-?\d+(?:\.\d+)?)\s*[,;\s]\s*(-?\d+(?:\.\d+)?)/);
+    if(!m) return null;
+    var lat=parseFloat(m[1]), lon=parseFloat(m[2]);
+    if(!isFinite(lat)||!isFinite(lon)||Math.abs(lat)>90||Math.abs(lon)>180) return null;
+    return {lat:lat,lon:lon};
+  }
+  useEstimateManual.addEventListener('click', function(){
+    if(!best) return;
+    $('manual-coords').value=best.lat.toFixed(7)+', '+best.lon.toFixed(7);
+    $('manual-box').open=true;
+    showEstimateOnMap(best);
+    $('manual-coords').focus();
+    $('manual-error').textContent='Estimate copied. Verify this is the exact branch location on the map before choosing “Use these coordinates”. It will be audited as Manual, not verified GPS.';
+    $('manual-error').classList.remove('hidden');
+  });
+
+  $('manual-apply').addEventListener('click', function(){
+    var err=$('manual-error'), p=parseCoords($('manual-coords').value);
+    if(!p){ err.textContent='Could not read those coordinates. Use the format: -6.1630000, 35.7516000'; err.classList.remove('hidden'); return; }
+    err.classList.add('hidden'); stopWatch(); live.classList.add('hidden'); idleUI('Capture Branch GPS');
+    updateMapPoint(p.lat,p.lon,16);
+    reading={manual:true,lat:p.lat,lon:p.lon};
+    latInput.value=p.lat.toFixed(7); lonInput.value=p.lon.toFixed(7);
+    $('current-lat').textContent=p.lat.toFixed(7)+' (pending save)';
+    $('current-lon').textContent=p.lon.toFixed(7)+' (pending save)';
+    accInput.value=''; deviceInput.value='0'; confirmedInput.value='0';
+    preview.classList.remove('hidden');
+    preview.innerHTML='<div class="flex items-center justify-between gap-2"><strong>Manual coordinates ready</strong><span class="badge bg-amber-100 text-amber-700">Manual</span></div>'+
+      '<div class="mt-1 text-xs">'+p.lat.toFixed(7)+', '+p.lon.toFixed(7)+'</div>'+
+      '<a class="mt-2 inline-block text-xs font-semibold text-brand-700 underline" target="_blank" rel="noopener" href="https://www.google.com/maps?q='+p.lat.toFixed(7)+','+p.lon.toFixed(7)+'">Check this point on the map</a>';
+    setStatus('warn','Manual coordinates entered. Check the point on the map, then confirm to save.');
+    help.classList.add('hidden'); confirmBtn.disabled=false;
+  });
+
+  confirmBtn.addEventListener('click', function(){
+    if(!reading) return;
+    var lat=Number(latInput.value), lon=Number(lonInput.value);
+    if(!validPoint(lat,lon)){ setStatus('error','Latitude and longitude are missing or invalid. Apply the coordinates again before saving.'); return; }
+    var what=reading.manual?'these manual coordinates':'this GPS point';
+    if(!confirm('Save '+what+' as the official workplace location for {{ pharmacy.name|escapejs }}?')) return;
+    confirmedInput.value='1';
+    confirmBtn.disabled=true; confirmBtn.textContent='Saving location…';
+    if(typeof form.requestSubmit==='function') form.requestSubmit(); else form.submit();
+  });
+  window.addEventListener('pagehide', stopWatch);
+})();
+</script>
+<script>
+/* Independent manual-coordinate fallback. This intentionally lives outside the main GPS script
+   so manual entry still works if a device-GPS or map-library script fails. */
+(function(){
+  'use strict';
+  function byId(id){ return document.getElementById(id); }
+  var form=byId('workplace-location-form'), apply=byId('manual-apply'), confirmBtn=byId('confirm-gps');
+  var manualReady=false;
+  function parse(text){
+    text=String(text||'').trim();
+    var m=text.match(/@(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/) || text.match(/(-?\d+(?:\.\d+)?)\s*[,;\s]\s*(-?\d+(?:\.\d+)?)/);
+    if(!m){
+      var q=text.match(/[?&](?:q|query|ll)=(-?\d+(?:\.\d+)?)(?:%2C|,|%2c)(-?\d+(?:\.\d+)?)/i);
+      if(q) m=q;
+    }
+    if(!m) return null;
+    var lat=Number(m[1]), lon=Number(m[2]);
+    return Number.isFinite(lat)&&Number.isFinite(lon)&&Math.abs(lat)<=90&&Math.abs(lon)<=180?{lat:lat,lon:lon}:null;
+  }
+  function status(message,kind){
+    var el=byId('gps-status'); if(!el) return;
+    el.textContent=message;
+    el.className='mt-5 rounded-xl border p-4 text-sm '+(kind==='error'?'border-red-200 bg-red-50 text-red-700':kind==='ok'?'border-emerald-200 bg-emerald-50 text-emerald-800':'border-amber-200 bg-amber-50 text-amber-900');
+  }
+  function applyCoordinates(p){
+    byId('id_latitude').value=p.lat.toFixed(7);
+    byId('id_longitude').value=p.lon.toFixed(7);
+    byId('gps-capture-confirmed').value='0';
+    byId('location-captured-device').value='0';
+    byId('location-capture-accuracy').value='';
+    byId('current-lat').textContent=p.lat.toFixed(7)+' (pending save)';
+    byId('current-lon').textContent=p.lon.toFixed(7)+' (pending save)';
+    var preview=byId('gps-preview');
+    preview.classList.remove('hidden');
+    preview.innerHTML='<div class="flex items-center justify-between gap-2"><strong>Manual coordinates ready</strong><span class="badge bg-amber-100 text-amber-700">Manual</span></div><div class="mt-1 text-xs">'+p.lat.toFixed(7)+', '+p.lon.toFixed(7)+'</div><a class="mt-2 inline-block text-xs font-semibold text-brand-700 underline" target="_blank" rel="noopener" href="https://www.google.com/maps?q='+p.lat.toFixed(7)+','+p.lon.toFixed(7)+'">Check this point on the map</a>';
+    var manualError=byId('manual-error'); manualError.classList.add('hidden');
+    var box=byId('manual-box'); if(box) box.open=true;
+    var mapStatus=byId('map-point-status'); if(mapStatus) mapStatus.textContent='Selected manual point: '+p.lat.toFixed(7)+', '+p.lon.toFixed(7)+'. Check the map, then confirm and save.';
+    var map=byId('branch-location-map');
+    if(map){
+      if(window.L && map._leaflet_id && window.L.DomUtil){
+        // Leaflet is active; use the public map instance exposed by the main script when available.
+        if(window.__smartposBranchMap){ window.__smartposBranchMap.setView([p.lat,p.lon],17); }
+      }
+      var frame=map.querySelector('iframe[data-manual-map-fallback="1"]');
+      if(!frame){ frame=document.createElement('iframe'); frame.setAttribute('data-manual-map-fallback','1'); frame.title='Selected workplace location on Google Maps'; frame.loading='lazy'; frame.style.cssText='width:100%;height:100%;min-height:280px;border:0;border-radius:.75rem;'; map.innerHTML=''; map.appendChild(frame); }
+      frame.src='https://maps.google.com/maps?q='+encodeURIComponent(p.lat+','+p.lon)+'&z=17&output=embed';
+    }
+    var open=byId('branch-map-open'); if(open) open.href='https://www.google.com/maps?q='+p.lat+','+p.lon;
+    if(confirmBtn){ confirmBtn.disabled=false; confirmBtn.textContent='Confirm & Save GPS'; }
+    manualReady=true;
+    status('Manual coordinates entered. The selected point is shown on the map. Click “Confirm & Save GPS” to save it as the official workplace location.','warn');
+  }
+  if(apply){
+    apply.addEventListener('click',function(e){
+      e.preventDefault(); e.stopImmediatePropagation();
+      var p=parse(byId('manual-coords').value);
+      if(!p){ var err=byId('manual-error'); err.textContent='Could not read those coordinates. Enter latitude, longitude (for example: -6.1807560, 35.7480180), or paste a Google Maps link containing coordinates.'; err.classList.remove('hidden'); status('Coordinates could not be read. Check the format and try again.','error'); return; }
+      applyCoordinates(p);
+    },true);
+  }
+  if(confirmBtn){
+    confirmBtn.addEventListener('click',function(e){
+      if(!manualReady) return;
+      e.preventDefault(); e.stopImmediatePropagation();
+      var lat=Number(byId('id_latitude').value), lon=Number(byId('id_longitude').value);
+      if(!Number.isFinite(lat)||!Number.isFinite(lon)||Math.abs(lat)>90||Math.abs(lon)>180){status('Latitude and longitude are missing or invalid. Apply the coordinates again before saving.','error');return;}
+      if(!window.confirm('Save these manual coordinates as the official workplace location for this branch?')) return;
+      byId('gps-capture-confirmed').value='1';
+      byId('location-captured-device').value='0';
+      byId('location-capture-accuracy').value='';
+      confirmBtn.disabled=true; confirmBtn.textContent='Saving location…';
+      if(form.requestSubmit) form.requestSubmit(); else form.submit();
+    },true);
+  }
+  // Map-pin action shares the same safe manual save path.
+  var useMap=byId('use-map-point');
+  if(useMap) useMap.addEventListener('click',function(){
+    var t=byId('map-point-status').textContent, m=t.match(/(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/);
+    if(m){ byId('manual-coords').value=m[1]+', '+m[2]; applyCoordinates({lat:Number(m[1]),lon:Number(m[2])}); }
+  },true);
+})();
+</script>
+
+{% endblock %}

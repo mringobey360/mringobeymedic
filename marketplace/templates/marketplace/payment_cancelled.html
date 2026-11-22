@@ -1,0 +1,37 @@
+{% extends 'marketplace/base.html' %}{% load humanize %}{% block title %}Payment cancelled · SmartPOS Marketplace{% endblock %}{% block body %}
+<section class="panel" style="max-width:640px;margin:32px auto;padding:clamp(22px,4vw,40px);text-align:center">
+  <div aria-hidden="true" style="width:64px;height:64px;margin:0 auto 16px;border-radius:50%;background:#fff7ed;color:#c2410c;display:flex;align-items:center;justify-content:center">
+    <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 16.5h.01"/></svg>
+  </div>
+  <p class="eyebrow">SMARTPOS MARKETPLACE · PAYMENT CANCELLED</p>
+  <h1 style="margin:.2rem 0 .6rem">Your payment was cancelled</h1>
+  <p class="muted" style="line-height:1.65">You cancelled the payment before it was completed, so <strong>no money was taken</strong> and <strong>no order was created</strong>. Nothing further is needed from you.</p>
+
+  <div style="margin:22px 0 6px;text-align:left;border:1px solid #e2e8f0;border-radius:14px;overflow:hidden">
+    <div class="summary-line"><span>Payment reference</span><strong class="pay-ref">{{ short_ref }}</strong></div>
+    <div class="summary-line"><span>Amount</span><strong>TSh {{ attempt.total|floatformat:0|intcomma }}</strong></div>
+    <div class="summary-line"><span>Payment status</span><strong>Cancelled · not charged</strong></div>
+    {% if txn and txn.updated_at %}<div class="summary-line"><span>Cancelled on</span><strong>{{ txn.updated_at|date:'d M Y, H:i' }}</strong></div>{% endif %}
+  </div>
+
+  {% if items %}
+  <details style="text-align:left;margin:10px 0 0">
+    <summary style="cursor:pointer;font-weight:600;font-size:.9rem;padding:8px 2px">What was in this checkout ({{ items|length }} item{{ items|length|pluralize }})</summary>
+    {% for i in items %}<div class="summary-line"><span>{{ i.name }} × {{ i.quantity }}</span><strong>TSh {{ i.subtotal|floatformat:0|intcomma }}</strong></div>{% endfor %}
+  </details>
+  {% endif %}
+
+  <p class="muted" style="margin:18px 0 0;font-size:.85rem;line-height:1.6">
+    {% if cart_saved %}Your cart has been saved, so you can pay when you are ready.{% else %}Your cart is empty now — you can add the items again from the marketplace.{% endif %}
+    If you approved a request on your phone and money left your wallet, contact support and quote the payment reference above.
+  </p>
+
+  <div class="pay-actions">
+    {% if can_retry %}
+    <form method="post" action="{% url 'payments:retry' txn.merchant_reference %}">{% csrf_token %}<button class="btn checkout-btn" type="submit">Try payment again</button></form>
+    {% endif %}
+    {% if cart_saved %}<a class="btn {% if can_retry %}outline{% else %}checkout-btn{% endif %}" href="{% url 'marketplace:cart' %}">Review my cart</a>{% endif %}
+    <a class="btn outline" href="{% url 'marketplace:catalog' %}">Continue shopping</a>
+  </div>
+</section>
+{% endblock %}

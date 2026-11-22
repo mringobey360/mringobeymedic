@@ -1,0 +1,21 @@
+{% comment %}
+  SmartPOS dynamic renewal banner (V54.14).
+  Use ONE of:
+    {% include 'partials/renew_banner.html' with st=branch_billing_alert %}          (per-branch policy)
+    {% include 'partials/renew_banner.html' with legacy=request.subscription %}      (account-level fallback)
+  Stages: due soon (amber) -> urgent <=3 days (pulse) -> grace (orange) -> read-only (red).
+  Self-contained CSS/JS (no Tailwind rebuild needed), light/dark safe, reduced-motion safe.
+{% endcomment %}
+{% if st %}
+  {% if st.trial and not st.trial_timed and not st.locked %}{% include 'partials/trial_banner.html' %}
+  {% elif st.read_only or st.locked %}{% with tone="danger" %}{% include 'partials/_renew_banner_body.html' %}{% endwith %}
+  {% elif st.grace %}{% with tone="grace" %}{% include 'partials/_renew_banner_body.html' %}{% endwith %}
+  {% elif st.days_left is not None and st.days_left <= 3 %}{% with tone="urgent" %}{% include 'partials/_renew_banner_body.html' %}{% endwith %}
+  {% else %}{% with tone="soon" %}{% include 'partials/_renew_banner_body.html' %}{% endwith %}
+  {% endif %}
+{% elif legacy %}
+  {% if legacy.is_trial and not legacy.is_timed_trial %}{% include 'partials/trial_banner.html' %}
+  {% elif legacy.days_remaining <= 3 %}{% with tone="urgent" %}{% include 'partials/_renew_banner_body.html' %}{% endwith %}
+  {% else %}{% with tone="soon" %}{% include 'partials/_renew_banner_body.html' %}{% endwith %}
+  {% endif %}
+{% endif %}

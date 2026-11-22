@@ -1,0 +1,9 @@
+<div class="mk-field{% if full %} full{% endif %}">
+ {% if field.widget_type == 'checkbox' %}
+  <label class="mk-check" for="{{ field.id_for_label }}">{{ field }}<span>{{ field.label }}</span></label>
+ {% else %}
+  <label class="mk-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="mk-req" aria-hidden="true">*</span>{% endif %}</label>{{ field }}
+ {% endif %}
+ {% if field.help_text %}<small class="mk-help">{{ field.help_text }}</small>{% endif %}
+ {% for error in field.errors %}<small class="mk-error">{{ error }}</small>{% endfor %}
+</div>

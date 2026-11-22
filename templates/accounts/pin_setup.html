@@ -1,0 +1,120 @@
+{% extends "accounts/auth_base.html" %}
+{% block title %}{% if is_reset %}Create a new PIN{% else %}Create your PIN{% endif %} - SmartPOS{% endblock %}
+
+{% block auth_head %}
+{% include "accounts/partials/pin_pad_styles.html" %}
+{% endblock %}
+
+{% block auth_content %}
+<div id="pin-root" class="pin-root w-full max-w-[18rem] text-center"
+     data-url="{% url 'accounts:pin_setup' %}" data-length="{{ pin_length }}"
+     data-label-first="Enter a {{ pin_length }}-digit PIN" data-label-confirm="Confirm your PIN">
+    {% csrf_token %}
+    <div class="auth-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+    </div>
+    <h1 class="text-xl font-semibold tracking-tight text-ink-900">{% if is_reset %}Create a new PIN{% else %}Create your PIN{% endif %}</h1>
+    <p class="mt-1.5 text-xs leading-5 text-ink-600">
+        {% if is_reset %}Your previous PIN was reset or locked. Choose a new PIN to continue.{% else %}For your security, set a {{ pin_length }}-digit PIN. You will use it to sign in quickly on this device.{% endif %}
+    </p>
+
+    <p id="pin-step" class="mt-3 text-[10px] font-semibold uppercase tracking-[.2em] text-ink-400">Step 1 of 2</p>
+    <p id="pin-label" class="mt-0.5 text-xs font-semibold text-ink-800">Enter a {{ pin_length }}-digit PIN</p>
+    <div id="pin-dots" class="pin-dots" aria-hidden="true">
+        {% for ch in "x"|ljust:pin_length %}<span class="pin-dot"></span>{% endfor %}
+    </div>
+    <p id="pin-error" class="mt-1 min-h-[1rem] text-xs font-medium text-red-600" role="alert" aria-live="polite"></p>
+
+    {% include "accounts/partials/pin_pad_keys.html" %}
+
+    <label class="mt-4 flex items-start gap-2.5 rounded-xl border border-ink-200 bg-white px-3 py-2.5 text-left cursor-pointer hover:border-brand-300 hover:bg-brand-50/40 transition">
+        <input id="trust-device" type="checkbox" class="mt-0.5 h-4 w-4 rounded border-ink-300 text-brand-700 focus:ring-brand-500">
+        <span><span class="block text-xs font-semibold text-ink-800">Trust this device</span><span class="block mt-0.5 text-[10px] leading-4 text-ink-500">Only select this on a private POS device you control. Shared devices should stay untrusted.</span></span>
+    </label>
+
+    <button type="button" id="pin-restart" class="mt-2 hidden text-xs font-semibold text-brand-700 hover:text-brand-800">Start over</button>
+
+    <p class="mt-3 text-[10px] leading-4 text-ink-400">Avoid obvious PINs such as 0000 or 1234. Never share your PIN with anyone.</p>
+    <a href="{% url 'accounts:logout' %}" class="mt-3 inline-block text-[10px] font-semibold uppercase tracking-[.2em] text-ink-500 transition hover:text-brand-700">Sign out</a>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+    var root = document.getElementById('pin-root');
+    if (!root) return;
+    var length = parseInt(root.dataset.length, 10) || 4;
+    var url = root.dataset.url;
+    var csrf = root.querySelector('input[name="csrfmiddlewaretoken"]').value;
+    var dotsWrap = document.getElementById('pin-dots');
+    var dots = dotsWrap.querySelectorAll('.pin-dot');
+    var errorEl = document.getElementById('pin-error');
+    var labelEl = document.getElementById('pin-label');
+    var stepEl = document.getElementById('pin-step');
+    var restartBtn = document.getElementById('pin-restart');
+    var pin = '', first = null, busy = false;
+    var trustDevice = document.getElementById('trust-device');
+
+    function render() { PinUI.render(pin); }
+    function setError(msg) { errorEl.textContent = msg || ''; }
+    function shake() { dotsWrap.classList.remove('is-shake'); void dotsWrap.offsetWidth; dotsWrap.classList.add('is-shake'); }
+    function setBusy(v) { busy = v; root.classList.toggle('is-busy', v); if (v) PinUI.state('busy'); }
+    function labels(n) { PinUI.setLabel(n === 1 ? { idle: 'Enter PIN', ready: 'Continue\u2026' } : { idle: 'Confirm PIN', ready: 'Checking\u2026', busy: 'Saving PIN\u2026', success: 'PIN created' }); }
+    function showStep(n) {
+        stepEl.textContent = 'Step ' + n + ' of 2';
+        labelEl.textContent = n === 1 ? root.dataset.labelFirst : root.dataset.labelConfirm;
+        restartBtn.classList.toggle('hidden', n === 1);
+        labels(n);
+    }
+    function startOver(message) {
+        first = null; pin = ''; PinUI.state('idle'); render(); showStep(1); setError(message || '');
+        if (message) shake();
+    }
+    function submit() {
+        setBusy(true);
+        fetch(url, {
+            method: 'POST', credentials: 'same-origin',
+            headers: { 'X-CSRFToken': csrf, 'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'pin=' + encodeURIComponent(first) + '&pin_confirm=' + encodeURIComponent(pin) + '&trust_device=' + (trustDevice && trustDevice.checked ? 'on' : '')
+        })
+        .then(function (res) { return res.json().catch(function () { return { ok: false, error: 'Unexpected response. Please try again.' }; }); })
+        .then(function (data) {
+            if (data && data.ok) { setError(''); PinUI.leave(function () { window.location.href = data.redirect; }); return; }
+            setBusy(false); PinUI.state('idle');
+            startOver((data && data.error) || 'Something went wrong. Please try again.');
+        })
+        .catch(function () { setBusy(false); startOver('Network problem. Check your connection and try again.'); });
+    }
+    function complete() {
+        if (busy || pin.length !== length) return;
+        if (first === null) {
+            first = pin; pin = ''; PinUI.state('idle'); render(); showStep(2); setError('');
+        } else if (first !== pin) {
+            startOver('The two PINs do not match. Please start again.');
+        } else {
+            submit();
+        }
+    }
+    function addDigit(d) {
+        if (busy || pin.length >= length) return;
+        pin += d; setError(''); render();
+        if (pin.length === length) setTimeout(complete, 260);
+    }
+    function backspace() { if (busy) return; pin = pin.slice(0, -1); render(); }
+
+    root.querySelectorAll('[data-digit]').forEach(function (btn) {
+        btn.addEventListener('click', function () { addDigit(btn.dataset.digit); });
+    });
+    document.getElementById('pin-back').addEventListener('click', backspace);
+    restartBtn.addEventListener('click', function () { startOver(''); });
+    labels(1);
+    PinUI.onConfirm(function () { if (!busy && pin.length === length) complete(); });
+    document.addEventListener('keydown', function (e) {
+        if (e.ctrlKey || e.metaKey || e.altKey) return;
+        if (/^[0-9]$/.test(e.key)) { e.preventDefault(); addDigit(e.key); }
+        else if (e.key === 'Backspace') { e.preventDefault(); backspace(); }
+    });
+})();
+</script>
+{% endblock %}

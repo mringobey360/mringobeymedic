@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+{% load humanize %}
+{% block title %}Review Post-Close Activity · Cash Control{% endblock %}
+{% block content %}
+<div class="mx-auto max-w-3xl space-y-6">
+  <a href="{% url 'expenses:cash' %}" class="inline-flex items-center gap-2 text-sm font-semibold text-ink-500 hover:text-ink-900">← Back to Daily Cash Control</a>
+  <section class="card overflow-hidden rounded-2xl shadow-sm">
+    <div class="border-b border-ink-100 bg-gradient-to-r from-amber-50 to-white p-5 md:p-7">
+      <div class="flex items-start gap-4"><span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-800 text-xl font-black">!</span><div><p class="text-xs font-extrabold uppercase tracking-[0.15em] text-amber-700">Financial control · Exception workflow</p><h1 class="mt-1 text-2xl font-extrabold text-ink-900">Review post-close activity</h1><p class="mt-2 text-sm leading-6 text-ink-600">Reopening creates an audited correction point. The previous close is preserved permanently. If this day had a provisional opening, the system will safely rebase that opening from the earlier verified closing balance before you recount and close again.</p></div></div>
+    </div>
+    <div class="p-5 md:p-7 space-y-5">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div class="rounded-xl border border-ink-100 bg-ink-50/70 p-4"><p class="text-xs font-semibold uppercase tracking-wide text-ink-500">Cash day</p><p class="mt-1 text-lg font-extrabold text-ink-900">{{ day.date|date:"d M Y" }}</p><p class="mt-1 text-xs text-ink-500">Closed {{ day.closed_at|date:"d M Y · H:i" }}</p></div>
+        <div class="rounded-xl border border-ink-100 bg-ink-50/70 p-4"><p class="text-xs font-semibold uppercase tracking-wide text-ink-500">Previous physical close</p><p class="mt-1 text-lg font-extrabold text-ink-900">TZS {{ day.actual_closing_cash|floatformat:0|intcomma }}</p><p class="mt-1 text-xs text-ink-500">This historical count will be retained.</p></div>
+        <div class="rounded-xl border border-ink-100 p-4"><p class="text-xs font-semibold uppercase tracking-wide text-ink-500">Expected at original close</p><p class="mt-1 font-bold text-ink-900">TZS {{ day.expected_closing_cash|floatformat:0|intcomma }}</p></div>
+        <div class="rounded-xl border {% if day.cash_difference == 0 %}border-emerald-200 bg-emerald-50{% else %}border-amber-200 bg-amber-50{% endif %} p-4"><p class="text-xs font-semibold uppercase tracking-wide text-ink-500">Original variance</p><p class="mt-1 font-extrabold {% if day.cash_difference == 0 %}text-emerald-800{% else %}text-amber-900{% endif %}">TZS {{ day.cash_difference|floatformat:0|intcomma }}</p><p class="mt-1 text-xs text-ink-500">Historical variance; not recalculated away.</p></div>
+      </div>
+      {% if day.closing_snapshots.exists %}
+      <div class="rounded-xl border border-ink-100 p-4 text-sm"><p class="text-xs font-semibold uppercase tracking-wide text-ink-500">Closing snapshots (immutable)</p>
+        <ul class="mt-2 space-y-1">{% for s in day.closing_snapshots.all %}<li class="flex justify-between gap-3"><span>Revision {{ s.revision }} · {{ s.closed_at|date:"d M Y H:i" }}</span><span class="font-semibold">Expected TZS {{ s.expected_cash|floatformat:0|intcomma }} · Physical TZS {{ s.physical_cash|floatformat:0|intcomma }} · Variance {{ s.variance|floatformat:0|intcomma }}</span></li>{% endfor %}</ul></div>
+      {% endif %}
+      {% if provisional_opening %}
+      <div class="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-950">
+        <strong>Provisional opening detected.</strong> This day was closed using a temporary opening balance. After the earlier day is verified, the system will use that verified physical closing as the correct opening, record any change in the audit trail, and require a fresh physical recount before this day is closed again.
+      </div>
+      {% endif %}
+      {% if summary %}
+      <div class="rounded-xl border border-amber-200 bg-white p-4 text-sm">
+        <p class="text-xs font-semibold uppercase tracking-wide text-ink-500">Post-close reconciliation breakdown</p>
+        <dl class="mt-3 space-y-1.5">
+          <div class="flex justify-between"><dt>Original closing count</dt><dd class="font-semibold">TZS {{ summary.original_closing|floatformat:0|intcomma }}</dd></div>
+          <div class="flex justify-between"><dt>Cash sales after close ({{ summary.totals.sales_count }})</dt><dd class="font-semibold">+ TZS {{ summary.totals.cash_sales|floatformat:0|intcomma }}</dd></div>
+          <div class="flex justify-between"><dt>Credit payments in cash after close ({{ summary.totals.debt_payment_count }})</dt><dd class="font-semibold">+ TZS {{ summary.totals.cash_debt_collected|floatformat:0|intcomma }}</dd></div>
+          <div class="flex justify-between"><dt>Cash refunds after close ({{ summary.totals.refund_count }})</dt><dd class="font-semibold">− TZS {{ summary.totals.cash_refunds|floatformat:0|intcomma }}</dd></div>
+          <div class="flex justify-between"><dt>Cash expenses after close ({{ summary.totals.expense_count }})</dt><dd class="font-semibold">− TZS {{ summary.totals.cash_expenses|floatformat:0|intcomma }}</dd></div>
+          <div class="flex justify-between"><dt>Staff meals after close ({{ summary.totals.meal_count }})</dt><dd class="font-semibold">− TZS {{ summary.totals.cash_meals|floatformat:0|intcomma }}</dd></div>
+          <div class="flex justify-between border-t border-ink-100 pt-2"><dt>Net cash after close</dt><dd class="font-extrabold">TZS {{ summary.net|floatformat:0|intcomma }}</dd></div>
+          <div class="flex justify-between"><dt>Current expected cash</dt><dd class="font-extrabold">TZS {{ summary.current_expected|floatformat:0|intcomma }}</dd></div>
+        </dl>
+        <a href="{% url 'expenses:cash_activity_detail' day.pk %}" class="mt-3 inline-block text-sm font-semibold text-amber-800 underline">View every post-close transaction</a>
+      </div>
+      {% endif %}
+      {% if not reopenable_exception %}<div class="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-950"><strong>No unresolved correction is currently detected.</strong><p class="mt-1">The original closing snapshot remains untouched. Return to Cash Control and continue from the current state.</p></div>{% endif %}
+      <div class="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-950"><strong>What happens next?</strong><ol class="mt-2 list-decimal space-y-1 pl-5"><li>The system saves the original close, variance, closing manager and timestamp.</li><li>The day reopens; all existing cash-count records remain in the timeline.</li><li>Review source transactions and count the physical drawer again.</li><li>Close the day again. A later cash day blocks reopening to protect carry-forward balances.</li></ol></div>
+      <form method="post" class="space-y-4" {% if not reopenable_exception %}aria-disabled="true"{% endif %} data-confirm="Reopen this cash day?" data-confirm-detail="The original closing snapshot will remain permanently in the audit trail. After reopening, review the cash activity, recount the physical drawer and close the day again." data-confirm-accept="Reopen &amp; continue">
+        {% csrf_token %}
+        <label for="reason" class="block text-sm font-bold text-ink-800">Reason for reopening <span class="text-red-600">*</span></label>
+        <textarea id="reason" name="reason" rows="4" minlength="12" {% if not reopenable_exception %}disabled{% endif %} required placeholder="Example: Cash sales were recorded after the final count due to the register remaining active. Transactions reviewed against Sales History." class="w-full rounded-xl border border-ink-200 bg-white px-4 py-3 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100">{{ reason }}</textarea>
+        <p class="text-xs text-ink-500">This explanation is permanently recorded with the manager identity and reopening timestamp.</p>
+        <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 border-t border-ink-100 pt-4">
+          <a href="{% url 'expenses:cash' %}" class="btn btn-secondary text-center">Cancel</a>
+          <button type="submit" class="inline-flex items-center justify-center rounded-xl bg-amber-700 px-5 py-3 text-sm font-extrabold text-white hover:bg-amber-800">Confirm &amp; Reopen Cash Day</button>
+        </div>
+      </form>
+    </div>
+  </section>
+</div>
+{% endblock %}

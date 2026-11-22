@@ -1,0 +1,275 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Products{% endblock %}
+{% block content %}
+<div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+    <div>
+        <h1 class="text-2xl font-bold text-ink-900 tracking-tight">Products &amp; Stock</h1>
+        {% if request.pharmacy %}<p class="text-sm text-ink-500 mt-0.5">{{ request.pharmacy.name }}</p>{% endif %}
+    </div>
+    {% if user.is_management_user %}
+    <div class="product-page-actions flex gap-2 min-w-0" role="group" aria-label="Product actions">
+        <button type="submit" form="bulk-delete-form" id="bulk-delete-btn" class="btn btn-secondary text-red-600 product-action-delete" disabled>
+            <span aria-hidden="true">Delete</span> Selected <span id="bulk-delete-count" class="ml-1"></span>
+        </button>
+        <button type="button" data-pqs-open class="btn btn-secondary product-action-btn" data-resolve-url="{% url 'inventory:scan_resolve' %}" data-register-url="{% url 'inventory:scan_register' %}" data-restock-url="{% url 'inventory:scan_restock' 0 %}" data-list-url="{% url 'inventory:product_list' %}" title="Scan a pack to register a new product or restock an existing one">
+            <svg class="icon shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><path d="M7 8v8M10.5 8v8M14 8v8M17 8v8"/></svg>
+            <span>Scan</span>
+        </button>
+        <a href="{% url 'inventory:bulk_upload' %}" class="btn btn-secondary product-action-btn">
+            <svg class="icon shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M4 21h16"/></svg>
+            <span>Bulk Upload</span>
+        </a>
+        {% if user.is_management_user %}<a href="{% url 'inventory:restock_history' %}" class="btn btn-secondary product-action-btn" title="Every restock with date, time and download">
+            <svg class="icon shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+            <span>Restock History</span>
+        </a>{% endif %}
+        <button type="button" data-pqs-register-open class="btn btn-primary product-action-btn product-action-add"
+                data-resolve-url="{% url 'inventory:scan_resolve' %}"
+                data-register-url="{% url 'inventory:scan_register' %}"
+                data-restock-url="{% url 'inventory:scan_restock' 0 %}"
+                data-list-url="{% url 'inventory:product_list' %}"
+                title="Open the quick product registration form">
+            <span class="text-lg leading-none" aria-hidden="true">+</span><span>Register Product</span>
+        </button>
+    </div>
+    {% endif %}
+</div>
+
+{% if has_demo_products and user.is_management_user %}
+<div class="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3" role="note">
+    <div class="min-w-0">
+        <p class="text-sm font-bold text-amber-900">Sample products are loaded so you can try SmartPOS right away.</p>
+        <p class="text-xs text-amber-800 mt-0.5 leading-5">Open the POS and sell one now. Sales made with sample products never use your free monthly sales. When you are ready, remove them in one click &mdash; your own products are never touched.</p>
+    </div>
+    <form method="post" action="{% url 'inventory:demo_remove' %}" onsubmit="return confirm('Remove all sample products? Your own products will not be affected.');">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-secondary text-red-600 whitespace-nowrap">Remove sample data</button>
+    </form>
+</div>
+{% endif %}
+
+<style>
+    .product-page-actions { align-items: stretch; }
+    .product-page-actions > .product-action-btn,
+    .product-page-actions > .product-action-delete { white-space: nowrap; }
+    @media (max-width: 640px) {
+        .product-page-actions {
+            width: 100%;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            gap: .5rem;
+        }
+        .product-page-actions .product-action-btn,
+        .product-page-actions .product-action-delete {
+            min-width: 0;
+            width: 100%;
+            justify-content: center;
+            padding-left: .65rem;
+            padding-right: .65rem;
+            overflow: hidden;
+        }
+        .product-page-actions .product-action-delete {
+            grid-column: 1 / -1;
+        }
+        .product-page-actions .product-action-btn span:last-child {
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+    }
+    @media (max-width: 380px) {
+        .product-page-actions { gap: .4rem; }
+        .product-page-actions .product-action-btn { font-size: .78rem; }
+    }
+</style>
+<form method="get" id="product-filter-form" class="card mb-5 flex flex-wrap gap-3 items-end" autocomplete="off">
+    <div class="flex-1 min-w-[200px]">
+        <label class="block text-xs font-medium text-ink-500 mb-1" for="product-search-input">Search</label>
+        <div class="relative">
+            <input type="search" id="product-search-input" name="q" value="{{ query }}" placeholder="Type product name, barcode or batch..." class="form-input">
+            <span id="product-search-spinner" class="hidden absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-2 border-ink-200 border-t-brand-700 animate-spin" aria-hidden="true"></span>
+        </div>
+    </div>
+    <div>
+        <label class="block text-xs font-medium text-ink-500 mb-1">Category</label>
+        <select name="category" class="form-input">
+            <option value="">All</option>
+            {% for c in categories %}
+            <option value="{{ c.id }}" {% if category_id == c.id|stringformat:"s" %}selected{% endif %}>{{ c.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div>
+        <label class="block text-xs font-medium text-ink-500 mb-1">Stock Status</label>
+        <select name="stock" class="form-input">
+            <option value="">All</option>
+            <option value="low" {% if stock_filter == 'low' %}selected{% endif %}>Low Stock</option>
+            <option value="expiring" {% if stock_filter == 'expiring' %}selected{% endif %}>Expiring / Expired</option>
+        </select>
+    </div>
+    <a href="{% url 'inventory:product_list' %}" id="product-filter-clear" class="btn btn-secondary"{% if not query and not category_id and not stock_filter %} style="display:none"{% endif %}>Clear</a>
+    <noscript><button type="submit" class="btn btn-primary">Filter</button></noscript>
+</form>
+
+{% if user.is_management_user %}
+<form method="post" action="{% url 'inventory:product_delete_review' %}" id="bulk-delete-form">
+    {% csrf_token %}
+</form>
+{% endif %}
+
+<div id="product-results" aria-live="polite">
+{% include "inventory/_product_results.html" %}
+</div>
+
+<script>
+(function () {
+    const form = document.getElementById('product-filter-form');
+    const results = document.getElementById('product-results');
+    if (!form || !results) return;
+
+    const input = document.getElementById('product-search-input');
+    const spinner = document.getElementById('product-search-spinner');
+    const clearBtn = document.getElementById('product-filter-clear');
+    const bulkBtn = document.getElementById('bulk-delete-btn');
+    const countLabel = document.getElementById('bulk-delete-count');
+    const base = form.getAttribute('action') || window.location.pathname;
+
+    let timer = null;
+    let controller = null;
+    let requestId = 0;
+
+    /* ---- bulk-delete checkboxes (delegated, so they survive every live refresh) ---- */
+    function refreshBulk() {
+        if (!bulkBtn) return;
+        const checked = results.querySelectorAll('.product-row-checkbox:checked').length;
+        bulkBtn.disabled = checked === 0;
+        if (countLabel) countLabel.textContent = checked ? '(' + checked + ')' : '';
+    }
+    results.addEventListener('change', function (e) {
+        if (e.target.id === 'select-all-products') {
+            results.querySelectorAll('.product-row-checkbox').forEach(function (cb) { cb.checked = e.target.checked; });
+        } else if (e.target.classList.contains('product-row-checkbox')) {
+            const all = results.querySelector('#select-all-products');
+            if (all && !e.target.checked) all.checked = false;
+        } else {
+            return;
+        }
+        refreshBulk();
+    });
+
+    /* ---- live search ---- */
+    function currentParams(page) {
+        const params = new URLSearchParams(new FormData(form));
+        Array.from(params.keys()).forEach(function (k) { if (!params.get(k)) params.delete(k); });
+        if (page && page !== '1') params.set('page', page);
+        return params;
+    }
+
+    function setBusy(on) {
+        if (spinner) spinner.classList.toggle('hidden', !on);
+        results.style.opacity = on ? '0.55' : '';
+        results.style.transition = 'opacity .15s';
+    }
+
+    async function load(page) {
+        const params = currentParams(page);
+        const shown = params.toString();
+        const myId = ++requestId;
+        if (controller) controller.abort();          // drop the previous, now-outdated request
+        controller = new AbortController();
+        setBusy(true);
+
+        const fetchParams = new URLSearchParams(params);
+        fetchParams.set('partial', '1');
+        try {
+            const res = await fetch(base + '?' + fetchParams.toString(), {
+                credentials: 'same-origin',
+                headers: { 'Accept': 'text/html' },
+                signal: controller.signal
+            });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const html = await res.text();
+            if (myId !== requestId) return;          // a newer keystroke already replaced this one
+            results.innerHTML = html;
+            refreshBulk();
+            if (clearBtn) clearBtn.style.display = (params.get('q') || params.get('category') || params.get('stock')) ? '' : 'none';
+            history.replaceState(history.state, '', base + (shown ? '?' + shown : ''));
+        } catch (err) {
+            if (err.name === 'AbortError') return;
+            console.error('Product live search failed, falling back to full page load:', err);
+            window.location.href = base + (shown ? '?' + shown : '');
+            return;
+        } finally {
+            if (myId === requestId) setBusy(false);
+        }
+    }
+
+    input.addEventListener('input', function () {
+        clearTimeout(timer);
+        timer = setTimeout(function () { load(); }, 250);
+    });
+    input.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && input.value) {
+            input.value = '';
+            clearTimeout(timer);
+            load();
+        }
+    });
+    form.addEventListener('submit', function (e) {   // Enter key: search right away
+        e.preventDefault();
+        clearTimeout(timer);
+        load();
+    });
+    form.querySelectorAll('select').forEach(function (sel) {
+        sel.addEventListener('change', function () { clearTimeout(timer); load(); });
+    });
+    if (clearBtn) {
+        clearBtn.addEventListener('click', function (e) {
+            e.preventDefault();
+            input.value = '';
+            form.querySelectorAll('select').forEach(function (sel) {
+                sel.value = '';
+                sel.dispatchEvent(new Event('change', { bubbles: true }));
+            });
+            input.focus();
+        });
+    }
+
+    /* Pagination stays inside live mode too (keeps the search, no full reload). */
+    results.addEventListener('click', function (e) {
+        const link = e.target.closest('nav[aria-label="Pagination"] a[href]');
+        if (!link) return;
+        e.preventDefault();
+        const page = new URL(link.href, window.location.origin).searchParams.get('page') || '1';
+        load(page).then(function () { window.scrollTo({ top: 0, behavior: 'smooth' }); });
+    });
+
+    refreshBulk();
+    // Desktop: ready to type immediately. Skipped on touch devices so the keyboard doesn't pop up.
+    if (window.matchMedia('(pointer: fine)').matches) input.focus({ preventScroll: true });
+})();
+</script>
+<style>
+    #app-content tr.is-just-saved{background:#f0fdfa;box-shadow:inset 3px 0 0 #0f766e;animation:pm-saved-fade 4s ease-out 1.2s forwards}
+    @keyframes pm-saved-fade{to{background:transparent;box-shadow:inset 3px 0 0 transparent}}
+</style>
+<script>
+// After a scan-save the saved product is brought into view; the URL is cleaned so a refresh does not repeat it.
+(function () {
+    var row = document.querySelector('tr.is-just-saved');
+    if (!row) return;
+    setTimeout(function () { try { row.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) { row.scrollIntoView(); } }, 150);
+    try {
+        var u = new URL(window.location.href);
+        if (u.searchParams.has('highlight')) { u.searchParams.delete('highlight'); history.replaceState(history.state, '', u.pathname + (u.search || '')); }
+    } catch (e) { /* ignore */ }
+})();
+</script>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'js/pm-scanner.js' %}?v=2"></script>
+<script src="{% static 'js/pm-scan-fields.js' %}?v=2"></script>
+<script src="{% static 'js/pm-inline-add.js' %}?v=2"></script>
+<script src="{% static 'js/pm-quick-stock.js' %}?v=7"></script>
+{% endblock %}

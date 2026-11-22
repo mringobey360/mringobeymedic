@@ -1,0 +1,60 @@
+{% load registry_privacy %}<div id="customer-results" data-total="{{ total_count }}" data-page-count="{{ page_obj|length }}">
+  <section class="pro-panel">
+    <div class="pro-panel-h">
+      <div><h2>Customer contacts</h2><p>{{ total_count }} customer{{ total_count|pluralize }} found{% if q %} for “{{ q }}”{% endif %}.</p></div>
+    </div>
+
+    {% if user.is_admin_role %}
+    <div id="bulk-bar" class="hidden px-5 py-3 bg-brand-50 border-b border-brand-100 flex-wrap items-center gap-3">
+      <p class="text-sm font-semibold text-ink-800"><span id="bulk-count">0</span> selected</p>
+      <button type="button" id="bulk-select-all-matching" class="hidden text-sm font-semibold text-brand-700 underline">Select all {{ total_count }} customers matching this search</button>
+      <button type="button" id="bulk-clear" class="text-sm text-ink-500 underline">Clear</button>
+      <button type="submit" form="bulk-delete-form" class="btn btn-danger ml-auto">Delete selected</button>
+    </div>
+    {% endif %}
+
+    <div class="pro-tw">
+      <table class="pro-table stack">
+        <thead><tr>
+          {% if user.is_admin_role %}<th style="width:2.5rem"><input type="checkbox" id="select-all-page" class="h-4 w-4 rounded border-ink-300" aria-label="Select all customers on this page"></th>{% endif %}
+          <th>Customer</th><th>Phone</th><th>Status</th><th>Registered</th><th class="r">Action</th>
+        </tr></thead>
+        <tbody>
+        {% for c in page_obj %}
+          <tr>
+            {% if user.is_admin_role %}<td class="first"><input type="checkbox" name="ids" value="{{ c.pk }}" form="bulk-delete-form" class="row-check h-4 w-4 rounded border-ink-300" aria-label="Select {{ c.name }}"></td>{% endif %}
+            <td class="{% if not user.is_admin_role %}first{% endif %}">
+              <div class="pro-who">
+                <span class="pro-av" aria-hidden="true">{{ c.name|slice:":1"|upper }}</span>
+                <div>
+                  <div class="pro-cell-main">{{ c.name }}</div>
+                  <div style="margin-top:.3rem;display:flex;flex-wrap:wrap;align-items:center;gap:.35rem">
+                    <span class="pro-b {% if c.loyalty_status == 'VIP' %}vio{% elif c.loyalty_status == 'ALMOST VIP' %}warn{% elif c.loyalty_status == 'LOYAL' %}info{% else %}plain{% endif %}">{{ c.loyalty_status }}</span>
+                    <span class="pro-cell-sub" style="margin:0">{{ c.visits_90d }} visit{{ c.visits_90d|pluralize }} / {{ loyalty_window_days }} days{% if c.loyalty_status == 'ALMOST VIP' %} · {{ c.visits_to_vip }} more to VIP{% endif %}</span>
+                  </div>
+                  {% if c.notes %}<div class="pro-cell-sub">{{ c.notes }}</div>{% endif %}
+                </div>
+              </div>
+            </td>
+            <td data-label="Phone" class="num">{% if request.user|can_see_phone %}<a href="tel:{{ c.phone }}" class="pro-ref" title="Call {{ c.phone }}">{{ c.phone }}</a>{% else %}<span title="Only the manager can see full numbers">{{ c.phone|phone_for:request.user }}</span>{% endif %}</td>
+            <td data-label="Status"><span class="pro-b {% if c.is_active %}ok{% else %}plain{% endif %}">{{ c.is_active|yesno:"Active,Inactive" }}</span></td>
+            <td data-label="Registered" class="num mut">{{ c.created_at|date:"d M Y" }}</td>
+            <td class="acts r">
+              {% if user.is_management_user %}
+              <div class="pro-actions">
+                <a href="{% url 'customer_registry:edit' c.pk %}" class="pro-link bd" title="Edit customer details"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>Edit</a>
+                <form method="post" action="{% url 'customer_registry:toggle' c.pk %}">{% csrf_token %}<button class="pro-link bd">{{ c.is_active|yesno:"Deactivate,Activate" }}</button></form>
+                <form method="post" action="{% url 'customer_registry:delete' c.pk %}" data-confirm="Delete this customer?" data-confirm-detail="{{ c.name }} will be permanently removed from the customer registry. Existing SMS campaign history will be preserved.">{% csrf_token %}<button type="submit" class="pro-link bd danger">Delete</button></form>
+              </div>
+              {% else %}<span class="pro-cell-sub">View only</span>{% endif %}
+            </td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="6"><div class="pro-empty"><strong>No customers found</strong>Try a different search or register your first customer.</div></td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {% include "partials/pagination.html" with page_obj=page_obj %}
+</div>

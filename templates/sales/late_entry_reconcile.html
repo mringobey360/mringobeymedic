@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Reconcile late sales{% endblock %}
+{% block content %}
+<div class="mb-5">
+    <h1 class="text-2xl font-bold text-ink-900 tracking-tight">Late sales on closed cash days</h1>
+    <p class="text-sm text-ink-500 mt-0.5">
+        These sales happened on a day whose cash was already counted and closed. They are saved on their real date,
+        but the closed drawer is never changed silently. Finish each day in two steps; the sales resolve
+        themselves once the day is closed again, and the next day&rsquo;s opening cash is re-based automatically.
+    </p>
+</div>
+
+{% for row in rows %}
+<div class="card mb-4">
+    <div class="flex flex-wrap items-start justify-between gap-3">
+        <div>
+            <h2 class="text-lg font-semibold text-ink-900">{{ row.date|date:"l, d M Y" }}</h2>
+            <p class="text-xs text-ink-500">{{ row.sales|length }} late sale{{ row.sales|length|pluralize }} &middot; TZS {{ row.total|floatformat:0 }}</p>
+        </div>
+        <span class="badge {% if row.step == 'DONE' %}bg-green-100 text-green-700{% else %}bg-amber-100 text-amber-700{% endif %}">
+            {% if row.step == 'REOPEN' %}Step 1 of 2: reopen &amp; recount{% elif row.step == 'CLOSE' %}Step 2 of 2: close the day again{% elif row.step == 'NO_DAY' %}No cash record{% else %}Reconciled{% endif %}
+        </span>
+    </div>
+
+    <div class="mt-3 text-sm">
+        {% if row.step == 'REOPEN' %}
+            <p class="text-ink-700">Open the day for a recount with a written reason (audited). The sales below are already counted in that day&rsquo;s expected cash.</p>
+            {% if row.summary %}
+            <dl class="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                <div><dt class="text-ink-500">Original count</dt><dd class="font-semibold">TZS {{ row.summary.original_closing|floatformat:0 }}</dd></div>
+                <div><dt class="text-ink-500">Expected at close</dt><dd class="font-semibold">TZS {{ row.summary.original_expected|floatformat:0 }}</dd></div>
+                <div><dt class="text-ink-500">Expected now</dt><dd class="font-semibold">TZS {{ row.summary.current_expected|floatformat:0 }}</dd></div>
+                <div><dt class="text-ink-500">Cash posted after close</dt><dd class="font-semibold">TZS {{ row.summary.net|floatformat:0 }}</dd></div>
+            </dl>
+            {% endif %}
+            <p class="mt-2 text-xs text-ink-500">Tip: the cash for these sales was already in the drawer when it was counted, so the original count normally stays the same.</p>
+            <a href="{% url 'expenses:cash_reopen' row.day.pk %}" class="btn btn-primary mt-3">Step 1 &mdash; Reopen &amp; Recount</a>
+        {% elif row.step == 'CLOSE' %}
+            <p class="text-ink-700">The day is open for correction. Check the drawer, then close it again. These sales will resolve automatically.</p>
+            <a href="{% url 'expenses:cash_close' row.day.pk %}" class="btn btn-primary mt-3">Step 2 &mdash; Close the day</a>
+        {% elif row.step == 'NO_DAY' %}
+            <p class="text-ink-700">There is no cash-control record for this date. Check <a class="underline" href="{% url 'expenses:cash' %}">Cash Control</a>.</p>
+        {% else %}
+            <p class="text-green-700">This day is closed again. Refresh to clear it from the list.</p>
+        {% endif %}
+    </div>
+
+    <ul class="mt-3 text-xs text-ink-600 divide-y divide-ink-100">
+        {% for sale in row.sales %}
+        <li class="py-1.5">#{{ sale.sale_number|default:sale.id }} &middot; {{ sale.payment_summary }} &middot; TZS {{ sale.total_amount|floatformat:0 }} &middot; {% firstof sale.served_by.get_full_name sale.served_by.username %} &middot; entered {{ sale.created_at|date:"d M, H:i" }}</li>
+        {% endfor %}
+    </ul>
+</div>
+{% empty %}
+<div class="card text-center text-ink-400 py-8">Nothing to reconcile &mdash; no late sales are waiting on a closed cash day.</div>
+{% endfor %}
+{% endblock %}

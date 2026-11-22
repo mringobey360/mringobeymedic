@@ -1,0 +1,264 @@
+{% extends "base.html" %}
+{% block title %}Send SmartPOS Invitation - HQ{% endblock %}
+{% block content %}
+<style>
+.pc{max-width:76rem;margin:0 auto;color:var(--sp-text)}
+.pc *{box-sizing:border-box}
+.pc-back{font-size:.78rem;font-weight:700;color:var(--sp-accent);text-decoration:none}
+.pc-head{margin:.35rem 0 1.1rem}
+.pc-head h1{font-size:1.55rem;font-weight:800;letter-spacing:-.02em;margin:0}
+.pc-head p{margin:.35rem 0 0;font-size:.875rem;color:var(--sp-muted);max-width:44rem;line-height:1.5}
+.pc-layout{display:grid;grid-template-columns:minmax(0,1fr) 22rem;gap:1.25rem;align-items:start}
+@media(max-width:1000px){.pc-layout{grid-template-columns:1fr}}
+.pc-card{background:var(--sp-surface);border:1px solid var(--sp-border);border-radius:1.1rem;padding:1.15rem 1.2rem;margin-bottom:1.1rem;box-shadow:0 1px 2px rgba(15,23,42,.04)}
+.pc-step{display:flex;align-items:center;gap:.65rem;margin-bottom:.95rem}
+.pc-step b{width:1.7rem;height:1.7rem;border-radius:50%;background:var(--sp-accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:.8rem;flex:none}
+.pc-step h2{font-size:.95rem;font-weight:800;margin:0}
+.pc-step small{display:block;font-size:.75rem;color:var(--sp-muted);font-weight:500}
+.pc-lab{display:block;font-size:.72rem;font-weight:700;color:var(--sp-muted);margin:0 0 .3rem;text-transform:uppercase;letter-spacing:.04em}
+.pc-in,.pc-sel,.pc-ta{width:100%;padding:.65rem .8rem;border:1px solid var(--sp-border);border-radius:.7rem;background:var(--sp-input);color:var(--sp-text);font-size:.875rem;font-family:inherit}
+.pc-in:focus,.pc-sel:focus,.pc-ta:focus{outline:0;border-color:var(--sp-accent);box-shadow:0 0 0 3px var(--sp-focus)}
+.pc-ta{min-height:8rem;resize:vertical;line-height:1.55}
+.pc-err{color:var(--sp-danger);font-size:.78rem;margin:.35rem 0 0}
+.pc-hint{font-size:.76rem;color:var(--sp-muted);margin:.4rem 0 0;line-height:1.5}
+.pc-hint code{background:var(--sp-surface-3);padding:.05rem .35rem;border-radius:.35rem;font-size:.74rem}
+.pc-field{margin-bottom:.95rem}.pc-field:last-child{margin-bottom:0}
+.pc-tpls{display:grid;grid-template-columns:repeat(2,1fr);gap:.6rem;margin-bottom:1rem}
+@media(max-width:640px){.pc-tpls{grid-template-columns:1fr}}
+.pc-tpl{text-align:left;border:1.5px solid var(--sp-border);background:var(--sp-surface-2);border-radius:.85rem;padding:.7rem .85rem;cursor:pointer;color:var(--sp-text);font-family:inherit;transition:.15s}
+.pc-tpl:hover{border-color:var(--sp-accent)}
+.pc-tpl.on{border-color:var(--sp-accent);background:var(--sp-accent-soft)}
+.pc-tpl b{display:block;font-size:.82rem;font-weight:800}
+.pc-tpl span{display:block;font-size:.72rem;color:var(--sp-muted);margin-top:.2rem;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.pc-meter{height:.35rem;border-radius:999px;background:var(--sp-surface-3);overflow:hidden;margin-top:.5rem}
+.pc-meter i{display:block;height:100%;width:0;background:var(--sp-accent);transition:width .15s}
+.pc-meter-row{display:flex;justify-content:space-between;font-size:.74rem;color:var(--sp-muted);margin-top:.35rem}
+.pc-chips{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.5rem}
+.pc-chip{border:1px solid var(--sp-border);background:var(--sp-surface);color:var(--sp-text);border-radius:999px;padding:.3rem .75rem;font-size:.74rem;font-weight:700;cursor:pointer;font-family:inherit}
+.pc-chip:hover{border-color:var(--sp-accent);color:var(--sp-accent)}
+.pc-switch{display:flex;gap:.8rem;align-items:flex-start;padding:.75rem .9rem;border:1px solid var(--sp-border);border-radius:.85rem;background:var(--sp-surface-2);cursor:pointer}
+.pc-switch input{position:absolute;opacity:0;pointer-events:none}
+.pc-track{width:2.4rem;height:1.4rem;border-radius:999px;background:var(--sp-scrollbar);position:relative;flex:none;transition:.15s;margin-top:.1rem}
+.pc-track:after{content:"";position:absolute;top:.15rem;left:.15rem;width:1.1rem;height:1.1rem;border-radius:50%;background:#fff;transition:.15s;box-shadow:0 1px 2px rgba(0,0,0,.3)}
+.pc-switch input:checked+.pc-track{background:var(--sp-accent)}
+.pc-switch input:checked+.pc-track:after{left:1.15rem}
+.pc-switch b{display:block;font-size:.83rem}.pc-switch span.t{display:block;font-size:.75rem;color:var(--sp-muted);margin-top:.15rem;line-height:1.45}
+.pc-aud{display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem}
+@media(max-width:640px){.pc-aud{grid-template-columns:1fr}}
+.pc-opt{position:relative;display:block;border:1.5px solid var(--sp-border);border-radius:.9rem;padding:.8rem .9rem;cursor:pointer;background:var(--sp-surface-2);transition:.15s}
+.pc-opt input{position:absolute;opacity:0}
+.pc-opt:has(input:checked){border-color:var(--sp-accent);background:var(--sp-accent-soft)}
+.pc-opt b{display:block;font-size:.85rem;font-weight:800}
+.pc-opt em{display:block;font-style:normal;font-size:1.25rem;font-weight:800;color:var(--sp-accent);margin:.15rem 0}
+.pc-opt span{font-size:.72rem;color:var(--sp-muted)}
+.pc-list{max-height:16rem;overflow-y:auto;border:1px solid var(--sp-border);border-radius:.85rem;margin-top:.8rem}
+.pc-row{display:flex;align-items:center;gap:.7rem;padding:.55rem .85rem;border-bottom:1px solid var(--sp-border);cursor:pointer;font-size:.84rem}
+.pc-row:last-child{border-bottom:0}.pc-row:hover{background:var(--sp-surface-2)}
+.pc-row small{color:var(--sp-muted);margin-left:auto;font-variant-numeric:tabular-nums}
+.pc-side{position:sticky;top:5.5rem}
+@media(max-width:1000px){.pc-side{position:static}}
+.pc-phone{background:linear-gradient(160deg,#1e293b,#0f172a);border-radius:2rem;padding:.7rem;box-shadow:0 18px 40px rgba(15,23,42,.28)}
+.pc-screen{background:#f1f5f9;border-radius:1.5rem;overflow:hidden;min-height:18rem;display:flex;flex-direction:column}
+.pc-bar{display:flex;align-items:center;gap:.6rem;padding:.75rem 1rem;background:#fff;border-bottom:1px solid #e2e8f0;color:#0f172a}
+.pc-logo{width:2rem;height:2rem;border-radius:50%;background:#0f766e;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.8rem}
+.pc-bar b{font-size:.85rem;display:block}.pc-bar small{font-size:.68rem;color:#64748b}
+.pc-body{padding:1rem .85rem;flex:1}
+.pc-bubble{background:#fff;color:#0f172a;border-radius:1rem 1rem 1rem .3rem;padding:.7rem .85rem;font-size:.83rem;line-height:1.5;white-space:pre-line;word-break:break-word;box-shadow:0 1px 2px rgba(15,23,42,.1)}
+.pc-time{font-size:.66rem;color:#94a3b8;margin:.35rem .3rem 0}
+.pc-sum{margin-top:1rem}
+.pc-sum div{display:flex;justify-content:space-between;padding:.45rem 0;font-size:.84rem;border-bottom:1px dashed var(--sp-border)}
+.pc-sum div:last-child{border-bottom:0;font-weight:800;font-size:.95rem;color:var(--sp-accent)}
+.pc-sum span{color:var(--sp-muted)}.pc-sum div:last-child span{color:inherit}
+.pc-warn{font-size:.74rem;color:var(--sp-warning);margin-top:.5rem}
+.pc-send{width:100%;margin-top:1rem;padding:.8rem 1rem;border:0;border-radius:.85rem;background:var(--sp-accent);color:#fff;font-weight:800;font-size:.9rem;cursor:pointer;font-family:inherit}
+.pc-send:hover{background:var(--sp-accent-hover)}.pc-send:disabled{opacity:.5;cursor:not-allowed}
+.pc-alert{border:1px solid #fecaca;background:#fef2f2;color:#991b1b;border-radius:.9rem;padding:.8rem 1rem;margin-bottom:1rem;font-size:.84rem}
+.pc-alert b{display:block}
+/* Dropdowns: the global enhancer copies the select's classes onto its wrapper, so neutralise the
+   input styling on the wrapper (it caused a double box) and style the trigger/menu like our inputs. */
+.pc .custom-select.pc-sel{padding:0;border:0;background:transparent;box-shadow:none;border-radius:0}
+.pc .custom-select-trigger{background:var(--sp-input);border:1px solid var(--sp-border);border-radius:.7rem;color:var(--sp-text);min-height:2.6rem;padding:.55rem .8rem;font-size:.875rem}
+.pc .custom-select-trigger:hover{background:var(--sp-surface-2);border-color:var(--sp-border)}
+.pc .custom-select.open .custom-select-trigger,.pc .custom-select-trigger:focus-visible{border-color:var(--sp-accent);box-shadow:0 0 0 3px var(--sp-focus)}
+.pc .custom-select-menu{background:var(--sp-surface);border:1px solid var(--sp-border);box-shadow:var(--sp-shadow);z-index:80}
+.pc .custom-option{color:var(--sp-text)}
+.pc .custom-option:hover,.pc .custom-option:focus-visible,.pc .custom-option.selected{background:var(--sp-accent-soft);color:var(--sp-accent)}
+.pc-type{max-width:18rem}
+</style>
+
+<div class="pc">
+    <a class="pc-back" href="{% url 'hq:prospect_list' %}">&larr; Prospects</a>
+    <div class="pc-head">
+        <h1>Send SmartPOS Invitation</h1>
+        <p>Pick an official message, add your system link, then choose recipients. Contacts who joined or opted out are never messaged.</p>
+    </div>
+
+    {% if not provider_ready %}<div class="pc-alert"><b>SMS sending is not available</b>{{ provider_reason }}</div>{% endif %}
+
+    <form method="post" id="pf" novalidate>
+    {% csrf_token %}
+    <div class="pc-layout">
+        <div>
+            <section class="pc-card">
+                <div class="pc-step"><b>1</b><div><h2>Message</h2><small>Pick an official template, then edit it if you like</small></div></div>
+                <div class="pc-tpls">
+                    {% for t in templates %}<button type="button" class="pc-tpl{% if forloop.first %} on{% endif %}" data-title="{{ t.title }}" data-text="{{ t.text }}"><b>{{ t.label }}</b><span>{{ t.text }}</span></button>{% endfor %}
+                </div>
+                <div class="pc-field">
+                    <label class="pc-lab" for="f-title">Message title</label>
+                    <input class="pc-in" name="title" id="f-title" maxlength="120" value="{{ data.title }}">
+                    {% if errors.title %}<p class="pc-err">{{ errors.title }}</p>{% endif %}
+                </div>
+                <div class="pc-field">
+                    <label class="pc-lab" for="f-msg">Message text</label>
+                    <textarea class="pc-ta" name="message" id="f-msg" maxlength="{{ max_chars }}">{{ data.message }}</textarea>
+                    <div class="pc-meter"><i id="meter"></i></div>
+                    <div class="pc-meter-row"><span><code>{name}</code> = owner first name (blank: "Ndugu") &middot; <code>{link}</code> = SmartPOS link</span><span><span id="c-body">0</span>/{{ max_chars }}</span></div>
+                    {% if errors.message %}<p class="pc-err">{{ errors.message }}</p>{% endif %}
+                </div>
+                <div class="pc-field">
+                    <label class="pc-lab" for="f-link">SmartPOS link</label>
+                    <input class="pc-in" name="link_url" id="f-link" value="{{ data.link_url }}" placeholder="https://...">
+                    <div class="pc-chips">
+                        <button type="button" class="pc-chip lnk" data-url="{{ default_link }}">Home page</button>
+                        <button type="button" class="pc-chip lnk" data-url="{{ signup_link }}">Direct sign-up page</button>
+                    </div>
+                    {% if errors.link_url %}<p class="pc-err">{{ errors.link_url }}</p>{% endif %}
+                </div>
+            </section>
+
+            <section class="pc-card">
+                <div class="pc-step"><b>2</b><div><h2>Recipients</h2><small>Who should receive this invitation</small></div></div>
+                <div class="pc-aud">
+                    <label class="pc-opt"><input type="radio" name="mode" value="new" {% if data.mode == 'new' %}checked{% endif %}><b>New only</b><em>{{ counts.new }}</em><span>Never messaged before</span></label>
+                    <label class="pc-opt"><input type="radio" name="mode" value="all" {% if data.mode == 'all' %}checked{% endif %}><b>All eligible</b><em>{{ counts.all }}</em><span>Including those messaged before</span></label>
+                    <label class="pc-opt"><input type="radio" name="mode" value="selected" {% if data.mode == 'selected' %}checked{% endif %}><b>Selected</b><em id="sel-n">0</em><span>Choose from the list</span></label>
+                </div>
+                <div class="pc-field pc-type" style="margin-top:.9rem">
+                    <label class="pc-lab" for="f-type">Business type (optional)</label>
+                    <select class="pc-sel" name="business_type" id="f-type">
+                        <option value="">All types</option>
+                        {% for v, l in type_choices %}<option value="{{ v }}" {% if data.business_type == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
+                    </select>
+                </div>
+                {% if errors.mode %}<p class="pc-err">{{ errors.mode }}</p>{% endif %}
+                {% if errors.provider %}<p class="pc-err">{{ errors.provider }}</p>{% endif %}
+                <div id="sel-panel" style="display:none">
+                    <input type="search" id="sel-search" class="pc-in" style="max-width:20rem;margin-top:.8rem" placeholder="Search name or number">
+                    <div class="pc-list">
+                        {% for p in prospects %}
+                        <label class="pc-row" data-s="{{ p.display_name|lower }} {{ p.business_name|lower }} {{ p.phone_number }}">
+                            <input type="checkbox" name="prospect_ids" value="{{ p.pk }}" {% if p.pk|stringformat:"s" in selected_ids %}checked{% endif %}>
+                            <span>{{ p.display_name }}</span><small>{{ p.phone_number }}</small>
+                        </label>
+                        {% empty %}<p style="padding:1.2rem;text-align:center;color:var(--sp-muted);font-size:.84rem">No numbers yet.</p>{% endfor %}
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <aside class="pc-side">
+            <section class="pc-card">
+                <div class="pc-step"><b>3</b><div><h2>Review &amp; send</h2><small>This is how the SMS will look</small></div></div>
+                <div class="pc-phone"><div class="pc-screen">
+                    <div class="pc-bar"><span class="pc-logo">S</span><div><b>SmartPOS</b><small>Text message (SMS)</small></div></div>
+                    <div class="pc-body"><div class="pc-bubble" id="pv"></div><div class="pc-time">Just now</div></div>
+                </div></div>
+                <div class="pc-sum">
+                    <div><span>Characters</span><b id="s-chars">0</b></div>
+                    <div><span>SMS per person</span><b id="s-seg">0</b></div>
+                    <div><span>Recipients</span><b id="s-rec">0</b></div>
+                    <div><span>Total SMS</span><b id="s-total">0</b></div>
+                </div>
+                <p class="pc-hint" id="cost" style="display:none">One SMS holds 160 characters (153 per part when longer). This message is sent as <b id="cost-n">2</b> SMS per person.</p>
+                <p class="pc-warn" id="long" style="display:none">This message is <b id="long-n">4</b> SMS long per person. Consider shortening it to lower the cost.</p>
+                <p class="pc-warn" id="uni" style="display:none">Special characters (accents or emoji) found: each SMS holds only 70 characters, so cost goes up.</p>
+                <button type="button" class="pc-send" id="open" {% if not provider_ready %}disabled{% endif %}>Review and send</button>
+            </section>
+        </aside>
+    </div>
+
+    </form>
+</div>
+
+{{ type_counts|json_script:"type-counts" }}
+<script>
+(function () {
+    var TC = JSON.parse(document.getElementById('type-counts').textContent);
+    var ALL = {{ counts.all }}, NEW = {{ counts.new }};
+    var f = document.getElementById('pf'), title = document.getElementById('f-title'), msg = document.getElementById('f-msg'),
+        link = document.getElementById('f-link'), typ = document.getElementById('f-type'),
+        pv = document.getElementById('pv'), MAX = {{ max_chars }};
+    var WARN_SEG = 3;
+    var FOOT = '{{ footer|escapejs }}';
+    var GSM = /^[A-Za-z0-9 \r\n@£$¥èéùìòÇØøÅåΔ_ΦΓΛΩΠΨΣΘΞÆæßÉ!"#¤%&'()*+,\-.\/:;<=>?¡ÄÖÑÜ§¿äöñüà^{}\\\[~\]|€]*$/;
+    function g(id) { return document.getElementById(id); }
+    function compose() {
+        var body = msg.value.replace(/\{name\}/g, 'Neema').replace(/\{link\}/g, link.value || '');
+        return [title.value.trim(), body.trim(), FOOT].filter(Boolean).join('\n');
+    }
+    function mode() { var r = f.querySelector('input[name=mode]:checked'); return r ? r.value : 'new'; }
+    function recipients() {
+        var m = mode(), t = typ.value;
+        if (m === 'selected') return f.querySelectorAll('input[name=prospect_ids]:checked').length;
+        var key = m === 'all' ? 'all' : 'new';
+        if (!t) return key === 'all' ? ALL : NEW;
+        return (TC[t] && TC[t][key]) || 0;
+    }
+    var state = {};
+    function update() {
+        var t = compose(), uni = !GSM.test(t), n = t.length, seg;
+        seg = n ? (uni ? (n <= 70 ? 1 : Math.ceil(n / 67)) : (n <= 160 ? 1 : Math.ceil(n / 153))) : 0;
+        var rec = recipients();
+        pv.textContent = t;
+        g('s-chars').textContent = n; g('s-seg').textContent = seg; g('s-rec').textContent = rec; g('s-total').textContent = rec * seg;
+        g('uni').style.display = uni ? 'block' : 'none';
+        g('cost').style.display = (!uni && seg > 1 && seg <= WARN_SEG) ? 'block' : 'none'; g('cost-n').textContent = seg;
+        g('long').style.display = (!uni && seg > WARN_SEG) ? 'block' : 'none'; g('long-n').textContent = seg;
+        f.removeAttribute('data-confirm');   // the confirmation text is rebuilt on every send click
+        g('c-body').textContent = msg.value.length;
+        g('meter').style.width = Math.min(100, msg.value.length * 100 / MAX) + '%';
+        g('sel-n').textContent = f.querySelectorAll('input[name=prospect_ids]:checked').length;
+        g('sel-panel').style.display = mode() === 'selected' ? 'block' : 'none';
+        state = {rec: rec, seg: seg};
+    }
+    f.addEventListener('input', update); f.addEventListener('change', update);
+    document.querySelectorAll('.pc-tpl').forEach(function (b) {
+        b.addEventListener('click', function () {
+            document.querySelectorAll('.pc-tpl').forEach(function (x) { x.classList.toggle('on', x === b); });
+            title.value = b.dataset.title; msg.value = b.dataset.text; update();
+        });
+    });
+    document.querySelectorAll('.lnk').forEach(function (b) { b.addEventListener('click', function () { link.value = b.dataset.url; update(); }); });
+    g('sel-search').addEventListener('input', function (e) {
+        var q = e.target.value.toLowerCase();
+        document.querySelectorAll('.pc-row').forEach(function (r) { r.style.display = r.dataset.s.indexOf(q) > -1 ? '' : 'none'; });
+    });
+    function notify(text, title) {
+        if (window.showToast) window.showToast(text, 'warning', { title: title || 'Check the form' });
+    }
+    function plural(n, one, many) { return n + ' ' + (n === 1 ? one : many); }
+    // Validates, then asks for confirmation with the system's own confirm modal (data-confirm on the form).
+    g('open').addEventListener('click', function () {
+        update();
+        if (!title.value.trim() || !msg.value.trim()) { notify('Enter a message title and the message text first.', 'Message incomplete'); return; }
+        if (msg.value.indexOf('{link}') > -1 && !/^https?:\/\//.test(link.value.trim())) { notify('Enter a full link starting with https://', 'Link needed'); link.focus(); return; }
+        if (!state.rec) {
+            notify(mode() === 'selected' ? 'Tick at least one number in the list.' : 'No eligible numbers. Contacts who already joined or opted out are never messaged. Add numbers on the Prospects page.', 'No recipients');
+            return;
+        }
+        f.dataset.confirm = 'Send this invitation?';
+        f.dataset.confirmDetail = 'It will be sent now to ' + plural(state.rec, 'business owner', 'business owners') + ' (' +
+            state.seg + ' SMS each, ' + (state.rec * state.seg) + ' SMS in total). This cannot be undone.';
+        f.dataset.confirmAccept = 'Send now';
+        f.dataset.confirmBusy = 'Sending\u2026';
+        f.requestSubmit();
+    });
+    // Pressing Enter in a field must not skip the confirmation: route it through the same checks.
+    f.addEventListener('submit', function (e) {
+        if (!f.hasAttribute('data-confirm') && f.dataset.confirmed !== 'true') { e.preventDefault(); g('open').click(); }
+    });
+    update();
+})();
+</script>
+{% endblock %}

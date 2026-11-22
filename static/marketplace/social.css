@@ -1,0 +1,44 @@
+/* Seller social icons. Artwork: Simple Icons (CC0). Used on shop, product and listing pages and in the shop setup form.
+   Desktop: hover fills the brand colour. Touch: no sticky hover, 44px tap targets, tap feedback. */
+.sx-wrap{display:flex;align-items:center;flex-wrap:wrap;gap:8px 10px;margin:10px 0 12px;max-width:100%}
+.sx-cap{font-size:11px;font-weight:800;letter-spacing:.03em;text-transform:uppercase;color:var(--muted,#64748b)}
+.sx-social{list-style:none;margin:0;padding:0;display:flex;align-items:center;flex-wrap:wrap;gap:10px;min-width:0}
+.sx-btn{--sx:#475569;position:relative;flex:none;width:38px;height:38px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line,#e2e8f0);background:#fff;color:var(--sx);cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation;transition:background .18s ease,color .18s ease,border-color .18s ease,transform .18s ease,box-shadow .18s ease}
+.sx-btn svg{width:18px;height:18px;fill:currentColor;display:block}
+.sx-whatsapp{--sx:#25D366}.sx-instagram{--sx:#E4405F}.sx-tiktok{--sx:#111}.sx-facebook{--sx:#1877F2}.sx-youtube{--sx:#FF0000}
+.sx-btn:active{transform:scale(.93)}
+.sx-btn:focus-visible{outline:3px solid #91c7ad;outline-offset:2px;color:#fff;border-color:transparent;background:var(--sx)}
+.sx-instagram:focus-visible{background:linear-gradient(45deg,#f09433 0%,#e6683c 25%,#dc2743 50%,#cc2366 75%,#bc1888 100%)}
+@media (hover:hover) and (pointer:fine){
+ .sx-btn:hover{color:#fff;border-color:transparent;background:var(--sx);transform:translateY(-1px);box-shadow:0 6px 14px rgba(15,23,42,.18)}
+ .sx-instagram:hover{background:linear-gradient(45deg,#f09433 0%,#e6683c 25%,#dc2743 50%,#cc2366 75%,#bc1888 100%)}
+}
+.sx-sm .sx-btn{width:32px;height:32px}.sx-sm .sx-btn svg{width:15px;height:15px}
+/* Verified badge: a green tick on the icon, tied to the exact link SmartPOS verified */
+.sx-vb{position:absolute;right:-4px;bottom:-4px;width:17px;height:17px;border-radius:50%;background:#16a34a;border:2px solid #fff;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 3px rgba(15,23,42,.25)}
+.sx-btn .sx-vb svg,.sx-legend .sx-vb svg{width:9px;height:9px;fill:none;stroke:#fff;stroke-width:3.4;stroke-linecap:round;stroke-linejoin:round}
+.sx-sm .sx-vb{width:14px;height:14px;right:-3px;bottom:-3px}.sx-sm .sx-btn .sx-vb svg{width:7px;height:7px}
+.sx-legend{flex-basis:100%;display:inline-flex;align-items:center;gap:7px;font-size:11.5px;font-weight:600;color:var(--muted,#64748b)}
+.sx-vb-inline{position:static;flex:none;width:15px;height:15px;box-shadow:none;border:0}
+/* Touch devices: bigger targets, no hover */
+@media (pointer:coarse){
+ .sx-social{gap:12px}.sx-btn{width:44px;height:44px}.sx-btn svg{width:20px;height:20px}
+ .sx-sm .sx-btn{width:40px;height:40px}.sx-sm .sx-btn svg{width:17px;height:17px}
+}
+@media (max-width:420px){.sx-wrap{gap:6px 10px}.sx-cap{flex-basis:100%}}
+/* Setup form */
+.sx-labelrow{display:flex;align-items:center;justify-content:space-between;gap:6px 10px;flex-wrap:wrap}
+.sx-label{display:inline-flex;align-items:center;gap:8px}
+.sx-label .sx-ico{width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;color:var(--sx)}
+.sx-label .sx-ico svg{width:18px;height:18px;fill:currentColor}
+.sx-status{display:inline-flex;align-items:center;gap:5px;font-size:.72rem;font-weight:700;padding:2px 9px;border-radius:999px;background:#f1f5f9;color:#475569;white-space:nowrap}
+.sx-status.is-ok{background:#dcfce7;color:#166534}
+.sx-status svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+.sx-warn{color:#b45309}.sx-warn[hidden]{display:none}
+/* Selector is deliberately specific so it beats the shop form's own input rule (16px stops iOS zooming on focus). */
+.mk-form .mk-field input[data-sx-input]:not([type=file]):not([type=radio]):not([type=checkbox]){min-height:2.75rem;max-width:100%}
+@media (max-width:640px),(pointer:coarse){.mk-form .mk-field input[data-sx-input]:not([type=file]):not([type=radio]):not([type=checkbox]){font-size:16px}}
+.sx-preview{display:flex;align-items:center;flex-wrap:wrap;gap:10px;min-height:38px}
+.sx-preview .sx-btn[hidden]{display:none}
+.sx-preview-empty{font-size:.75rem;color:#64748b}
+@media(prefers-reduced-motion:reduce){.sx-btn{transition:none}.sx-btn:hover,.sx-btn:active{transform:none}}

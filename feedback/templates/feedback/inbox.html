@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}Team feedback inbox · SmartPOS{% endblock %}
+{% block extra_head %}{% include "feedback/_styles.html" %}{% endblock %}
+{% block content %}
+<div class="fbp">
+  {% include "feedback/_header.html" with eyebrow=is_hq|yesno:"System owner,Voice of the user" heading="Feedback inbox" lead="Review, reply to and track feedback from your users in one place." %}
+
+  <div class="fbc-strip" aria-label="Feedback summary">
+    <div class="fbc-kpi"><small>Total</small><b>{{ stats.total|default:0 }}</b></div>
+    <div class="fbc-kpi"><small>Avg rating</small><b>{% if stats.average %}{{ stats.average|floatformat:1 }}<span>/5</span>{% else %}&mdash;{% endif %}</b></div>
+    <div class="fbc-kpi"><small>New</small><b class="{% if stats.new %}is-alert{% endif %}">{{ stats.new|default:0 }}</b></div>
+    <div class="fbc-kpi"><small>Resolved</small><b>{{ stats.resolved|default:0 }}</b></div>
+  </div>
+
+  <form method="get" id="fbi-form" class="fbp-card fbi-filters" role="search" aria-label="Search and filter feedback">
+    <div class="fbi-row1">
+      <label class="fbi-search"><span class="fbp-sr-only">Search feedback</span>
+        <input class="fbp-field" type="search" name="q" id="fbi-q" value="{{ filters.q }}" maxlength="120" placeholder="Search comment, user, branch or section…" autocomplete="off">
+      </label>
+      <button type="button" class="fbp-btn-ghost fbi-toggle" id="fbi-toggle" aria-expanded="false" aria-controls="fbi-more">Filters</button>
+    </div>
+    <div class="fbi-more" id="fbi-more">
+      <label><span class="fbi-lbl">Rating</span><select class="fbp-select" name="rating"><option value="">All ratings</option>{% for n,label in ratings %}<option value="{{ n }}" {% if filters.rating == n|stringformat:"s" %}selected{% endif %}>{{ n }} · {{ label }}</option>{% endfor %}</select></label>
+      <label><span class="fbi-lbl">Topic</span><select class="fbp-select" name="category"><option value="">All topics</option>{% for value,label in categories %}<option value="{{ value }}" {% if filters.category == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+      {% if is_hq %}<label><span class="fbi-lbl">Branch</span><select class="fbp-select" name="branch"><option value="">All branches</option>{% for b in branches %}<option value="{{ b.branch_id }}" {% if filters.branch == b.branch_id|stringformat:"s" %}selected{% endif %}>{{ b.branch__name }}</option>{% endfor %}</select></label>{% endif %}
+      <label><span class="fbi-lbl">From</span><input class="fbp-field" type="date" name="date_from" value="{{ filters.date_from }}"></label>
+      <label><span class="fbi-lbl">To</span><input class="fbp-field" type="date" name="date_to" value="{{ filters.date_to }}"></label>
+    </div>
+    <input type="hidden" name="status" id="fbi-status" value="{{ filters.status }}">
+    <div class="fbi-chips" role="group" aria-label="Filter by status">
+      <button type="button" data-status="" class="fbi-chip {% if not filters.status %}is-active{% endif %}">All <em>{{ chips_total }}</em></button>
+      {% for c in status_chips %}<button type="button" data-status="{{ c.value }}" class="fbi-chip {% if filters.status == c.value %}is-active{% endif %}">{{ c.label }} <em>{{ c.count }}</em></button>{% endfor %}
+      {% if has_filters %}<a href="{% url 'feedback:inbox' %}" class="fbi-clear">Clear</a>{% endif %}
+    </div>
+  </form>
+
+  <section class="fbp-card fbi-panel" aria-label="Feedback list">
+    <div class="fbi-panel-head"><b>{% if page_obj.paginator.count %}{{ page_obj.start_index }}–{{ page_obj.end_index }} of {{ page_obj.paginator.count }}{% else %}No results{% endif %}</b><small>Tap a row to open details{% if is_hq %}, reply or change status{% endif %}</small></div>
+    <div class="fbi-list">
+    {% for item in feedback_items %}
+      <details class="fbi-item {% if item.status == 'NEW' %}is-new{% endif %}">
+        <summary>
+          <span class="fbi-emo" title="{{ item.get_rating_display }}">{% if item.rating == 1 %}&#128545;{% elif item.rating == 2 %}&#128533;{% elif item.rating == 3 %}&#128528;{% elif item.rating == 4 %}&#128578;{% else %}&#128525;{% endif %}</span>
+          <span class="fbi-main">
+            <span class="fbi-title">{{ item.get_category_display }}{% if item.page_section %} <i>· {{ item.page_section }}</i>{% endif %}</span>
+            <span class="fbi-snippet">{% if item.comment %}{{ item.comment }}{% else %}Rating only — no written comment{% endif %}</span>
+            <span class="fbi-meta">{% firstof item.user.get_full_name item.user.username %} · {{ item.branch|default:"No branch" }}{% if item.replies.all|length %} · {{ item.replies.all|length }} repl{{ item.replies.all|length|pluralize:"y,ies" }}{% endif %}</span>
+          </span>
+          <span class="fbi-side">
+            <span class="fbp-badge s-{{ item.status }}">{{ item.get_status_display }}</span>
+            <time class="fbi-date" datetime="{{ item.created_at|date:'c' }}">{{ item.created_at|date:"d M, H:i" }}</time>
+          </span>
+          <span class="fbi-chev" aria-hidden="true"></span>
+        </summary>
+
+        <div class="fbi-body">
+          <div class="fbi-full">
+            <div class="fbi-kv"><span>{{ item.get_rating_display }} ({{ item.rating }}/5)</span><span>{{ item.created_at|date:"d M Y, H:i" }}</span><span>{{ item.user_role|default:"User" }}</span></div>
+            <p>{% if item.comment %}{{ item.comment }}{% else %}<em>Rating only — no written comment.</em>{% endif %}</p>
+          </div>
+
+          {% with replies=item.replies.all %}{% if replies %}
+          <div class="fbi-replies">
+            {% for reply in replies %}{% if not reply.is_internal or is_hq %}
+            <div class="fbp-message {% if reply.is_internal %}is-internal{% endif %}"><div class="fbp-item-top"><strong>{% if reply.author.is_superuser %}SmartPOS Support{% else %}{% firstof reply.author.get_full_name reply.author.username %}{% endif %}{% if reply.is_internal %} · Internal note{% endif %}</strong><small>{{ reply.created_at|date:"d M Y, H:i" }}</small></div><p>{{ reply.message }}</p></div>
+            {% endif %}{% endfor %}
+          </div>
+          {% endif %}{% endwith %}
+
+          {% if is_hq %}
+          <div class="fbi-actions">
+            <form method="post" class="fbi-status">{% csrf_token %}<input type="hidden" name="feedback_id" value="{{ item.pk }}">
+              <label><span class="fbi-lbl">Status</span><select name="status" class="fbp-select" data-autosubmit>{% for value,label in statuses %}<option value="{{ value }}" {% if item.status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+            </form>
+            <form method="post" action="{% url 'feedback:reply' item.pk %}" class="fbi-reply">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
+              <label class="fbi-lbl" for="rp-{{ item.pk }}">Reply</label>
+              <textarea id="rp-{{ item.pk }}" class="fbp-field" name="message" rows="2" maxlength="3000" required placeholder="Write a helpful response…"></textarea>
+              <div class="fbi-reply-foot"><label class="fbp-inline-check"><input type="checkbox" name="is_internal" value="1"> Internal note only</label><button class="fbp-btn" type="submit">Send</button></div>
+            </form>
+          </div>
+          {% endif %}
+
+          <div class="fbi-tech"><span>Page: {{ item.page_url|default:"not captured" }}</span><span>{{ item.app_version }} · #{{ item.pk }}</span><span class="fbi-ua">{{ item.user_agent|default:"Device not captured" }}</span></div>
+        </div>
+      </details>
+    {% empty %}
+      <div class="fbp-empty"><b>No feedback found</b>{% if has_filters %}Try changing or clearing the filters.{% else %}New feedback will appear here.{% endif %}</div>
+    {% endfor %}
+    </div>
+  </section>
+
+  {% include "partials/pagination.html" with page_obj=page_obj %}
+</div>
+
+<script>
+(function(){
+  var form=document.getElementById('fbi-form'); if(!form) return;
+  var q=document.getElementById('fbi-q'), t=null;
+  function go(){ form.submit(); }
+  // Auto-filter: selects/dates apply immediately, search after a short pause.
+  form.querySelectorAll('.fbi-more select, .fbi-more input').forEach(function(el){ el.addEventListener('change',go); });
+  q.addEventListener('input',function(){ clearTimeout(t); t=setTimeout(go,500); });
+  var st=document.getElementById('fbi-status');
+  form.querySelectorAll('.fbi-chip').forEach(function(c){ c.addEventListener('click',function(){ st.value=c.dataset.status; go(); }); });
+  // Restore caret in search after reload.
+  if(q.value){ q.focus(); q.setSelectionRange(q.value.length,q.value.length); }
+  var tg=document.getElementById('fbi-toggle'), more=document.getElementById('fbi-more');
+  var hasAdv=[].some.call(more.querySelectorAll('select,input'),function(e){return e.value;});
+  function setOpen(o){ more.classList.toggle('is-open',o); tg.setAttribute('aria-expanded',o?'true':'false'); }
+  setOpen(hasAdv); tg.addEventListener('click',function(){ setOpen(!more.classList.contains('is-open')); });
+  // Status change posts immediately.
+  document.querySelectorAll('select[data-autosubmit]').forEach(function(s){ s.addEventListener('change',function(){ s.form.submit(); }); });
+})();
+</script>
+{% endblock %}

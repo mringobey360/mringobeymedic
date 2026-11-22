@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+{% block title %}Review notice - HQ{% endblock %}
+{% block content %}
+{% include 'partials/_system_notice_styles.html' %}
+<style>
+  .rv-frame{border:1px solid #e2e8f0;border-radius:1rem;overflow:hidden;margin:0 auto;transition:max-width .2s ease;max-width:100%}
+  .rv-frame.rv-mobile{max-width:390px}
+  .rv-frame[data-theme="light"]{background:#f1f5f9;color:#0f172a;border-color:#e2e8f0}
+  .rv-frame[data-theme="dark"]{background:#0b1220;color:#e2e8f0;border-color:#1e293b}
+  .rv-bar{display:flex;align-items:center;gap:.6rem;padding:.7rem 1rem;border-bottom:1px solid rgba(148,163,184,.3);font-weight:700;font-size:.9rem}
+  .rv-bar i{display:inline-block;width:.6rem;height:.6rem;border-radius:50%;background:#0d9488}
+  .rv-skel{padding:0 1rem 1rem}
+  .rv-skel span{display:block;height:.75rem;border-radius:.4rem;background:rgba(148,163,184,.25);margin-top:.7rem}
+  .rv-skel span:nth-child(1){width:38%;height:1.1rem}
+  .rv-skel span:nth-child(3){width:82%}
+  .rv-skel span:nth-child(4){width:64%}
+  .rv-frame .spn-stack{margin:.85rem 1rem}
+  /* Force the light palette inside a light preview, even when the whole site is in dark mode. */
+  .rv-frame[data-theme="light"] .spn{--spn-bg:#eff6ff;--spn-bd:#bfdbfe;--spn-fg:#1e3a8a;--spn-ac:#2563eb;--spn-chip:#dbeafe;box-shadow:0 1px 2px rgba(15,23,42,.05)}
+  .rv-frame[data-theme="light"] .spn-brand{--spn-bg:#f0fdfa;--spn-bd:#99f6e4;--spn-fg:#134e4a;--spn-ac:#0d9488;--spn-chip:#ccfbf1}
+  .rv-frame[data-theme="light"] .spn-warning{--spn-bg:#fffbeb;--spn-bd:#fde68a;--spn-fg:#78350f;--spn-ac:#d97706;--spn-chip:#fef3c7}
+  .rv-frame[data-theme="light"] .spn-danger{--spn-bg:#fef2f2;--spn-bd:#fecaca;--spn-fg:#7f1d1d;--spn-ac:#dc2626;--spn-chip:#fee2e2}
+  .rv-frame[data-theme="light"] .spn-success{--spn-bg:#ecfdf5;--spn-bd:#a7f3d0;--spn-fg:#064e3b;--spn-ac:#059669;--spn-chip:#d1fae5}
+  .rv-seg{display:inline-flex;border:1px solid #cbd5e1;border-radius:.7rem;overflow:hidden}
+  .rv-seg button{padding:.35rem .8rem;font-size:.78rem;font-weight:600;background:transparent;color:inherit;border:0;cursor:pointer}
+  .rv-seg button[aria-pressed="true"]{background:#0d9488;color:#fff}
+  @media (min-width:1024px){ .rv-sticky{position:sticky;top:1.5rem} }
+</style>
+
+<div class="max-w-6xl mx-auto">
+
+    <div class="mb-6">
+        <a href="{% url 'hq:notice_list' %}" class="text-xs font-medium text-brand-700 hover:text-brand-800">&larr; System notices</a>
+        <div class="flex flex-wrap items-center gap-3 mt-1">
+            <h1 class="text-2xl font-bold text-ink-900 tracking-tight">Review notice</h1>
+            {% with st=notice.status %}
+            <span class="badge {% if st == 'LIVE' %}bg-emerald-100 text-emerald-700{% elif st == 'SCHEDULED' %}bg-brand-100 text-brand-700{% elif st == 'DRAFT' %}bg-amber-100 text-amber-700{% else %}bg-ink-100 text-ink-600{% endif %}">{% if st == 'LIVE' %}Live{% elif st == 'SCHEDULED' %}Scheduled{% elif st == 'EXPIRED' %}Expired{% elif st == 'DRAFT' %}Draft{% else %}Off{% endif %}</span>
+            {% endwith %}
+        </div>
+        <p class="text-sm text-ink-500 mt-1">
+            {% if notice.is_published %}This is the banner customers are seeing now.{% else %}Customers cannot see this yet. Check the preview below, then publish when you are happy with it.{% endif %}
+        </p>
+    </div>
+
+    {% if blocking %}
+    <div class="card !py-3.5 mb-4 border border-red-200 bg-red-50" role="alert">
+        <p class="text-sm font-semibold text-red-800">Fix this before publishing</p>
+        <ul class="mt-1 list-disc pl-5 text-sm text-red-700 space-y-0.5">{% for item in blocking %}<li>{{ item }}</li>{% endfor %}</ul>
+    </div>
+    {% endif %}
+    {% if warnings %}
+    <div class="card !py-3.5 mb-4 border border-amber-200 bg-amber-50">
+        <p class="text-sm font-semibold text-amber-800">Worth a second look</p>
+        <ul class="mt-1 list-disc pl-5 text-sm text-amber-700 space-y-0.5">{% for item in warnings %}<li>{{ item }}</li>{% endfor %}</ul>
+    </div>
+    {% endif %}
+
+    <div class="grid lg:grid-cols-3 gap-6">
+
+        <section class="lg:col-span-2 card space-y-4">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <h2 class="text-sm font-semibold text-ink-800">What customers will see</h2>
+                <div class="flex flex-wrap items-center gap-2">
+                    <div class="rv-seg" role="group" aria-label="Screen size" id="rv-size">
+                        <button type="button" data-size="desktop" aria-pressed="true">Computer</button>
+                        <button type="button" data-size="mobile" aria-pressed="false">Phone</button>
+                    </div>
+                    <div class="rv-seg" role="group" aria-label="Appearance" id="rv-theme">
+                        <button type="button" data-theme-set="light" aria-pressed="true">Light</button>
+                        <button type="button" data-theme-set="dark" aria-pressed="false">Dark</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rv-frame" id="rv-frame" data-theme="light">
+                <div class="rv-bar"><i></i>SmartPOS</div>
+                <div class="spn-stack">
+                    {% include 'partials/_system_notice_card.html' with n=row preview=True %}
+                </div>
+                <div class="rv-skel"><span></span><span></span><span></span><span></span></div>
+            </div>
+            <p class="text-xs text-ink-400">This uses the same banner design as the real app, so what you see here is what customers see.</p>
+        </section>
+
+        <aside class="space-y-4">
+            <div class="rv-sticky space-y-4">
+                <section class="card space-y-3">
+                    <h2 class="text-sm font-semibold text-ink-800">Summary</h2>
+                    <dl class="text-sm space-y-2">
+                        <div class="flex justify-between gap-3"><dt class="text-ink-500">Type</dt><dd class="text-ink-800 text-right">{{ notice.get_kind_display }}</dd></div>
+                        <div class="flex justify-between gap-3"><dt class="text-ink-500">Who sees it</dt><dd class="text-ink-800 text-right">{{ notice.get_audience_display }}{% if reach is not None %}<span class="block text-xs text-ink-400">About {{ reach }} active account{{ reach|pluralize }}</span>{% endif %}</dd></div>
+                        <div class="flex justify-between gap-3"><dt class="text-ink-500">Login page</dt><dd class="text-ink-800 text-right">{% if notice.show_on_login %}Also shown{% else %}Not shown{% endif %}</dd></div>
+                        <div class="flex justify-between gap-3"><dt class="text-ink-500">Customers can close it</dt><dd class="text-ink-800 text-right">{% if notice.dismissible %}Yes{% else %}No{% endif %}</dd></div>
+                        <div class="flex justify-between gap-3"><dt class="text-ink-500">Notification bell</dt><dd class="text-ink-800 text-right">{% if notice.notify_in_app %}Also sent (bell + push){% else %}Banner only{% endif %}</dd></div>
+                        <div class="flex justify-between gap-3"><dt class="text-ink-500">Link</dt><dd class="text-ink-800 text-right break-all">{% if notice.link_url %}{{ notice.link_url }}{% else %}None{% endif %}</dd></div>
+                        <div class="flex justify-between gap-3"><dt class="text-ink-500">Shown from</dt><dd class="text-ink-800 text-right">{% if notice.is_published %}{{ notice.starts_at|date:"d M Y H:i" }}{% else %}When you publish{% endif %}</dd></div>
+                        <div class="flex justify-between gap-3"><dt class="text-ink-500">Hidden after</dt><dd class="text-ink-800 text-right">{% if notice.ends_at %}{{ notice.ends_at|date:"d M Y H:i" }}{% else %}Until switched off{% endif %}</dd></div>
+                    </dl>
+                    <p class="text-xs text-ink-400">Banners reach people who are signed in. To reach customers who are offline, also send an <a href="{% url 'hq:announcement_compose' %}" class="font-medium text-brand-700 hover:text-brand-800">SMS announcement</a>.</p>
+                </section>
+
+                <section class="card space-y-3">
+                    {% if notice.is_published %}
+                        <p class="text-sm text-ink-700">This notice is already published.</p>
+                        <div class="flex flex-wrap gap-2">
+                            <a href="{% url 'hq:notice_list' %}" class="btn btn-secondary text-sm">Back to notices</a>
+                            <a href="{% url 'hq:notice_edit' notice.pk %}" class="btn btn-secondary text-sm">Edit</a>
+                        </div>
+                    {% else %}
+                        {% if can_publish %}
+                        <form method="post" action="{% url 'hq:notice_publish' notice.pk %}" onsubmit="return confirm('Publish this banner to customers now?');">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-primary text-sm w-full justify-center">Publish to customers</button>
+                        </form>
+                        {% else %}
+                        <button type="button" class="btn btn-primary text-sm w-full justify-center opacity-50 cursor-not-allowed" disabled>Publish to customers</button>
+                        <p class="text-xs text-red-600">Fix the problem above first.</p>
+                        {% endif %}
+                        <div class="flex flex-wrap gap-2">
+                            <a href="{% url 'hq:notice_edit' notice.pk %}" class="btn btn-secondary text-sm">Edit</a>
+                            <a href="{% url 'hq:notice_list' %}" class="btn btn-secondary text-sm">Keep as draft</a>
+                        </div>
+                    {% endif %}
+                </section>
+            </div>
+        </aside>
+    </div>
+</div>
+
+<script>
+(function () {
+  var frame = document.getElementById('rv-frame');
+  if (!frame) return;
+  var siteDark = document.documentElement.getAttribute('data-theme') === 'dark';
+
+  function setPressed(group, attr, value) {
+    group.querySelectorAll('button').forEach(function (b) { b.setAttribute('aria-pressed', b.getAttribute(attr) === value ? 'true' : 'false'); });
+  }
+  var sizeGroup = document.getElementById('rv-size'), themeGroup = document.getElementById('rv-theme');
+
+  function setTheme(t) { frame.setAttribute('data-theme', t); setPressed(themeGroup, 'data-theme-set', t); }
+  function setSize(s) {
+    frame.classList.toggle('rv-mobile', s === 'mobile');
+    frame.classList.toggle('spn-narrow', s === 'mobile');
+    setPressed(sizeGroup, 'data-size', s);
+  }
+
+  sizeGroup.addEventListener('click', function (e) { var b = e.target.closest('button[data-size]'); if (b) setSize(b.getAttribute('data-size')); });
+  themeGroup.addEventListener('click', function (e) { var b = e.target.closest('button[data-theme-set]'); if (b) setTheme(b.getAttribute('data-theme-set')); });
+
+  setTheme(siteDark ? 'dark' : 'light');
+  setSize('desktop');
+})();
+</script>
+{% endblock %}

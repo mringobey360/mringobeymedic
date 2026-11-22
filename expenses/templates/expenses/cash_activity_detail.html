@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+{% load humanize %}
+{% block title %}{{ title }} · Cash Control{% endblock %}
+{% block content %}
+<div class="mx-auto max-w-5xl space-y-6">
+  <a href="{% url 'expenses:cash' %}" class="inline-flex items-center gap-2 text-sm font-semibold text-ink-500 hover:text-ink-900">← Back to Daily Cash Control</a>
+  <section class="card overflow-hidden rounded-2xl shadow-sm">
+    <div class="border-b border-ink-100 p-5 md:p-6">
+      <p class="text-xs font-extrabold uppercase tracking-[0.15em] text-ink-500">Financial control · Source ledger</p>
+      <h1 class="mt-1 text-2xl font-extrabold text-ink-900">{{ title }}</h1>
+      <div class="mt-3 flex gap-2 text-xs font-semibold">
+        <a href="?scope=post_close" class="rounded-full px-3 py-1 {% if scope == 'post_close' %}bg-amber-100 text-amber-900{% else %}bg-ink-50 text-ink-600{% endif %}">After close</a>
+        <a href="?scope=day" class="rounded-full px-3 py-1 {% if scope == 'day' %}bg-amber-100 text-amber-900{% else %}bg-ink-50 text-ink-600{% endif %}">Whole day</a>
+      </div>
+    </div>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 p-5 md:p-6">
+      <div class="rounded-xl bg-ink-50/70 p-3"><p class="text-xs text-ink-500">Cash sales ({{ totals.sales_count }})</p><p class="font-extrabold">TZS {{ totals.cash_sales|floatformat:0|intcomma }}</p></div>
+      <div class="rounded-xl bg-ink-50/70 p-3"><p class="text-xs text-ink-500">Credit &amp; layaway payments in cash ({{ totals.debt_payment_count }})</p><p class="font-extrabold">TZS {{ totals.cash_debt_collected|floatformat:0|intcomma }}</p>{% if totals.cash_layaway_collected %}<p class="text-[11px] text-ink-500">of which layaway: TZS {{ totals.cash_layaway_collected|floatformat:0|intcomma }}</p>{% endif %}</div>
+      <div class="rounded-xl bg-ink-50/70 p-3"><p class="text-xs text-ink-500">Refunds ({{ totals.refund_count }})</p><p class="font-extrabold">TZS {{ totals.cash_refunds|floatformat:0|intcomma }}</p></div>
+      <div class="rounded-xl bg-ink-50/70 p-3"><p class="text-xs text-ink-500">Cash expenses ({{ totals.expense_count }})</p><p class="font-extrabold">TZS {{ totals.cash_expenses|floatformat:0|intcomma }}</p></div>
+      <div class="rounded-xl bg-ink-50/70 p-3"><p class="text-xs text-ink-500">Staff meals paid ({{ totals.meal_count }})</p><p class="font-extrabold">TZS {{ totals.cash_meals|floatformat:0|intcomma }}</p></div>
+      <div class="rounded-xl bg-amber-50 p-3"><p class="text-xs text-amber-800">Net</p><p class="font-extrabold">TZS {{ totals.net|floatformat:0|intcomma }}</p></div>
+    </div>
+    <div class="overflow-x-auto"><table class="w-full text-sm min-w-[860px]">
+      <thead class="bg-ink-50"><tr><th class="text-left px-5 py-3">Recorded</th><th class="text-left px-5 py-3">Business date</th><th class="text-left px-5 py-3">Type</th><th class="text-left px-5 py-3">Reference</th><th class="text-left px-5 py-3">By</th><th class="text-left px-5 py-3">Source</th><th class="text-right px-5 py-3">Amount</th></tr></thead>
+      <tbody class="divide-y divide-ink-100">
+      {% for e in entries %}<tr>
+        <td class="px-5 py-3 whitespace-nowrap">{{ e.occurred_at|date:"d M · H:i" }}</td>
+        <td class="px-5 py-3 whitespace-nowrap">{{ e.business_date|date:"d M" }}{% if e.date_mismatch %}<span class="block text-[11px] font-semibold text-blue-700">Recorded on a different date</span>{% endif %}</td>
+        <td class="px-5 py-3 font-semibold">{{ e.kind|capfirst }}</td>
+        <td class="px-5 py-3">{{ e.reference }}{% if e.note %}<span class="block text-[11px] text-ink-500">{{ e.note }}</span>{% endif %}</td>
+        <td class="px-5 py-3">{{ e.actor|default:"—" }}</td>
+        <td class="px-5 py-3">{% if e.offline %}<span class="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-blue-700">Offline sync</span>{% else %}Live{% endif %}</td>
+        <td class="px-5 py-3 text-right font-bold {% if e.sign < 0 %}text-red-700{% endif %}">{% if e.sign < 0 %}−{% else %}+{% endif %} TZS {{ e.amount|floatformat:0|intcomma }}</td>
+      </tr>{% empty %}<tr><td colspan="7" class="px-5 py-12 text-center text-ink-400">No cash transactions in this window.</td></tr>{% endfor %}
+      </tbody></table></div>
+  </section>
+</div>
+{% endblock %}

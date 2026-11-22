@@ -1,0 +1,104 @@
+{% load humanize %}
+<div class="pv-back" id="pv-modal" aria-hidden="true">
+  <div class="pv-dialog" role="dialog" aria-modal="true" aria-labelledby="pv-modal-t" aria-describedby="pv-modal-d" tabindex="-1">
+    <span class="pv-grab" aria-hidden="true"></span>
+
+    <header class="pv-dialog-h">
+      <span class="pv-dialog-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg></span>
+      <div class="pv-dialog-title">
+        <h2 id="pv-modal-t">{{ product.name|truncatechars:60 }}</h2>
+        <p id="pv-modal-d"><span class="pv-badge">Free sample</span><span>PDF preview</span></p>
+      </div>
+      <a class="pv-newtab" id="pv-newtab" href="{% url 'marketplace:preview' product.slug %}" target="_blank" rel="noopener" data-no-loading>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4 10 14M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>
+        <span>Open in new tab</span>
+      </a>
+      <button type="button" class="pv-x" data-pv-close aria-label="Close preview">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        <span class="pv-x-t">Close</span>
+      </button>
+    </header>
+
+    <div class="pv-dialog-b">
+      <div class="pv-state pv-loading" id="pv-loading" role="status" aria-live="polite">
+        <span class="pv-spin" aria-hidden="true"></span>
+        <b>Loading your free sample&hellip;</b>
+        <small>This usually takes a few seconds.</small>
+      </div>
+      <div class="pv-state pv-failed" id="pv-failed" hidden>
+        <span class="pv-state-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg></span>
+        <b>The sample could not be shown here</b>
+        <small>Check your connection, or read it in the full-page viewer.</small>
+        <a class="pv-retry" href="{% url 'marketplace:preview' product.slug %}" target="_blank" rel="noopener" data-no-loading>Open the full-page viewer</a>
+      </div>
+      <iframe id="pv-frame" title="Free sample of {{ product.name }}"></iframe>
+    </div>
+
+    <footer class="pv-dialog-f">
+      <div class="pv-price">
+        <span class="pv-price-l">Full file</span>
+        <b>TSh {{ product.price|floatformat:0|intcomma }}</b>
+        <small><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Unlocks right after payment</small>
+      </div>
+      <div class="pv-actions">
+        <button type="button" class="pv-btn pv-btn-ghost" data-pv-close>Close</button>
+        <button type="button" class="pv-btn pv-btn-buy" data-pv-buy>Buy now</button>
+      </div>
+    </footer>
+  </div>
+</div>
+<script>
+(function(){
+  var back=document.getElementById('pv-modal'),frame=document.getElementById('pv-frame'),
+      opener=document.querySelector('[data-pv-open]'),
+      loading=document.getElementById('pv-loading'),failed=document.getElementById('pv-failed');
+  if(!back||!frame||!opener)return;
+  var dialog=back.querySelector('.pv-dialog'),last=null,timer=null,ready=false;
+
+  function state(name){            /* 'loading' | 'failed' | 'ready' */
+    loading.hidden=name!=='loading';
+    failed.hidden=name!=='failed';
+    frame.classList.toggle('ready',name==='ready');
+  }
+  function focusable(){
+    return [].slice.call(dialog.querySelectorAll('a[href],button:not([disabled])')).filter(function(el){return el.offsetParent!==null;});
+  }
+  function open(){
+    var src=opener.getAttribute('data-src');
+    last=document.activeElement;
+    state('loading');
+    ready=false;
+    frame.src=src+(src.indexOf('?')<0?'?':'&')+'embed=1';       /* SmartPOS viewer page: no browser PDF toolbar, no download button */
+    clearTimeout(timer);
+    timer=setTimeout(function(){if(!ready)state('failed');},20000);
+    back.classList.add('on');back.setAttribute('aria-hidden','false');document.body.classList.add('pv-lock');
+    var x=back.querySelector('.pv-x');if(x)x.focus({preventScroll:true});
+  }
+  function close(){
+    clearTimeout(timer);ready=false;
+    back.classList.remove('on');back.setAttribute('aria-hidden','true');document.body.classList.remove('pv-lock');
+    frame.removeAttribute('src');state('loading');
+    if(last&&last.focus)try{last.focus({preventScroll:true});}catch(e){}
+  }
+  window.addEventListener('message',function(e){            /* the viewer page reports when the sample is drawn */
+    if(e.origin!==location.origin||e.source!==frame.contentWindow||!e.data)return;
+    if(e.data.pv==='ready'){ready=true;clearTimeout(timer);state('ready');}
+    else if(e.data.pv==='error'){clearTimeout(timer);state('failed');}
+  });
+  opener.addEventListener('click',open);
+  back.addEventListener('click',function(e){
+    if(e.target===back||e.target.closest('[data-pv-close]')){close();return;}
+    if(e.target.closest('[data-pv-buy]')){close();var b=document.querySelector('[data-buy-now]');if(b)b.click();}
+  });
+  document.addEventListener('keydown',function(e){
+    if(!back.classList.contains('on'))return;
+    if(e.key==='Escape'){e.preventDefault();close();return;}
+    if(e.key==='Tab'){                       /* keep keyboard focus inside the dialog */
+      var f=focusable();if(!f.length)return;
+      var first=f[0],lastEl=f[f.length-1];
+      if(e.shiftKey&&document.activeElement===first){e.preventDefault();lastEl.focus();}
+      else if(!e.shiftKey&&document.activeElement===lastEl){e.preventDefault();first.focus();}
+    }
+  });
+})();
+</script>

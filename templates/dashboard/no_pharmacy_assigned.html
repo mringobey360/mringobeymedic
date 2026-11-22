@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}No Branch Assigned{% endblock %}
+{% block content %}
+<div class="min-h-[60vh] flex flex-col items-center justify-center text-center px-4">
+    <div class="w-16 h-16 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mb-5">
+        <svg class="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M12 9v4"/><circle cx="12" cy="16.3" r="0.6" fill="currentColor"/><path d="M10.3 3.9L2.6 17.5A1.5 1.5 0 004 19.8h16a1.5 1.5 0 001.4-2.3L13.7 3.9a1.5 1.5 0 00-2.6 0z"/></svg>
+    </div>
+    <h1 class="text-xl font-semibold text-ink-900 mb-2">No Branch Assigned Yet</h1>
+    <p class="text-sm text-ink-500 max-w-sm mb-6">
+        Your account isn't linked to a branch yet, so there's nothing to show here.
+        Please contact your shop owner/supervisor so they can assign you to a branch.
+    </p>
+    <a href="{% url 'accounts:profile' %}" class="btn btn-nav btn-secondary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>View My Profile</a>
+</div>
+{% endblock %}

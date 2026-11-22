@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}{{ announcement.title }} - SMS Announcement{% endblock %}
+{% block content %}
+<div class="max-w-6xl mx-auto space-y-6">
+
+    <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+        <div class="min-w-0">
+            <a href="{% url 'hq:announcement_list' %}" class="text-xs font-medium text-brand-700 hover:text-brand-800">&larr; SMS announcements</a>
+            <div class="flex flex-wrap items-center gap-3 mt-1">
+                <h1 class="text-2xl font-bold text-ink-900 tracking-tight">{{ announcement.title }}</h1>
+                <span class="badge {% if announcement.status == 'COMPLETED' %}bg-emerald-100 text-emerald-700{% elif announcement.status == 'PARTIAL' %}bg-amber-100 text-amber-700{% elif announcement.status == 'FAILED' %}bg-red-100 text-red-700{% else %}bg-brand-100 text-brand-700{% endif %}">{{ announcement.get_status_display }}</span>
+            </div>
+            <p class="text-sm text-ink-500 mt-1">
+                {{ announcement.get_message_type_display }} &middot; {{ announcement.get_audience_display }} &middot;
+                {{ announcement.created_at|date:"d M Y H:i" }} by {% firstof announcement.created_by.get_full_name announcement.created_by.username "System" %}
+            </p>
+        </div>
+        {% if can_retry %}
+        <form method="post" action="{% url 'hq:announcement_retry' announcement.pk %}">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-primary text-sm">Retry {{ announcement.failed_count|add:announcement.pending_count }} undelivered</button>
+        </form>
+        {% endif %}
+    </div>
+
+    {% if announcement.is_running %}
+    <div class="card !py-3.5 ring-1 ring-brand-200 bg-brand-50/60">
+        <div class="flex items-center justify-between gap-3">
+            <p class="text-sm font-medium text-brand-800">Sending in progress &mdash; this page refreshes automatically.</p>
+            <span class="text-sm font-semibold text-brand-800">{{ announcement.progress_percent }}%</span>
+        </div>
+        <div class="mt-2 h-2 rounded-full bg-brand-100 overflow-hidden"><div class="h-full bg-brand-600 transition-all" style="width: {{ announcement.progress_percent }}%"></div></div>
+    </div>
+    <script>setTimeout(function () { window.location.reload(); }, 4000);</script>
+    {% endif %}
+
+    <section class="grid grid-cols-2 lg:grid-cols-{% if announcement.link_url %}6{% else %}5{% endif %} gap-3">
+        <div class="card"><p class="text-xs font-medium text-ink-500">Recipients</p><p class="text-2xl font-bold text-ink-900 mt-1">{{ announcement.total_recipients }}</p></div>
+        <div class="card"><p class="text-xs font-medium text-ink-500">Delivered</p><p class="text-2xl font-bold text-emerald-600 mt-1">{{ announcement.sent_count }}</p></div>
+        <div class="card"><p class="text-xs font-medium text-ink-500">Failed</p><p class="text-2xl font-bold {% if announcement.failed_count %}text-red-600{% else %}text-ink-900{% endif %} mt-1">{{ announcement.failed_count }}</p></div>
+        <div class="card"><p class="text-xs font-medium text-ink-500">Skipped</p><p class="text-2xl font-bold text-ink-900 mt-1">{{ announcement.skipped_count }}</p><p class="text-xs text-ink-400 mt-1">No / invalid phone</p></div>
+        <div class="card"><p class="text-xs font-medium text-ink-500">SMS segments sent</p><p class="text-2xl font-bold text-ink-900 mt-1">{{ announcement.total_segments }}</p></div>
+        {% if opened_count %}
+        <div class="card"><p class="text-xs font-medium text-ink-500">Link opened</p><p class="text-2xl font-bold text-brand-700 mt-1">{{ opened_count }}</p><p class="text-xs text-ink-400 mt-1">of {{ announcement.sent_count }} delivered</p></div>
+        {% endif %}
+    </section>
+
+    <section class="card">
+        <div class="flex items-center justify-between gap-3 mb-2">
+            <h2 class="text-sm font-semibold text-ink-800">Customer message</h2>
+            <span class="badge bg-brand-100 text-brand-700">Title + Message + Admin signature</span>
+        </div>
+        <div class="rounded-xl bg-ink-50 ring-1 ring-ink-900/5 px-4 py-3 text-sm text-ink-800 whitespace-pre-line break-words">{{ announcement.title }}
+{{ announcement.message }}
+SmartPOS Team</div>
+        {% if announcement.link_url %}<p class="text-xs text-ink-500 mt-2">{link} leads to: <a href="{{ announcement.link_url }}" target="_blank" rel="noopener" class="text-brand-700 hover:underline break-all">{{ announcement.link_url }}</a></p>{% endif %}
+        {% if announcement.also_in_app %}<p class="text-xs text-ink-400 mt-2">Also posted as an in-app notification.</p>{% endif %}
+    </section>
+
+    <section class="card">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
+            <h2 class="text-sm font-semibold text-ink-800">Delivery report</h2>
+            <form method="get" class="flex flex-wrap items-center gap-2">
+                <input type="search" name="q" value="{{ q }}" class="form-input !w-auto !py-2" placeholder="Name or phone">
+                <select name="status" class="form-input !w-auto !py-2" onchange="this.form.submit()">
+                    <option value="">All statuses</option>
+                    {% for value, label in delivery_choices %}<option value="{{ value }}" {% if current_status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+                </select>
+                <button type="submit" class="btn btn-secondary !py-2 text-sm">Filter</button>
+            </form>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-left border-b border-ink-200">
+                        <th class="py-2 pr-4">Customer</th>
+                        <th class="py-2 pr-4">Phone</th>
+                        <th class="py-2 pr-4">Status</th>
+                        <th class="py-2 pr-4">Segments</th>
+                        {% if opened_count %}<th class="py-2 pr-4">Opened</th>{% endif %}
+                        <th class="py-2">Details</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in page_obj %}
+                    <tr class="border-b border-ink-100">
+                        <td class="py-2.5 pr-4 font-medium text-ink-800">{{ r.display_name|default:"-" }}</td>
+                        <td class="py-2.5 pr-4 text-ink-500 whitespace-nowrap">{{ r.phone_number|default:"-" }}</td>
+                        <td class="py-2.5 pr-4">
+                            <span class="badge {% if r.status == 'SENT' %}bg-emerald-100 text-emerald-700{% elif r.status == 'FAILED' %}bg-red-100 text-red-700{% elif r.status == 'SKIPPED' %}bg-ink-100 text-ink-600{% else %}bg-amber-100 text-amber-700{% endif %}">{{ r.get_status_display }}</span>
+                        </td>
+                        <td class="py-2.5 pr-4 text-ink-500">{% if r.status != 'SKIPPED' %}{{ r.segments }}{% else %}-{% endif %}</td>
+                        {% if opened_count %}
+                        <td class="py-2.5 pr-4">
+                            {% if r.opened_at %}<span class="badge bg-brand-100 text-brand-700" title="{{ r.opened_at|date:'d M Y H:i' }}">Yes &middot; {{ r.opened_at|date:"d M H:i" }}</span>
+                            {% else %}<span class="text-xs text-ink-400">-</span>{% endif %}
+                        </td>
+                        {% endif %}
+                        <td class="py-2.5 text-xs text-ink-500">
+                            {% if r.status == 'SENT' %}{{ r.sent_at|date:"d M H:i" }}{% if r.provider_status %} &middot; {{ r.provider_status }}{% endif %}
+                            {% elif r.error_message %}<span class="{% if r.status == 'FAILED' %}text-red-600{% endif %}">{{ r.error_message }}</span>
+                            {% else %}-{% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="{% if announcement.link_url %}6{% else %}5{% endif %}" class="py-8 text-center text-ink-400">No recipients match this filter.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% include "partials/pagination.html" with page_obj=page_obj %}
+    </section>
+</div>
+{% endblock %}

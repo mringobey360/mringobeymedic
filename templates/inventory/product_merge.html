@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Merge {{ source.name }}{% endblock %}
+{% block content %}
+<div class="max-w-3xl mx-auto">
+    <div class="mb-5">
+        <h1 class="text-2xl font-bold text-ink-900 tracking-tight">Merge Product</h1>
+        <p class="text-sm text-ink-500 mt-1">Move the source product's stock and sales history into the correct existing product.</p>
+    </div>
+
+    <div class="card mb-5 border-amber-200 bg-amber-50/50">
+        <h2 class="font-semibold text-ink-900">Before you continue</h2>
+        <ul class="mt-2 text-sm text-ink-700 space-y-1 list-disc pl-5">
+            <li>The <strong>destination product</strong> keeps its SKU, barcode, category, and catalog identity.</li>
+            <li>All batches and remaining stock from the source will move to the destination.</li>
+            <li>Historical sale lines and stock movements will be reassigned so sales history remains available.</li>
+            <li>The source product will be <strong>archived</strong>, not permanently deleted.</li>
+            <li>Only products belonging to this same branch can be merged.</li>
+        </ul>
+    </div>
+
+    <div class="grid md:grid-cols-2 gap-4 mb-5">
+        <div class="card">
+            <p class="text-xs uppercase tracking-wide text-ink-400">Source — will be archived</p>
+            <h2 class="text-lg font-semibold text-ink-900 mt-1">{{ source.name }}</h2>
+            <p class="text-sm text-ink-500 mt-2">SKU: {{ source.sku|default:"-" }}</p>
+            <p class="text-sm text-ink-500">Barcode: {{ source.effective_barcode }}</p>
+            <p class="text-sm text-ink-500">Current stock: {{ source.total_quantity }} {{ source.get_unit_display }}</p>
+        </div>
+
+        <div class="card">
+            <p class="text-xs uppercase tracking-wide text-ink-400">Destination — will remain active</p>
+            {% if selected_target %}
+            <h2 class="text-lg font-semibold text-ink-900 mt-1">{{ selected_target.name }}</h2>
+            <p class="text-sm text-ink-500 mt-2">SKU: {{ selected_target.sku|default:"-" }}</p>
+            <p class="text-sm text-ink-500">Barcode: {{ selected_target.effective_barcode }}</p>
+            <p class="text-sm text-ink-500">Current stock: {{ selected_target.total_quantity }} {{ selected_target.get_unit_display }}</p>
+            {% else %}
+            <p class="text-sm text-ink-400 mt-2">Select the correct product below.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <form method="post" class="card">
+        {% csrf_token %}
+        <label class="block text-sm font-medium text-ink-700 mb-2" for="target_product">Merge into existing product</label>
+        <select id="target_product" name="target_product" class="form-input w-full" required>
+            <option value="">-- Select the correct destination product --</option>
+            {% for target in targets %}
+            <option value="{{ target.pk }}" {% if selected_target and selected_target.pk == target.pk %}selected{% endif %}>
+                {{ target.name }} — SKU {{ target.sku|default:"-" }} — {{ target.total_quantity }} {{ target.get_unit_display }}
+            </option>
+            {% endfor %}
+        </select>
+        <p class="text-xs text-ink-500 mt-2">Choose only when you have confirmed that both catalog entries represent the same product/medicine.</p>
+
+        <div class="flex flex-wrap gap-2 mt-5">
+            <button type="submit" class="btn btn-primary" data-confirm="Merge these products?" data-confirm-detail="This will move stock and sales history to the selected destination and archive the source product. Make sure the destination is correct.">Merge Products</button>
+            <a href="{% url 'inventory:product_list' %}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

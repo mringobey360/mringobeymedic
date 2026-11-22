@@ -1,0 +1,359 @@
+{% extends "accounts/auth_base.html" %}
+{% block title %}Sign in - SmartPOS{% endblock %}
+{% block meta_description %}Sign in to SmartPOS to manage sales, stock, customers, staff and branches. Built by Mutech Apex Innovations.{% endblock %}
+{% block og_title %}Sign in - SmartPOS{% endblock %}
+{% block canonical %}<link rel="canonical" href="{{ SITE_URL }}/accounts/login/">{% endblock %}
+
+{% block auth_head %}
+<style>
+    /* Joined username / password box */
+    .auth-group { border: 1px solid #cbd5e1; border-radius: .75rem; background: #fff; overflow: hidden; transition: border-color .15s ease, box-shadow .15s ease; }
+    .auth-group:focus-within { border-color: #0d9488; box-shadow: 0 0 0 3px rgba(20,184,166,.18); }
+    .auth-group > * + * { border-top: 1px solid #e2e8f0; }
+    .auth-group .login-input { display: block; width: 100%; border: 0; border-radius: 0; background: transparent; padding: .95rem 1rem; font-size: .9375rem; color: #0f172a; outline: none; box-shadow: none; }
+    .auth-group .login-input::placeholder { color: #94a3b8; }
+    .auth-group .pw-field .login-input { padding-right: 3rem; }
+
+    /* Forgot password dialog */
+    .fp-overlay { position: fixed; inset: 0; z-index: 130; display: none; align-items: center; justify-content: center; padding: 1rem; background: rgba(11,18,32,.55); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+    .fp-overlay.is-open { display: flex; }
+    .fp-card { width: 100%; max-width: 24rem; border-radius: 1rem; background: #fff; padding: 1.5rem; text-align: center; box-shadow: 0 24px 60px rgba(15,23,42,.28); animation: fpIn .18s ease both; }
+    @keyframes fpIn { from { opacity: 0; transform: translateY(8px) scale(.97); } to { opacity: 1; transform: none; } }
+    @media (prefers-reduced-motion: reduce) { .fp-card { animation: none; } }
+    .fp-input { width: 100%; border: 1px solid #cbd5e1; border-radius: .625rem; background: #f8fafc; padding: .8rem 1rem; font-size: .9375rem; color: #0f172a; text-align: left; outline: none; transition: border-color .15s ease, box-shadow .15s ease, background .15s ease; }
+    .fp-input:focus { background: #fff; border-color: #0d9488; box-shadow: 0 0 0 3px rgba(20,184,166,.18); }
+    .fp-input.has-error { border-color: #dc2626; box-shadow: 0 0 0 3px rgba(220,38,38,.12); }
+
+</style>
+{% include "accounts/partials/pin_pad_styles.html" %}
+{% endblock %}
+
+{% block auth_content %}
+{% if pin_device %}
+<div id="pin-root" class="pin-root w-full max-w-[18rem] text-center"
+     data-url="{% url 'accounts:pin_login' %}" data-length="{{ pin_length }}">
+    {% csrf_token %}
+    {% with pu=pin_device.user %}
+    {% if pu.profile_photo %}
+        <img src="{{ pu.profile_photo.url }}" alt="" class="mx-auto h-12 w-12 rounded-full object-cover ring-1 ring-ink-200">
+    {% else %}
+        <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-brand-50 text-xl font-bold text-brand-700 ring-1 ring-brand-100">{{ pu.first_name.0|default:pu.username.0|upper }}</div>
+    {% endif %}
+    <h1 class="mt-2 text-lg font-semibold tracking-tight text-ink-900">Welcome back, {{ pu.first_name|default:pu.username }}</h1>
+    <p class="mt-0.5 text-xs text-ink-500">@{{ pu.username }} &middot; {{ pu.get_role_display }}</p>
+    {% endwith %}
+
+    <p id="pin-label" class="mt-3 text-xs font-semibold text-ink-800">Enter your PIN</p>
+    <div id="pin-dots" class="pin-dots" aria-hidden="true">
+        {% for ch in "x"|ljust:pin_length %}<span class="pin-dot"></span>{% endfor %}
+    </div>
+    <p id="pin-error" class="mt-1 min-h-[1rem] text-xs font-medium text-red-600" role="alert" aria-live="polite"></p>
+
+    {% include "accounts/partials/pin_pad_keys.html" %}
+
+    <a href="{% url 'accounts:login' %}?use=password&amp;reason=forgot" id="pin-forgot" class="mt-3 inline-block text-xs font-semibold text-brand-700 transition hover:text-brand-800">Forgot PIN?</a>
+    <br>
+    <a href="{% url 'accounts:login' %}?use=password" id="pin-other" class="mt-3 inline-block text-[10px] font-semibold uppercase tracking-[.2em] text-ink-500 transition hover:text-brand-700">Use another account</a>
+</div>
+{% else %}
+<div class="w-full max-w-sm sm:max-w-md">
+    <h1 class="text-center text-xl sm:text-2xl font-light tracking-tight text-ink-900">Sign in to your account</h1>
+
+    {% if pin_reason == 'forgot' %}
+    <div class="mt-3 rounded-lg border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-800" role="status">
+        <strong class="font-semibold">Forgot your PIN?</strong> Sign in with your username and password. You will then create a new PIN.
+    </div>
+    {% elif pin_reason == 'locked' %}
+    <div class="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800" role="status">
+        <strong class="font-semibold">Your PIN is locked</strong> after too many wrong attempts. Sign in with your password to create a new one.
+    </div>
+    {% endif %}
+
+    {% if google_enabled %}
+    <div class="mt-5 sm:mt-6 text-center">{% include "partials/google_button.html" %}<div class="sp-or">or use your username</div></div>
+    {% endif %}
+    <form method="post" id="login-form" class="{% if google_enabled %}mt-0{% else %}mt-5 sm:mt-6{% endif %}" novalidate>
+        {% csrf_token %}
+        {% if pin_reason == 'forgot' %}<input type="hidden" name="reason" value="forgot">{% endif %}
+
+        {% if form.non_field_errors %}
+            <div class="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
+                {{ form.non_field_errors|striptags }}
+            </div>
+        {% endif %}
+
+        <div class="auth-group">
+            <div>
+                <label for="{{ form.username.id_for_label }}" class="sr-only">Username</label>
+                {{ form.username }}
+            </div>
+            <div>
+                <label for="{{ form.password.id_for_label }}" class="sr-only">Password</label>
+                {{ form.password }}
+            </div>
+        </div>
+        {% if form.username.errors %}<p class="mt-2 text-xs text-red-600">{{ form.username.errors|striptags }}</p>{% endif %}
+        {% if form.password.errors %}<p class="mt-2 text-xs text-red-600">{{ form.password.errors|striptags }}</p>{% endif %}
+
+        <div class="auth-options mt-4">
+            <div class="auth-options-checks">
+                <label class="sp-check">
+                    <input type="checkbox" name="remember_me">
+                    <span>Remember me</span>
+                </label>
+                <label class="sp-check">
+                    <input type="checkbox" name="trust_device">
+                    <span>Trust this device</span>
+                </label>
+            </div>
+            <a href="{% url 'accounts:forgot_password' %}" id="forgot-open" class="auth-link">Forgot your password?</a>
+        </div>
+
+        <button type="submit" class="auth-btn relative mt-4">
+            <svg class="absolute left-4 h-4 w-4 text-brand-200" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+            Sign in
+        </button>
+    </form>
+
+    <div class="auth-switch">
+        <span>Don't have an account?</span>
+        <a href="{% url 'hq:signup' %}" class="btn btn-secondary btn-sm"><svg class="icon btn-icon" aria-hidden="true"><use href="#i-user-plus"/></svg>Create account</a>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block auth_overlays %}
+<!-- Forgot password dialog -->
+<div id="fp-overlay" class="fp-overlay" aria-hidden="true">
+    <div class="fp-card" role="dialog" aria-modal="true" aria-labelledby="fp-title" aria-describedby="fp-text">
+        <h2 id="fp-title" class="text-lg font-bold text-ink-900">Forgot Password?</h2>
+        <p id="fp-text" class="mt-2 text-sm text-ink-600">Please type your registered phone number to get reset instructions.</p>
+
+        <form id="fp-form" action="{% url 'accounts:forgot_password' %}" method="post" class="mt-5" data-allow-resubmit="true" novalidate>
+            {% csrf_token %}
+            <label for="fp-phone" class="sr-only">Phone number</label>
+            <input id="fp-phone" name="phone_number" type="tel" inputmode="tel" autocomplete="tel" placeholder="0712345678 or +255712345678" class="fp-input" required>
+            <p id="fp-error" class="mt-2 hidden text-left text-xs font-medium text-red-600" role="alert"></p>
+
+            <div class="mt-5 grid grid-cols-2 gap-3">
+                <button type="button" id="fp-cancel" class="btn btn-secondary"><svg class="icon btn-icon" aria-hidden="true"><use href="#i-x"/></svg>Cancel</button>
+                <button type="submit" id="fp-submit" class="btn btn-primary"><svg class="icon btn-icon" aria-hidden="true"><use href="#i-send"/></svg>Submit</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+
+{% block extra_scripts %}
+{% if pin_device %}
+<script>
+(function () {
+    var root = document.getElementById('pin-root');
+    if (!root) return;
+    var length = parseInt(root.dataset.length, 10) || 4;
+    var url = root.dataset.url;
+    var csrf = root.querySelector('input[name="csrfmiddlewaretoken"]').value;
+    var dotsWrap = document.getElementById('pin-dots');
+    var dots = dotsWrap.querySelectorAll('.pin-dot');
+    var errorEl = document.getElementById('pin-error');
+    var keys = root.querySelectorAll('.pin-key');
+    var pin = '';
+    var busy = false;
+    var locked = false;
+    var cooldownTimer = null;
+
+    function render() {
+        PinUI.render(pin);
+    }
+    function setError(msg) { errorEl.textContent = msg || ''; }
+    function shake() {
+        dotsWrap.classList.remove('is-shake');
+        void dotsWrap.offsetWidth;
+        dotsWrap.classList.add('is-shake');
+    }
+    function setBusy(v) {
+        busy = v;
+        root.classList.toggle('is-busy', v);
+        if (v) PinUI.state('busy');
+    }
+    function lockPad() {
+        locked = true;
+        keys.forEach(function (k) { k.disabled = true; });
+    }
+    function startCooldown(seconds) {
+        clearInterval(cooldownTimer);
+        locked = true;
+        var left = Math.max(1, parseInt(seconds, 10) || 1);
+        keys.forEach(function (k) { k.disabled = true; });
+        function tick() {
+            setError('Please wait ' + left + ' seconds before trying again.');
+            if (left <= 0) { clearInterval(cooldownTimer); locked = false; keys.forEach(function (k) { k.disabled = false; }); setError('You can try your PIN again.'); }
+            left -= 1;
+        }
+        tick();
+        cooldownTimer = setInterval(tick, 1000);
+    }
+    function fail(data) {
+        pin = '';
+        render();
+        shake();
+        setError((data && data.error) || 'Something went wrong. Please try again.');
+        setBusy(false);
+        PinUI.state('idle');
+        if (data && data.fallback) {
+            lockPad();
+            setTimeout(function () { window.location.href = data.redirect; }, 2500);
+        } else if (data && data.cooldown) {
+            startCooldown(data.retry_after);
+        }
+    }
+    function submit() {
+        if (busy || locked || pin.length !== length) return;
+        setBusy(true);
+        fetch(url, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'X-CSRFToken': csrf,
+                'X-Requested-With': 'XMLHttpRequest',
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: 'pin=' + encodeURIComponent(pin)
+        })
+        .then(function (res) {
+            return res.json().catch(function () { return { ok: false, error: 'Unexpected response. Please try again.' }; });
+        })
+        .then(function (data) {
+            if (data && data.ok) {
+                setError('');
+                PinUI.leave(function () { window.location.href = data.redirect; });
+                return;
+            }
+            fail(data);
+        })
+        .catch(function () { fail({ error: 'Network problem. Check your connection and try again.' }); });
+    }
+    function addDigit(d) {
+        if (busy || locked || pin.length >= length) return;
+        pin += d;
+        setError('');
+        render();
+        if (pin.length === length) setTimeout(submit, 220);
+    }
+    function backspace() {
+        if (busy || locked) return;
+        pin = pin.slice(0, -1);
+        render();
+    }
+
+    root.querySelectorAll('[data-digit]').forEach(function (btn) {
+        btn.addEventListener('click', function () { addDigit(btn.dataset.digit); });
+    });
+    document.getElementById('pin-back').addEventListener('click', backspace);
+    PinUI.setLabel({ idle: 'Enter PIN', ready: 'Verifying\u2026', busy: 'Verifying PIN\u2026', success: 'Access granted' });
+    PinUI.onConfirm(function () { if (!busy && !locked && pin.length === length) submit(); });
+    document.addEventListener('keydown', function (e) {
+        if (e.ctrlKey || e.metaKey || e.altKey) return;
+        if (/^[0-9]$/.test(e.key)) { e.preventDefault(); addDigit(e.key); }
+        else if (e.key === 'Backspace') { e.preventDefault(); backspace(); }
+    });
+})();
+</script>
+{% else %}
+<script>
+(function () {
+    var overlay = document.getElementById('fp-overlay');
+    var openLink = document.getElementById('forgot-open');
+    var form = document.getElementById('fp-form');
+    var phone = document.getElementById('fp-phone');
+    var errorEl = document.getElementById('fp-error');
+    var submitBtn = document.getElementById('fp-submit');
+    var cancelBtn = document.getElementById('fp-cancel');
+    if (!overlay || !openLink || !form) return;
+
+    function showError(msg) {
+        errorEl.textContent = msg || '';
+        errorEl.classList.toggle('hidden', !msg);
+        phone.classList.toggle('has-error', !!msg);
+    }
+    function openDialog() {
+        showError('');
+        overlay.classList.add('is-open');
+        overlay.setAttribute('aria-hidden', 'false');
+        setTimeout(function () { phone.focus(); }, 30);
+    }
+    function closeDialog() {
+        overlay.classList.remove('is-open');
+        overlay.setAttribute('aria-hidden', 'true');
+        openLink.focus();
+    }
+
+    openLink.addEventListener('click', function (e) { e.preventDefault(); openDialog(); });
+    cancelBtn.addEventListener('click', closeDialog);
+    overlay.addEventListener('mousedown', function (e) { if (e.target === overlay) closeDialog(); });
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && overlay.classList.contains('is-open')) closeDialog();
+    });
+    phone.addEventListener('input', function () { showError(''); });
+
+    form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var value = phone.value.trim();
+        if (!value) { showError('Please enter your phone number.'); phone.focus(); return; }
+
+        submitBtn.disabled = true;
+        var original = submitBtn.innerHTML;
+        submitBtn.innerHTML = '<span class="spinner" aria-hidden="true"></span> Sending\u2026';
+
+        fetch(form.action, {
+            method: 'POST',
+            body: new FormData(form),
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            credentials: 'same-origin'
+        })
+        .then(function (res) { return res.json().then(function (data) { return { res: res, data: data }; }); })
+        .then(function (r) {
+            if (r.data && r.data.ok) {
+                window.location.href = r.data.redirect;
+                return;
+            }
+            showError((r.data && r.data.error) || 'Something went wrong. Please try again.');
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = original;
+        })
+        .catch(function () {
+            showError('Network problem. Check your connection and try again.');
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = original;
+        });
+    });
+})();
+</script>
+<script>
+(function () {
+    /* Same professional "Signing in securely" splash for username + password sign-in. */
+    var form = document.getElementById('login-form');
+    if (!form) return;
+    var overlay = null;
+    function show() {
+        if (overlay) return;
+        overlay = window.SignInSplash ? SignInSplash.show() : true;
+    }
+    function hide() { if (overlay) { if (window.SignInSplash) SignInSplash.hide(); overlay = null; } }
+    form.addEventListener('submit', function (e) {
+        var u = form.querySelector('[name="username"]'), p = form.querySelector('[name="password"]');
+        if (!u || !p || !u.value.trim() || !p.value) return;   // let the server show the normal field errors
+        if (e.defaultPrevented) return;
+        var btn = form.querySelector('button[type="submit"]');
+        if (btn) btn.disabled = true;
+        show();
+    });
+    window.addEventListener('pageshow', function (ev) {
+        if (ev.persisted) { hide(); var b = form.querySelector('button[type="submit"]'); if (b) b.disabled = false; }
+    });
+})();
+</script>
+{% endif %}
+{% endblock %}

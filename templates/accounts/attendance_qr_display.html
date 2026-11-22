@@ -1,0 +1,239 @@
+{% extends "base.html" %}
+{% block title %}Attendance Display · {{ request.pharmacy.name }}{% endblock %}
+{% block content %}
+<div class="page-shell max-w-6xl">
+  <div class="page-header">
+    <div class="min-w-0">
+      <p class="eyebrow">Attendance · Dedicated device</p>
+      <h1 class="page-title">Branch Attendance Display</h1>
+      <p class="page-subtitle">Securely manage the account used by the branch tablet, phone, laptop or desktop that stays on the live attendance QR screen.</p>
+    </div>
+    <div class="flex items-center gap-3 rounded-2xl border border-ink-200 bg-white px-4 py-3 shadow-sm min-w-0">
+      <div class="w-10 h-10 rounded-xl bg-brand-50 text-brand-700 grid place-items-center shrink-0">
+        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v11a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 17.5z"/><path d="M8 8h8M8 12h8M8 16h4"/></svg>
+      </div>
+      <div class="min-w-0">
+        <div class="text-[11px] font-bold uppercase tracking-wider text-ink-400">Active branch</div>
+        <div class="font-bold text-sm text-ink-900 truncate">{{ request.pharmacy.name }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 xl:grid-cols-5 gap-5">
+    <section class="xl:col-span-3 card p-0 overflow-hidden">
+      <div class="p-5 sm:p-6 border-b border-ink-100">
+        <div class="flex items-start gap-3">
+          <div class="w-11 h-11 rounded-2xl bg-brand-50 text-brand-700 grid place-items-center shrink-0">
+            <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 11h8M8 15h5"/></svg>
+          </div>
+          <div class="min-w-0">
+            <h2 class="section-title">Display account</h2>
+            <p class="section-subtitle">One dedicated login for this branch's attendance screen. It has no sales, stock, customer or reporting access.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="p-5 sm:p-6">
+        {% if display_account %}
+          <div class="rounded-2xl border {% if display_account.is_active %}border-emerald-200 bg-emerald-50/50{% else %}border-amber-200 bg-amber-50/50{% endif %} p-4 sm:p-5">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div class="min-w-0">
+                <div class="text-[11px] font-bold uppercase tracking-wider text-ink-400">Current status</div>
+                <div class="flex items-center gap-2 mt-1">
+                  <span class="w-2.5 h-2.5 rounded-full {% if display_account.is_active %}bg-emerald-500{% else %}bg-amber-500{% endif %}"></span>
+                  <span id="display-status-label" class="font-bold text-sm text-ink-900">{% if display_account.is_active %}Enabled{% else %}Disabled{% endif %}</span>
+                </div>
+              </div>
+              <form method="post" action="{% url 'accounts:attendance_qr_display_account' %}" class="shrink-0 display-toggle-form" data-display-toggle="true" data-allow-resubmit="true">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="toggle">
+                <button type="submit" class="group inline-flex items-center gap-3 rounded-full border bg-white px-2 py-1.5 shadow-sm hover:shadow transition focus:outline-none focus:ring-2 focus:ring-brand-500/30" aria-label="{% if display_account.is_active %}Disable{% else %}Enable{% endif %} display access">
+                  <span id="display-switch-label" class="text-xs font-semibold text-ink-600 px-1">{% if display_account.is_active %}On{% else %}Off{% endif %}</span>
+                  <span id="display-switch-track" class="relative w-11 h-6 rounded-full {% if display_account.is_active %}bg-brand-600{% else %}bg-ink-300{% endif %} transition-colors">
+                    <span id="display-switch-thumb" class="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform {% if display_account.is_active %}translate-x-5{% else %}translate-x-0.5{% endif %}"></span>
+                  </span>
+                </button>
+              </form>
+            </div>
+            <p id="display-status-help" class="text-xs text-ink-500 mt-3 leading-5">{% if display_account.is_active %}The dedicated device can sign in and show the live QR.{% else %}The dedicated device cannot sign in until access is enabled again.{% endif %}</p>
+          </div>
+
+          <div class="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div class="rounded-2xl border border-ink-100 bg-ink-50/60 p-4 min-w-0">
+              <div class="text-[11px] font-bold uppercase tracking-wider text-ink-400">Username</div>
+              <div class="mt-2 flex items-center gap-2 min-w-0">
+                <code id="display-username" class="text-sm font-semibold text-ink-900 truncate">{{ display_account.username }}</code>
+                <button type="button" class="copy-btn shrink-0 rounded-lg border border-ink-200 bg-white p-2 text-ink-500 hover:text-brand-700 hover:border-brand-200" data-copy-target="display-username" aria-label="Copy username" title="Copy username">
+                  <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="9" width="10" height="10" rx="2"/><path d="M15 9V7a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/></svg>
+                </button>
+              </div>
+            </div>
+            <div class="rounded-2xl border border-ink-100 bg-ink-50/60 p-4">
+              <div class="text-[11px] font-bold uppercase tracking-wider text-ink-400">Password</div>
+              <div class="mt-2 text-sm font-semibold text-ink-700">Protected · never displayed again</div>
+            </div>
+          </div>
+
+          <div class="mt-6 rounded-2xl border border-ink-100 bg-white p-4 sm:p-5">
+            <div class="flex items-start gap-3">
+              <div class="w-9 h-9 rounded-xl bg-brand-50 text-brand-700 grid place-items-center shrink-0">
+                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v4M12 17v4M4.2 7.2l2.8 2.1M17 14.7l2.8 2.1M3 12h4M17 12h4M4.2 16.8L7 14.7M17 9.3l2.8-2.1"/><circle cx="12" cy="12" r="3"/></svg>
+              </div>
+              <div>
+                <h3 class="font-bold text-sm text-ink-900">Customize credentials</h3>
+                <p class="text-xs text-ink-500 mt-1 leading-5">Change the username anytime. Enter a new password only when you want to replace the current one. The saved password is never readable by the manager.</p>
+              </div>
+            </div>
+
+            <form method="post" action="{% url 'accounts:attendance_qr_display_account' %}" class="mt-5 space-y-4" autocomplete="off" data-allow-resubmit="true">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="save">
+              <div>
+                <label for="id_username" class="block text-xs font-bold text-ink-700 mb-1.5">Display username</label>
+                {{ credential_form.username }}
+                {% for error in credential_form.username.errors %}<p class="text-xs text-red-600 mt-1">{{ error }}</p>{% endfor %}
+                <p class="text-[11px] text-ink-400 mt-1.5">Use letters, numbers, dots, dashes or underscores for a device-friendly login.</p>
+              </div>
+              <div>
+                <label for="id_password" class="block text-xs font-bold text-ink-700 mb-1.5">New display password <span class="font-normal text-ink-400">(optional)</span></label>
+                <div class="pw-field">
+                  {{ credential_form.password }}
+                  <button type="button" class="pw-toggle" data-password-toggle="id_password" aria-label="Show password" aria-pressed="false"></button>
+                </div>
+                {% for error in credential_form.password.errors %}<p class="text-xs text-red-600 mt-1">{{ error }}</p>{% endfor %}
+                <div class="flex flex-wrap items-center justify-between gap-2 mt-1.5">
+                  <p class="text-[11px] text-ink-400">Minimum 8 characters. Leave blank to keep the current password.</p>
+                  <button type="button" id="generate-display-password" class="text-xs font-bold text-brand-700 hover:text-brand-900">Generate strong password</button>
+                </div>
+              </div>
+              <button type="submit" class="btn btn-primary w-full sm:w-auto">Save display credentials</button>
+            </form>
+          </div>
+
+          <div class="mt-5 flex flex-col sm:flex-row gap-2">
+            <form method="post" action="{% url 'accounts:attendance_qr_display_account' %}" class="flex-1" data-allow-resubmit="true">
+              {% csrf_token %}<input type="hidden" name="action" value="rotate">
+              <button type="submit" class="btn btn-secondary w-full">Generate new password</button>
+            </form>
+            <a href="{% url 'accounts:login' %}" class="btn btn-primary flex-1 text-center">Open display login</a>
+          </div>
+        {% else %}
+          <div class="rounded-2xl border border-dashed border-ink-200 bg-ink-50/50 p-6 sm:p-8 text-center">
+            <div class="mx-auto w-14 h-14 rounded-2xl bg-white text-brand-700 grid place-items-center shadow-sm ring-1 ring-ink-100">
+              <svg class="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M8 9h8M8 13h5"/></svg>
+            </div>
+            <h2 class="font-bold text-lg mt-4">Set up the branch display</h2>
+            <p class="text-sm text-ink-500 max-w-md mx-auto mt-2">Create a dedicated username and password for the device that will stay on the live attendance QR screen.</p>
+          </div>
+          <form method="post" action="{% url 'accounts:attendance_qr_display_account' %}" class="mt-5 space-y-4" autocomplete="off" data-allow-resubmit="true">
+            {% csrf_token %}<input type="hidden" name="action" value="create">
+            <div>
+              <label for="id_username" class="block text-xs font-bold text-ink-700 mb-1.5">Display username</label>
+              {{ credential_form.username }}
+              {% for error in credential_form.username.errors %}<p class="text-xs text-red-600 mt-1">{{ error }}</p>{% endfor %}
+            </div>
+            <div>
+              <label for="id_password" class="block text-xs font-bold text-ink-700 mb-1.5">Display password <span class="font-normal text-ink-400">(optional)</span></label>
+              <div class="pw-field">{{ credential_form.password }}<button type="button" class="pw-toggle" data-password-toggle="id_password" aria-label="Show password" aria-pressed="false"></button></div>
+              <div class="flex flex-wrap items-center justify-between gap-2 mt-1.5"><p class="text-[11px] text-ink-400">Leave blank to securely generate one.</p><button type="button" id="generate-display-password" class="text-xs font-bold text-brand-700">Generate strong password</button></div>
+              {% for error in credential_form.password.errors %}<p class="text-xs text-red-600 mt-1">{{ error }}</p>{% endfor %}
+            </div>
+            <button type="submit" class="btn btn-primary w-full">Create secure display account</button>
+          </form>
+        {% endif %}
+      </div>
+    </section>
+
+    <aside class="xl:col-span-2 space-y-5">
+      <section class="card p-5 sm:p-6">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-brand-50 text-brand-700 grid place-items-center shrink-0">✓</div>
+          <div><h2 class="font-bold text-ink-900">Recommended setup</h2><p class="text-xs text-ink-500 mt-0.5">Three simple steps</p></div>
+        </div>
+        <div class="mt-5 space-y-3">
+          <div class="flex gap-3"><span class="w-7 h-7 rounded-full bg-brand-700 text-white text-xs font-bold grid place-items-center shrink-0">1</span><div><b class="text-sm">Create credentials</b><p class="text-xs text-ink-500 mt-0.5">Use a device-specific username and strong password.</p></div></div>
+          <div class="flex gap-3"><span class="w-7 h-7 rounded-full bg-brand-700 text-white text-xs font-bold grid place-items-center shrink-0">2</span><div><b class="text-sm">Sign in on the branch device</b><p class="text-xs text-ink-500 mt-0.5">The account automatically opens the attendance kiosk.</p></div></div>
+          <div class="flex gap-3"><span class="w-7 h-7 rounded-full bg-brand-700 text-white text-xs font-bold grid place-items-center shrink-0">3</span><div><b class="text-sm">Keep the QR screen open</b><p class="text-xs text-ink-500 mt-0.5">Employees scan the rotating QR from their own phones.</p></div></div>
+        </div>
+      </section>
+
+      <section class="card p-5 sm:p-6">
+        <h2 class="font-bold text-ink-900">Security at a glance</h2>
+        <div class="mt-4 space-y-3">
+          <div class="soft-panel"><b class="text-sm">Branch-bound</b><p class="text-xs text-ink-500 mt-1 leading-5">The display account belongs only to <strong>{{ request.pharmacy.name }}</strong>.</p></div>
+          <div class="soft-panel"><b class="text-sm">Least privilege</b><p class="text-xs text-ink-500 mt-1 leading-5">It can operate the attendance kiosk but cannot enter management pages.</p></div>
+          <div class="soft-panel"><b class="text-sm">Rotating QR</b><p class="text-xs text-ink-500 mt-1 leading-5">The live attendance code changes automatically and expired codes cannot be reused.</p></div>
+        </div>
+      </section>
+    </aside>
+  </div>
+</div>
+
+<script>
+(function () {
+  const password = document.getElementById('id_password');
+  const generate = document.getElementById('generate-display-password');
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%&*';
+  function makePassword() {
+    const values = new Uint32Array(18);
+    crypto.getRandomValues(values);
+    return Array.from(values, n => alphabet[n % alphabet.length]).join('');
+  }
+  if (generate && password) generate.addEventListener('click', function () {
+    password.value = makePassword();
+    password.type = 'text';
+    password.focus();
+  });
+
+  document.querySelectorAll('.copy-btn').forEach(function (button) {
+    button.addEventListener('click', async function () {
+      const target = document.getElementById(button.dataset.copyTarget);
+      if (!target) return;
+      try {
+        await navigator.clipboard.writeText(target.textContent.trim());
+        const original = button.innerHTML;
+        button.innerHTML = '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m5 12 4 4L19 6"/></svg>';
+        button.classList.add('text-emerald-600', 'border-emerald-200');
+        setTimeout(() => { button.innerHTML = original; button.classList.remove('text-emerald-600', 'border-emerald-200'); }, 1300);
+      } catch (e) {
+        const range = document.createRange(); range.selectNodeContents(target);
+        const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range);
+      }
+    });
+  });
+
+  document.querySelectorAll('[data-password-toggle]').forEach(function (button) {
+    button.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"/><circle cx="12" cy="12" r="2.5"/></svg>';
+    button.addEventListener('click', function () {
+      const input = document.getElementById(button.dataset.passwordToggle);
+      if (!input) return;
+      const visible = input.type === 'text';
+      input.type = visible ? 'password' : 'text';
+      button.setAttribute('aria-pressed', String(!visible));
+      button.setAttribute('aria-label', visible ? 'Show password' : 'Hide password');
+    });
+  });
+})();
+</script>
+<script>
+(function () {
+  // Submit through Django normally. This deliberately avoids fetch/redirect/CSRF
+  // ambiguity and lets the server-rendered state be the single source of truth.
+  const form = document.querySelector('[data-display-toggle="true"]');
+  if (!form) return;
+  const button = form.querySelector('button[type="submit"]');
+  form.addEventListener('submit', function () {
+    if (form.dataset.submitting === 'true') return;
+    form.dataset.submitting = 'true';
+    if (button) {
+      button.disabled = true;
+      button.setAttribute('aria-busy', 'true');
+      const label = document.getElementById('display-switch-label');
+      const help = document.getElementById('display-status-help');
+      if (label) label.textContent = 'Saving…';
+      if (help) help.textContent = 'Saving your change securely. The page will refresh when it is complete.';
+    }
+  });
+})();
+</script>
+{% endblock %}

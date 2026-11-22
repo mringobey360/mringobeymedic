@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Payment Settings{% endblock %}
+{% block content %}
+<div class="max-w-lg mx-auto">
+    <h1 class="text-2xl font-bold text-ink-900 tracking-tight mb-4">Payment Settings</h1>
+    <form method="post" class="card space-y-4">
+        {% csrf_token %}
+        <div class="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4">
+            <div class="flex items-start gap-3">
+                <div class="min-w-0 flex-1">
+                    <h2 class="font-semibold text-ink-900">Manual Lipa Namba payments</h2>
+                    <p class="mt-1 text-sm text-ink-600">Turn this off to hide the manual Lipa Namba number and instructions from new-customer payment pages. Online/mobile-money checkout remains available when a payment gateway is configured.</p>
+                </div>
+            </div>
+        </div>
+        {% for field in form %}
+        <div>
+            <label class="block text-sm font-medium mb-1">{{ field.label }}</label>
+            {{ field }}
+            {% if field.help_text %}<p class="text-xs text-ink-400 mt-1">{{ field.help_text }}</p>{% endif %}
+            {% if field.errors %}<p class="text-xs text-red-600 mt-1">{{ field.errors.0 }}</p>{% endif %}
+        </div>
+        {% endfor %}
+        <button type="submit" class="btn btn-primary w-full">Save</button>
+    </form>
+</div>
+{% endblock %}

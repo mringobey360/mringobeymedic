@@ -1,0 +1,111 @@
+{% extends "base.html" %}{% load static %}
+{% block title %}{% if store %}Shop profile{% else %}Set up online store{% endif %} · SmartPOS{% endblock %}
+{% block extra_head %}{% include 'marketplace/_mk_styles.html' %}<link rel="stylesheet" href="{% static 'marketplace/social.css' %}?v=sx-5">{% endblock %}
+{% block content %}
+<div class="mk-page">
+ <nav class="mk-crumbs" aria-label="Breadcrumb"><a href="{% url 'marketplace:seller_dashboard' %}">Seller Centre</a><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg><span>My store</span><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg><b>{% if store %}Shop profile{% else %}Set up{% endif %}</b></nav>
+ <header class="mk-hero">
+  <div class="mk-hero-main">
+   <span class="mk-hero-icon"><svg viewBox="0 0 24 24"><path d="M3 9l1.5-5h15L21 9"/><path d="M4 9v11h16V9"/><path d="M3 9a3 3 0 006 0 3 3 0 006 0 3 3 0 006 0"/></svg></span>
+   <div><h1>{% if store %}Your online shop{% else %}Set up your online store{% endif %}</h1><p>{% if store %}Each manager runs one online shop. Update its name, description and logo here.{% else %}Your store is linked to a SmartPOS business branch you manage. Each manager can create one online shop.{% endif %}</p></div>
+  </div>
+  {% if store %}<div class="mk-actions">{% if store.is_published %}<span class="mk-badge mk-b-published">Published</span>{% else %}<span class="mk-badge mk-b-muted">Not published</span>{% endif %}</div>{% endif %}
+ </header>
+
+ <form class="mk-form" method="post" enctype="multipart/form-data">{% csrf_token %}
+ <div class="mk-layout">
+  <div class="mk-main">
+   <section class="mk-sect">
+    <div class="mk-sect-h"><span class="mk-sect-ico"><svg viewBox="0 0 24 24"><path d="M3 9l1.5-5h15L21 9"/><path d="M4 9v11h16V9"/></svg></span><div><h2>Shop identity</h2><p>What customers see at the top of your public shop.</p></div></div>
+    <div class="mk-sect-b"><div class="mk-form-grid">
+     <div class="mk-field full"><label class="mk-label" for="pharmacy">Business / branch <span class="mk-req" aria-hidden="true">*</span></label>{% if store %}<input id="pharmacy" value="{{ store.pharmacy.name }}" disabled><small class="mk-help">Your shop is linked to this branch and cannot be moved or duplicated.</small>{% else %}<select name="pharmacy" id="pharmacy" required>{% for p in pharmacies %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}</select>{% endif %}</div>
+     <div class="mk-field full"><label class="mk-label" for="public_name">Public shop name <span class="mk-req" aria-hidden="true">*</span></label><input id="public_name" name="public_name" maxlength="150" required placeholder="e.g. Chris Store" value="{{ store.public_name|default:'' }}"><small class="mk-help">Your shop link is created automatically from this name.</small></div>
+     <div class="mk-field full"><label class="mk-label" for="description">Shop description</label><textarea id="description" name="description" rows="4" maxlength="3000" placeholder="What do you sell? Where are you based? How do customers get their orders?">{{ store.description|default:'' }}</textarea><small class="mk-help">A short, clear description helps customers trust your shop.</small></div>
+    </div></div>
+   </section>
+
+   <section class="mk-sect">
+    <div class="mk-sect-h"><span class="mk-sect-ico"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></svg></span><div><h2>Branding</h2><p>Optional. A square logo looks best.</p></div></div>
+    <div class="mk-sect-b">
+     <div class="mk-upload">
+      <span class="mk-upload-prev" id="mk-logo-prev">{% if store.logo %}<img src="{{ store.logo.url }}" alt="Current shop logo">{% else %}<svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></svg>{% endif %}</span>
+      <div class="mk-upload-txt"><strong>Shop logo</strong><input id="logo" type="file" name="logo" accept="image/*" aria-label="Shop logo"><small>PNG, JPG or WebP. {% if store.logo %}Choose a new file only to replace the current logo.{% endif %}</small></div>
+     </div>
+    </div>
+   </section>
+
+   <section class="mk-sect">
+    <div class="mk-sect-h"><span class="mk-sect-ico"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg></span><div><h2>Social media</h2><p>Optional. These icons appear on your shop page and on every product page.</p></div></div>
+    <div class="mk-sect-b"><div class="mk-form-grid">
+     {% for f in social_fields %}<div class="mk-field full">
+      <div class="sx-labelrow"><label class="mk-label sx-label" for="{{ f.field }}"><span class="sx-ico sx-{{ f.key }}" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="{{ f.path }}"/></svg></span>{{ f.label }}</label>{% if f.verified %}<span class="sx-status is-ok"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Verified by SmartPOS</span>{% elif f.stored %}<span class="sx-status">Not verified</span>{% endif %}</div>
+      <input id="{{ f.field }}" name="{{ f.field }}" type="text" inputmode="{{ f.inputmode }}" maxlength="200" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="{{ f.placeholder }}" value="{{ f.value }}" data-sx-input="{{ f.key }}" data-sx-stored="{{ f.stored }}">
+      <small class="mk-help">{{ f.help }}</small>{% if f.verified %}
+      <small class="mk-help sx-warn" data-sx-warn="{{ f.key }}" hidden>Saving a different link will remove the Verified badge.</small>{% endif %}
+     </div>
+     {% endfor %}
+    </div></div>
+   </section>
+
+   <section class="mk-sect">
+    <div class="mk-sect-h"><span class="mk-sect-ico"><svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg></span><div><h2>Visibility</h2><p>Control whether customers can find your shop.</p></div></div>
+    <div class="mk-sect-b">
+     <label class="mk-switch"><span><strong>Publish my shop after saving</strong><small>Publishing needs an active Online Selling plan. Without one, your shop stays hidden.</small></span><input type="checkbox" name="is_published" {% if not store or store.is_published %}checked{% endif %}><span class="mk-sw" aria-hidden="true"></span></label>
+    </div>
+   </section>
+
+   <div class="mk-actionbar"><span>{% if store %}Changes apply to your public shop straight away.{% else %}You can edit these details at any time.{% endif %}</span><div class="mk-actions"><a class="btn btn-secondary" href="{% url 'marketplace:seller_dashboard' %}">Cancel</a><button class="btn btn-primary" type="submit">{% if store %}Save changes{% else %}Create online store{% endif %}</button></div></div>
+  </div>
+
+  <aside class="mk-aside">
+   <div class="mk-aside-card">
+    <h3><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>Your shop link</h3>
+    {% if store %}<div class="mk-linkprev"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/></svg><span>{{ request.get_host }}{% url 'marketplace:seller_store_public' store.slug %}</span></div><p>This link stays the same even if you rename your shop.</p>{% else %}<p>A shareable link is created from your shop name when you save. Once created it never changes.</p>{% endif %}
+   </div>
+   <div class="mk-aside-card">
+    <h3><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12h8M12 8v8"/></svg>How customers see it</h3>
+    <div class="sx-preview" id="sx-preview">{% for f in social_fields %}<span class="sx-btn sx-{{ f.key }}" data-sx-prev="{{ f.key }}" title="{{ f.label }}"{% if not f.value %} hidden{% endif %}><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="{{ f.path }}"/></svg></span>{% endfor %}<span class="sx-preview-empty" id="sx-preview-empty">Add a link to see its icon.</span></div>
+    <p>Only the accounts you fill in are shown. Icons open your page in a new tab. A green tick means SmartPOS checked that the account is really yours. Contact SmartPOS support to get it verified.</p>
+   </div>
+   <div class="mk-aside-card is-tint">
+    <h3><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v5h1"/></svg>Tips for a trusted shop</h3>
+    <ul class="mk-checklist">
+     <li><i><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg></i><span>Use the name customers already know you by.</span></li>
+     <li><i><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg></i><span>Say what you sell and where you deliver.</span></li>
+     <li><i><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg></i><span>Add a clear logo so your shop stands out.</span></li>
+     <li><i><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg></i><span>Link your active social pages so customers can trust and follow you.</span></li>
+    </ul>
+   </div>
+  </aside>
+ </div>
+ </form>
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+(function(){
+ var prev=document.getElementById('sx-preview'), empty=document.getElementById('sx-preview-empty');
+ function sync(){
+  if(!prev) return; var any=false;
+  document.querySelectorAll('[data-sx-input]').forEach(function(i){
+   var on=i.value.trim()!=='', icon=prev.querySelector('[data-sx-prev="'+i.getAttribute('data-sx-input')+'"]');
+   if(icon) icon.hidden=!on; if(on) any=true;
+   var warn=document.querySelector('[data-sx-warn="'+i.getAttribute('data-sx-input')+'"]');
+   if(warn) warn.hidden=(i.value.trim()===(i.getAttribute('data-sx-stored')||''));
+  });
+  if(empty) empty.hidden=any;
+ }
+ document.querySelectorAll('[data-sx-input]').forEach(function(i){ i.addEventListener('input',sync); });
+ sync();
+})();
+(function(){
+ var inp=document.getElementById('logo'), box=document.getElementById('mk-logo-prev');
+ if(!inp||!box) return;
+ inp.addEventListener('change',function(){
+  var f=inp.files&&inp.files[0]; if(!f||!/^image\//.test(f.type)) return;
+  var url=URL.createObjectURL(f), img=new Image(); img.alt='New logo preview'; img.src=url;
+  img.onload=function(){ box.textContent=''; box.appendChild(img); };
+ });
+})();
+</script>
+{% endblock %}

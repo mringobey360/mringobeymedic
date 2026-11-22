@@ -1,0 +1,261 @@
+{# Rating popup for signed-in users (owners, assistants, employees). The server decides whether it shows. #}
+<style id="sp-testi-css">
+.spt-ov{position:fixed;inset:0;z-index:2147483000;display:none;align-items:center;justify-content:center;padding:16px;background:rgba(8,15,25,.66);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+.spt-ov.open{display:flex;animation:sptf .25s ease}
+.spt-box{width:min(480px,100%);max-height:calc(100dvh - 24px);overflow:auto;background:#fff;color:#0f172a;border-radius:24px;box-shadow:0 40px 90px -24px rgba(0,0,0,.6);animation:sptu .35s cubic-bezier(.2,.8,.2,1);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overscroll-behavior:contain}
+html[data-theme=dark] .spt-box{background:#0d1722;color:#f1f5f9}
+.spt-hd{position:relative;padding:26px 26px 22px;color:#fff;background:radial-gradient(120% 140% at 100% 0,#14b8a6 0,transparent 55%),linear-gradient(135deg,#0f766e,#0b3b46);border-radius:24px 24px 0 0}
+.spt-badge{width:46px;height:46px;border-radius:14px;background:rgba(255,255,255,.16);display:grid;place-items:center;font-size:1.5rem;margin-bottom:14px;border:1px solid rgba(255,255,255,.25)}
+.spt-eye{font-size:.7rem;font-weight:800;letter-spacing:.14em;text-transform:uppercase;opacity:.85;margin:0}
+.spt-box h2{font-size:1.35rem;font-weight:800;letter-spacing:-.02em;margin:4px 0 0;line-height:1.25}
+.spt-steps{display:flex;gap:6px;margin-top:16px}
+.spt-steps i{flex:1;height:4px;border-radius:4px;background:rgba(255,255,255,.28)}
+.spt-steps i.on{background:#fff}
+.spt-bd{padding:22px 26px 22px}
+.spt-hello{margin:0 0 14px;color:#64748b;font-size:.9rem}
+.spt-stars{display:flex;gap:8px;justify-content:center;margin:4px 0 2px}
+.spt-star{border:0;background:none;padding:2px;cursor:pointer;font-size:2.7rem;line-height:1;color:#d5dde8;transition:transform .15s,color .15s;filter:drop-shadow(0 2px 0 rgba(0,0,0,.04))}
+html[data-theme=dark] .spt-star{color:#2a3a4d}
+.spt-star.on,.spt-star.hv{color:#f59e0b}.spt-star:hover{transform:scale(1.14) rotate(-4deg)}
+.spt-lab{text-align:center;min-height:1.5em;font-weight:800;font-size:.95rem;color:#0f766e;margin-bottom:6px}
+.spt-chips{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 4px}
+.spt-chip{border:1px solid #cbd5e1;background:transparent;color:inherit;border-radius:999px;padding:6px 13px;font:inherit;font-size:.8rem;font-weight:650;cursor:pointer;transition:background .15s,border-color .15s,color .15s}
+.spt-chip:hover{border-color:#0f766e}.spt-chip.on{background:#0f766e;border-color:#0f766e;color:#fff}
+.spt-box label.l{display:block;font-size:.8rem;font-weight:700;margin-top:14px}
+.spt-f{display:block;width:100%;border:1px solid #cbd5e1;border-radius:14px;padding:11px 13px;font:inherit;color:inherit;background:transparent;margin-top:6px;transition:border-color .15s,box-shadow .15s}
+.spt-f:focus{outline:0;border-color:#0f766e;box-shadow:0 0 0 3px rgba(15,118,110,.18)}
+.spt-cnt{text-align:right;font-size:.72rem;color:#64748b}
+.spt-ck{display:flex;gap:10px;align-items:flex-start;font-size:.8rem;color:#64748b;margin-top:12px;padding:12px;border:1px dashed #cbd5e1;border-radius:14px}
+.spt-ck input{margin-top:3px;accent-color:#0f766e}
+.spt-names{display:none;gap:8px}.spt-names.show{display:grid;grid-template-columns:1fr 1fr}
+.spt-err{color:#b91c1c;font-size:.82rem;min-height:1.2em;margin-top:8px}
+.spt-row{display:flex;gap:8px;align-items:center;justify-content:space-between;margin-top:10px}
+.spt-l{display:flex;gap:2px}
+.spt-b{border:0;border-radius:999px;padding:12px 26px;font:inherit;font-weight:800;cursor:pointer;transition:transform .15s,box-shadow .15s}
+.spt-b.p{background:#0f766e;color:#fff;box-shadow:0 10px 24px -10px rgba(15,118,110,.7)}.spt-b.p:hover:not(:disabled){transform:translateY(-1px)}
+.spt-b.p:disabled{opacity:.45;cursor:not-allowed;box-shadow:none}
+.spt-b.g{background:none;color:#64748b;padding:12px 10px;font-weight:650;font-size:.88rem}
+.spt-trust{display:flex;gap:6px;align-items:center;justify-content:center;font-size:.72rem;color:#64748b;margin-top:14px}
+.spt-ok{text-align:center;padding:34px 26px 28px}
+.spt-ok .tick{width:68px;height:68px;border-radius:50%;margin:0 auto 14px;display:grid;place-items:center;background:#dcfce7;color:#16a34a;font-size:2rem;animation:sptp .5s cubic-bezier(.2,1.4,.4,1)}
+.spt-ok p{color:#64748b;margin:6px 0 18px}
+@keyframes sptf{from{opacity:0}}@keyframes sptu{from{opacity:0;transform:translateY(18px) scale(.98)}}@keyframes sptp{from{transform:scale(.4);opacity:0}}
+@media(max-width:480px){.spt-names.show{grid-template-columns:1fr}.spt-hd{padding:22px 20px 18px}.spt-bd{padding:18px 20px}.spt-star{font-size:2.3rem}}
+@media(prefers-reduced-motion:reduce){.spt-ov.open,.spt-box,.spt-ok .tick{animation:none}}
+
+/* V108: smaller, calmer review dialog; keep the complete flow inside the viewport */
+#spt-ov.spt-ov{padding:12px;background:rgba(8,15,25,.58);backdrop-filter:blur(4px)}
+#spt-ov .spt-box{
+ width:min(420px,calc(100vw - 24px));max-height:min(84dvh,680px);
+ border-radius:18px;line-height:1.42;font-size:14px;box-shadow:0 22px 60px -28px rgba(0,0,0,.55);
+}
+#spt-ov .spt-hd{padding:16px 20px 13px}
+#spt-ov .spt-bd{padding:14px 20px 16px}
+#spt-ov .spt-badge{width:32px;height:32px;margin-bottom:7px;font-size:1rem}
+#spt-ov .spt-eye{font-size:.7rem;margin-bottom:3px}
+#spt-ov #spt-title{font-size:1.2rem;line-height:1.2;letter-spacing:-.025em}
+#spt-ov .spt-hello{font-size:.84rem;margin-bottom:7px}
+#spt-ov .spt-star{font-size:1.8rem;padding:1px 4px}
+#spt-ov .spt-stars{gap:5px;margin:5px 0 0}
+#spt-ov .spt-lab{font-size:.76rem;margin:2px 0 8px}
+#spt-ov .spt-chips{gap:5px;margin:7px 0 10px}
+#spt-ov .spt-chip{font-size:.72rem;padding:5px 9px;border-radius:999px}
+#spt-ov .l{font-size:.78rem;margin-bottom:4px}
+#spt-ov .spt-f{font-size:.84rem;padding:8px 10px;border-radius:9px;margin-top:3px}
+#spt-ov textarea.spt-f{min-height:56px;resize:vertical}
+#spt-ov .spt-cnt{font-size:.68rem}
+#spt-ov .spt-ck{font-size:.72rem;gap:8px;margin-top:8px;padding:8px 9px;border-radius:10px}
+#spt-ov .spt-names{gap:6px}
+#spt-ov .spt-err{font-size:.75rem;min-height:.8em;margin-top:4px}
+#spt-ov .spt-row{gap:6px;margin-top:7px}
+#spt-ov .spt-b{font-size:.8rem;padding:9px 15px}
+#spt-ov .spt-b.g{padding:8px 7px;font-size:.76rem}
+#spt-ov .spt-trust{font-size:.67rem;margin-top:8px}
+#spt-ov .spt-ok{padding:24px 20px 20px}
+#spt-ov .spt-ok .tick{width:48px;height:48px;margin-bottom:10px;font-size:1.5rem}
+#spt-ov .spt-ok h2{font-size:1.25rem}
+#spt-ov .spt-ok p{font-size:.84rem;margin:5px 0 12px}
+#spt-ov .spt-b.p{background:#0f766e;color:#fff;box-shadow:0 5px 14px -8px rgba(15,118,110,.55)}
+#spt-ov .spt-f:focus{border-color:#0f766e;box-shadow:0 0 0 2px rgba(15,118,110,.13)}
+#spt-ov .spt-ck input{accent-color:#0f766e}
+@media(max-width:480px){
+ #spt-ov.spt-ov{padding:8px}
+ #spt-ov .spt-box{width:100%;max-height:88dvh;border-radius:15px}
+ #spt-ov .spt-hd{padding:14px 16px 11px}
+ #spt-ov .spt-bd{padding:12px 16px 14px}
+ #spt-ov .spt-names.show{grid-template-columns:1fr 1fr}
+ #spt-ov .spt-star{font-size:1.7rem}
+ #spt-ov .spt-row{flex-wrap:wrap}
+ #spt-ov .spt-row>.spt-b{margin-left:auto}
+}
+
+
+/* V109: viewport-fit review dialog, always light and no internal vertical scrollbar */
+#spt-ov{color-scheme:light;padding:10px;background:rgba(11,25,36,.55)}
+#spt-ov .spt-box{width:min(410px,calc(100vw - 20px));max-height:calc(100dvh - 20px);overflow:hidden;display:flex;flex-direction:column;border-radius:16px;background:#fff;color:#243746;line-height:1.32;font-size:13px}
+#spt-ov #spt-form{min-height:0;display:flex;flex-direction:column}
+#spt-ov .spt-hd{padding:12px 17px 10px;border-radius:16px 16px 0 0;flex:none;background:linear-gradient(125deg,#0f766e,#164e63)}
+#spt-ov .spt-badge{width:27px;height:27px;border-radius:9px;font-size:.95rem;margin-bottom:5px}
+#spt-ov .spt-eye{font-size:.62rem;letter-spacing:.12em}
+#spt-ov #spt-title{font-size:1.08rem;line-height:1.18;margin-top:3px}
+#spt-ov .spt-steps{margin-top:9px}
+#spt-ov .spt-bd{padding:10px 17px 12px;min-height:0;overflow:visible}
+#spt-ov .spt-hello{font-size:.78rem;margin:0 0 3px}
+#spt-ov .spt-stars{gap:7px;margin:0}
+#spt-ov .spt-star{font-size:1.75rem;padding:0 3px;filter:none}
+#spt-ov .spt-lab{font-size:.72rem;min-height:1em;margin:0 0 5px}
+#spt-ov .spt-chips{gap:5px;margin:4px 0 5px}
+#spt-ov .spt-chip{font-size:.68rem;padding:4px 8px;border-color:#d7e1e5}
+#spt-ov .spt-box label.l{font-size:.72rem;margin-top:6px}
+#spt-ov .spt-f{font-size:.78rem;padding:7px 9px;border-radius:8px;margin-top:3px;border-color:#d4dfe3}
+#spt-ov textarea.spt-f{height:46px;min-height:46px;max-height:46px;resize:none}
+#spt-ov .spt-cnt{font-size:.63rem;line-height:1.2}
+#spt-ov .spt-ck{font-size:.65rem;gap:7px;margin-top:6px;padding:6px 8px;border-radius:8px;line-height:1.3}
+#spt-ov .spt-ck input{margin-top:1px;flex:none}
+#spt-ov .spt-err{font-size:.68rem;min-height:.7em;margin-top:3px}
+#spt-ov .spt-row{margin-top:5px;gap:5px}
+#spt-ov .spt-b{font-size:.73rem;padding:8px 13px}
+#spt-ov .spt-b.g{font-size:.7rem;padding:7px 5px}
+#spt-ov .spt-trust{font-size:.61rem;margin-top:5px}
+#spt-ov .spt-ok{padding:22px 18px 18px;overflow:hidden}
+#spt-ov .spt-ok .tick{width:42px;height:42px;margin-bottom:8px;font-size:1.35rem}
+#spt-ov .spt-ok h2{font-size:1.12rem}
+#spt-ov .spt-ok p{font-size:.78rem;margin:5px 0 10px}
+#spt-ov .spt-b.p{background:#0f766e;color:#fff}
+#spt-ov .spt-f:focus{border-color:#0f766e;box-shadow:0 0 0 2px rgba(15,118,110,.12)}
+#spt-ov .spt-ck input{accent-color:#0f766e}
+html[data-theme=dark] #spt-ov .spt-box{background:#fff;color:#243746}
+html[data-theme=dark] #spt-ov .spt-star{color:#d5dde8}
+html[data-theme=dark] #spt-ov .spt-star.on,html[data-theme=dark] #spt-ov .spt-star.hv{color:#f59e0b}
+@media(max-height:700px){#spt-ov .spt-hd{padding:9px 15px 7px}#spt-ov .spt-bd{padding:7px 15px 8px}#spt-ov .spt-badge{display:none}#spt-ov .spt-steps{margin-top:6px}#spt-ov .spt-chips{margin:3px 0}#spt-ov .spt-ck{margin-top:4px;padding:5px 7px}#spt-ov .spt-trust{display:none}}
+@media(max-width:480px){#spt-ov{padding:8px}#spt-ov .spt-box{width:calc(100vw - 16px);max-height:calc(100dvh - 16px);border-radius:14px}#spt-ov .spt-hd{padding:11px 14px 9px}#spt-ov .spt-bd{padding:9px 14px 10px}#spt-ov .spt-chip{font-size:.65rem;padding:4px 7px}#spt-ov .spt-row{flex-wrap:nowrap}#spt-ov .spt-row>.spt-b{margin-left:auto}}
+@media(max-height:580px){#spt-ov .spt-hello{display:none}#spt-ov .spt-chips{display:none}#spt-ov textarea.spt-f{height:40px;min-height:40px;max-height:40px}}
+
+
+/* V110: compact, light-only rating dialog tuned to fit common desktop and phone viewports. */
+#spt-ov.spt-ov{padding:8px;background:rgba(8,15,25,.54);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+#spt-ov .spt-box,#spt-ov html[data-theme=dark] .spt-box{width:min(390px,calc(100vw - 16px));max-height:calc(100dvh - 16px);overflow-y:auto;overscroll-behavior:contain;background:#fff!important;color:#152536!important;border:1px solid #e1e8eb;border-radius:16px;line-height:1.32;font-size:13px;box-shadow:0 22px 60px -28px rgba(0,0,0,.5)}
+#spt-ov .spt-hd{padding:12px 16px 10px;border-radius:15px 15px 0 0}
+#spt-ov .spt-bd{padding:10px 16px 12px}
+#spt-ov .spt-badge{width:28px;height:28px;border-radius:9px;margin-bottom:5px;font-size:.9rem}
+#spt-ov .spt-eye{font-size:.64rem;letter-spacing:.1em}
+#spt-ov #spt-title{font-size:1.12rem;line-height:1.18}
+#spt-ov .spt-steps{margin-top:9px}
+#spt-ov .spt-hello{font-size:.79rem;line-height:1.35;margin-bottom:5px}
+#spt-ov .spt-stars{gap:5px;margin:3px 0 0}
+#spt-ov .spt-star{font-size:1.75rem;padding:1px 3px;color:#d5dde8}
+#spt-ov .spt-lab{font-size:.73rem;min-height:1.1em;margin:1px 0 5px;color:#0f766e}
+#spt-ov .spt-chips{gap:4px;margin:5px 0 6px}
+#spt-ov .spt-chip{font-size:.68rem;padding:4px 8px}
+#spt-ov .spt-box label.l{font-size:.73rem;margin-top:7px}
+#spt-ov .spt-f{font-size:.8rem;padding:7px 9px;border-radius:9px;margin-top:3px}
+#spt-ov textarea.spt-f{min-height:42px;height:48px;resize:vertical}
+#spt-ov .spt-cnt{font-size:.65rem;line-height:1.2}
+#spt-ov .spt-ck{font-size:.68rem;gap:7px;margin-top:6px;padding:7px 8px;border-radius:9px}
+#spt-ov .spt-names{gap:6px}
+#spt-ov .spt-err{font-size:.7rem;min-height:.8em;margin-top:4px}
+#spt-ov .spt-row{gap:6px;margin-top:6px}
+#spt-ov .spt-b{font-size:.76rem;padding:8px 16px}
+#spt-ov .spt-b.g{font-size:.72rem;padding:7px 8px}
+#spt-ov .spt-trust{font-size:.64rem;margin-top:6px}
+#spt-ov .spt-ok{padding:20px 16px 16px}
+#spt-ov .spt-ok .tick{width:44px;height:44px;font-size:1.35rem;margin-bottom:8px}
+#spt-ov .spt-ok h2{font-size:1.15rem}
+#spt-ov .spt-ok p{font-size:.8rem;margin:4px 0 10px}
+#spt-ov .spt-b.p{background:#0f766e;color:#fff}
+#spt-ov .spt-f:focus{border-color:#0f766e;box-shadow:0 0 0 2px rgba(15,118,110,.13)}
+#spt-ov .spt-ck input{accent-color:#0f766e}
+@media(max-width:480px){#spt-ov.spt-ov{padding:5px}#spt-ov .spt-box{width:calc(100vw - 10px);max-height:calc(100dvh - 10px);border-radius:13px}#spt-ov .spt-hd{padding:10px 13px 8px}#spt-ov .spt-bd{padding:9px 13px 10px}#spt-ov .spt-names.show{grid-template-columns:1fr 1fr}#spt-ov .spt-star{font-size:1.65rem}}
+@media(max-height:650px){#spt-ov .spt-hd{padding-top:8px;padding-bottom:7px}#spt-ov .spt-bd{padding-top:7px;padding-bottom:8px}#spt-ov .spt-badge{display:none}#spt-ov .spt-steps{margin-top:6px}#spt-ov .spt-star{font-size:1.5rem}#spt-ov .spt-chips{margin:3px 0}#spt-ov .spt-ck{margin-top:4px;padding:5px 7px}#spt-ov .spt-trust{margin-top:4px}}
+
+</style>
+<div class="spt-ov" id="spt-ov" role="dialog" aria-modal="true" aria-labelledby="spt-title">
+ <div class="spt-box">
+  <div id="spt-form">
+   <div class="spt-hd">
+    <div class="spt-badge" aria-hidden="true">★</div>
+    <p class="spt-eye">Your opinion matters</p>
+    <h2 id="spt-title">How is SmartPOS working for you?</h2>
+    <div class="spt-steps" aria-hidden="true"><i class="on"></i><i id="spt-s2"></i></div>
+   </div>
+   <div class="spt-bd">
+    <p class="spt-hello" id="spt-hello">Rate your experience in less than a minute.</p>
+    <div class="spt-stars" role="radiogroup" aria-label="Star rating">
+     <button type="button" class="spt-star" data-n="1" aria-label="1 star">★</button><button type="button" class="spt-star" data-n="2" aria-label="2 stars">★</button><button type="button" class="spt-star" data-n="3" aria-label="3 stars">★</button><button type="button" class="spt-star" data-n="4" aria-label="4 stars">★</button><button type="button" class="spt-star" data-n="5" aria-label="5 stars">★</button>
+    </div>
+    <div class="spt-lab" id="spt-lab" aria-live="polite">Tap a star</div>
+    <div class="spt-chips" id="spt-chips" aria-label="Quick topics">
+     <button type="button" class="spt-chip" data-t="Easy to use.">Easy to use</button><button type="button" class="spt-chip" data-t="Fast at the counter.">Fast selling</button><button type="button" class="spt-chip" data-t="Stock and expiry tracking helps a lot.">Stock control</button><button type="button" class="spt-chip" data-t="Cash and reports are clear.">Reports</button><button type="button" class="spt-chip" data-t="Support responds well.">Support</button>
+    </div>
+    <label class="l" for="spt-comment">Tell us more</label>
+    <textarea id="spt-comment" class="spt-f" rows="3" maxlength="600" placeholder="What do you like? What has changed in your work?"></textarea>
+    <div class="spt-cnt"><span id="spt-n">0</span>/600 · at least 10 characters</div>
+    <label class="spt-ck"><input type="checkbox" id="spt-consent"> <span>Show my name, photo and business next to this review. Otherwise it appears as “Verified SmartPOS customer”.</span></label>
+    <div class="spt-names" id="spt-names">
+     <input id="spt-name" class="spt-f" maxlength="80" placeholder="Your name" aria-label="Your name">
+     <input id="spt-biz" class="spt-f" maxlength="80" placeholder="Business name" aria-label="Business name">
+    </div>
+    <div class="spt-err" id="spt-err" role="alert"></div>
+    <div class="spt-row"><div class="spt-l"><button type="button" class="spt-b g" id="spt-later">Later</button><button type="button" class="spt-b g" id="spt-no">No thanks</button></div><button type="button" class="spt-b p" id="spt-send" disabled>Submit review</button></div>
+    <div class="spt-trust">🔒 Published only after SmartPOS approves it.</div>
+   </div>
+  </div>
+  <div class="spt-ok" id="spt-done" hidden><div class="tick">✓</div><h2>Thank you!</h2><p>Your review was sent. It will appear on our website once approved.</p><button type="button" class="spt-b p" id="spt-close">Close</button></div>
+ </div>
+</div>
+<script data-spa-shell>
+(function(){
+ 'use strict';
+ if(window.__sptTesti) return; window.__sptTesti=true;
+ var UNSAFE=/(\/sales\/pos|\/payments?\/|cash.*(close|closing)|checkout|complete-sale|\/login|\/logout|\/device-pin|\/change-password|\/jiunge|\/hq\/)/;
+ var csrf=function(){return (document.querySelector('meta[name="csrf-token"]')||{}).content||(document.cookie.match(/csrftoken=([^;]+)/)||[])[1]||''};
+ var ov=document.getElementById('spt-ov'); if(!ov) return;
+ var $=function(i){return document.getElementById(i)};
+ var stars=[].slice.call(ov.querySelectorAll('.spt-star')),chips=[].slice.call(ov.querySelectorAll('.spt-chip')),rating=0,busy=false,checked=false;
+ var LAB=['Tap a star','Very poor','Poor','Average','Good','Excellent'];
+ function post(url,body){return fetch(url,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-CSRFToken':csrf(),'X-Requested-With':'XMLHttpRequest'},body:JSON.stringify(body||{})}).then(function(r){return r.json().then(function(d){return {ok:r.ok&&d.ok!==false,d:d}})})}
+ function paint(n,hover){stars.forEach(function(s){var on=+s.dataset.n<=n;s.classList.toggle(hover?'hv':'on',on);if(hover)s.classList.remove('on');else s.classList.remove('hv');if(!hover)s.classList.toggle('on',on)})}
+ function setRating(n){rating=n;stars.forEach(function(s){s.classList.remove('hv');s.classList.toggle('on',+s.dataset.n<=n);s.setAttribute('aria-pressed',+s.dataset.n===n)});$('spt-lab').textContent=LAB[n];validate()}
+ function validate(){var ok=rating&&$('spt-comment').value.trim().length>=10;$('spt-send').disabled=busy||!ok;$('spt-s2').classList.toggle('on',!!rating)}
+ stars.forEach(function(s){
+  s.addEventListener('mouseenter',function(){var n=+s.dataset.n;stars.forEach(function(x){x.classList.toggle('hv',+x.dataset.n<=n)});$('spt-lab').textContent=LAB[n]});
+  s.addEventListener('mouseleave',function(){stars.forEach(function(x){x.classList.remove('hv')});$('spt-lab').textContent=LAB[rating]});
+  s.addEventListener('click',function(){setRating(+s.dataset.n)});
+  s.addEventListener('keydown',function(e){if(e.key==='ArrowRight'&&rating<5)setRating(rating+1);if(e.key==='ArrowLeft'&&rating>1)setRating(rating-1)})});
+ chips.forEach(function(c){c.addEventListener('click',function(){
+  var ta=$('spt-comment'),t=c.dataset.t;
+  if(c.classList.contains('on')){ta.value=ta.value.replace(t,'').replace(/\s{2,}/g,' ').trim();c.classList.remove('on')}
+  else if((ta.value+' '+t).length<=600){ta.value=(ta.value?ta.value.trim()+' ':'')+t;c.classList.add('on')}
+  $('spt-n').textContent=ta.value.length;validate()})});
+ function open(info){
+  $('spt-name').value=info.name||'';$('spt-biz').value=info.business||'';
+  $('spt-hello').textContent='Hello '+(info.name||'there')+(info.role?' ('+info.role+')':'')+', rate your experience in less than a minute.';
+  ov.classList.add('open');document.body.style.overflow='hidden';setTimeout(function(){stars[4].focus()},50)}
+ function close(){ov.classList.remove('open');document.body.style.overflow=''}
+ $('spt-comment').addEventListener('input',function(){$('spt-n').textContent=this.value.length;validate()});
+ $('spt-consent').addEventListener('change',function(){$('spt-names').classList.toggle('show',this.checked)});
+ $('spt-later').addEventListener('click',function(){post('/testimonials/later/');close()});
+ $('spt-no').addEventListener('click',function(){post('/testimonials/decline/');close()});
+ $('spt-close').addEventListener('click',close);
+ document.addEventListener('keydown',function(e){if(e.key==='Escape'&&ov.classList.contains('open')){if($('spt-form').hidden){close()}else{post('/testimonials/later/');close()}}});
+ $('spt-send').addEventListener('click',function(){
+  if(busy)return;busy=true;validate();$('spt-err').textContent='';
+  var c=$('spt-consent').checked;
+  post('/testimonials/submit/',{rating:rating,comment:$('spt-comment').value,consent:c,display_name:c?$('spt-name').value:'',business_name:c?$('spt-biz').value:''})
+   .then(function(r){busy=false;
+    if(r.ok){$('spt-form').hidden=true;$('spt-done').hidden=false}
+    else{$('spt-err').textContent=(r.d&&r.d.message)||'Could not send. Please try again.';validate()}})
+   .catch(function(){busy=false;$('spt-err').textContent='Network problem. Please try again.';validate()})});
+ function ask(){
+  fetch('/testimonials/popup/',{credentials:'same-origin',headers:{'X-Requested-With':'XMLHttpRequest'}})
+   .then(function(r){return r.ok?r.json():null}).then(function(d){
+    if(d&&d.show&&!ov.classList.contains('open')&&!checked){checked=true;setTimeout(function(){open(d)},500)}})
+   .catch(function(){})}
+ /* Ask as soon as the account opens. On busy screens (POS, payments) wait until the user moves to a safe page. */
+ function check(){
+  if(checked)return;
+  if(UNSAFE.test(location.pathname)){setTimeout(check,6000);return}
+  ask()}
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',check);else check();
+})();
+</script>

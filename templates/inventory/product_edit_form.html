@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Edit Product{% endblock %}
+{% block content %}
+<div class="max-w-lg">
+    <h1 class="text-2xl font-bold text-ink-900 tracking-tight mb-5">Edit "{{ product.name }}"</h1>
+    <form method="post" enctype="multipart/form-data" class="card space-y-4 product-edit-form">
+        {% csrf_token %}
+        {% for field in form %}
+        {% if field.name == 'image' %}
+        <div data-field="image" style="grid-column:1 / -1">{% include 'inventory/_product_image_field.html' with f=form %}</div>
+        {% elif field.name != 'remove_image' %}
+        <div data-field="{{ field.name }}">
+            <label class="block text-sm font-medium mb-1">{{ field.label }}</label>
+            {% if field.name == 'barcode' %}
+            <div class="flex flex-col sm:flex-row gap-2 items-stretch">{{ field }}<button type="button" id="smartpos-open-barcode-scanner" class="btn btn-secondary whitespace-nowrap"><span aria-hidden="true">▦</span> Scan real barcode</button></div>
+            <p class="text-xs text-ink-500 mt-1">Scan the barcode printed on the actual product. The existing product is updated automatically after validation.</p>
+            {% else %}{{ field }}{% endif %}
+            {% if field.help_text %}<p class="text-xs text-ink-400 mt-1">{{ field.help_text }}</p>{% endif %}
+            {% if field.errors %}<p class="text-xs text-red-600 mt-1">{{ field.errors.0 }}</p>{% endif %}
+        </div>
+        {% endif %}
+        {% endfor %}
+        <div class="rounded-xl border border-brand-100 bg-brand-50/50 p-4">
+            <h2 class="font-semibold text-sm mb-1">POS Discount Policy</h2>
+            <p class="text-xs text-ink-500 mb-3">You control the range here. Sellers can only grant discounts within this range; the server enforces the limit at checkout.</p>
+            <div class="text-xs text-ink-500">Enabled: allow seller discount • Type: percentage or fixed TZS amount per unit • Minimum / Maximum: the range the seller can choose from</div>
+        </div>
+        <p class="text-xs text-ink-400">To change price, quantity, or expiry, use "Batches" from the product list instead — those are tracked per delivery.</p>
+        <div class="flex gap-3">
+            <button type="submit" class="btn btn-primary">Save Changes</button>
+            <a href="{% url 'inventory:product_list' %}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+<style>
+.product-edit-form { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.7rem 1rem; }
+.product-edit-form > [data-field] { min-width:0; }
+.product-edit-form > .rounded-xl, .product-edit-form > p, .product-edit-form > .flex { grid-column:1 / -1; }
+@media (max-width:639px) { .product-edit-form { grid-template-columns:1fr; } .product-edit-form > [data-field], .product-edit-form > .rounded-xl, .product-edit-form > p, .product-edit-form > .flex { grid-column:1; } }
+</style>
+<script>
+(function () {
+  var typeSel = document.getElementById('id_discount_type');
+  if (!typeSel) return;
+  function wrap(name) { var el = document.querySelector('[data-field="' + name + '"]'); return el; }
+  function sync() {
+    var amount = typeSel.value === 'AMOUNT';
+    ['min_discount_percent', 'max_discount_percent'].forEach(function (n) { var w = wrap(n); if (w) w.classList.toggle('hidden', amount); });
+    ['min_discount_amount', 'max_discount_amount'].forEach(function (n) { var w = wrap(n); if (w) w.classList.toggle('hidden', !amount); });
+  }
+  typeSel.addEventListener('change', sync);
+  sync();
+})();
+</script>
+<div id="smartpos-barcode-modal" class="hidden fixed inset-0 z-[100] bg-black/60 p-3 sm:p-6" role="dialog" aria-modal="true" aria-labelledby="smartpos-barcode-title">
+  <div class="mx-auto mt-8 max-w-lg rounded-2xl bg-white p-4 sm:p-6 shadow-2xl">
+    <div class="flex items-start justify-between gap-3"><div><h2 id="smartpos-barcode-title" class="text-lg font-bold text-ink-900">Scan product barcode</h2><p class="text-sm text-ink-500 mt-1">Keep the barcode inside the camera frame. It will be saved automatically after validation.</p></div><button type="button" id="smartpos-close-barcode-scanner" class="btn btn-secondary" aria-label="Close scanner">Close</button></div>
+    <div class="mt-4 overflow-hidden rounded-xl bg-slate-950"><video id="smartpos-barcode-video" class="w-full max-h-80 object-cover" playsinline muted></video></div>
+    <p id="smartpos-barcode-status" class="text-sm mt-3" role="status" aria-live="polite">Starting camera…</p>
+    <div class="mt-4 border-t pt-4"><label for="smartpos-barcode-manual" class="block text-sm font-medium mb-1">Scanner fallback (USB/Bluetooth or type manually)</label><div class="flex gap-2"><input id="smartpos-barcode-manual" class="form-input min-w-0 flex-1" inputmode="numeric" autocomplete="off" placeholder="Scan or enter barcode"><button id="smartpos-barcode-manual-save" type="button" class="btn btn-primary">Apply</button></div></div>
+  </div>
+</div>
+<script>
+(function(){
+ const openBtn=document.getElementById('smartpos-open-barcode-scanner'); if(!openBtn)return;
+ const modal=document.getElementById('smartpos-barcode-modal'), video=document.getElementById('smartpos-barcode-video'), status=document.getElementById('smartpos-barcode-status'), manual=document.getElementById('smartpos-barcode-manual');
+ const barcodeInput=document.getElementById('id_barcode'); let stream=null, timer=null, busy=false, zxingControls=null, zxingReader=null;
+ const updateUrl="{% url 'inventory:product_barcode_auto_update_api' product.pk %}";
+ function say(msg, bad){status.textContent=msg;status.className='text-sm mt-3 '+(bad?'text-red-600':'text-ink-600');}
+ function stop(){if(timer)clearTimeout(timer);timer=null;if(zxingControls){try{zxingControls.stop();}catch(e){}zxingControls=null;}if(zxingReader){try{zxingReader.reset();}catch(e){}zxingReader=null;}if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}video.srcObject=null;}
+ function close(){stop();modal.classList.add('hidden');busy=false;}
+ async function save(code){code=(code||'').replace(/\s+/g,'');if(!code){say('No barcode detected. Try again.',true);return;}if(busy)return;busy=true;stop();say('Checking barcode and updating product…');try{const body=new URLSearchParams();body.set('barcode',code);const csrfInput=document.querySelector('[name=csrfmiddlewaretoken]')?.value||'';const csrfCookie=(document.cookie.match(/(?:^|; )csrftoken=([^;]+)/)||[])[1]||'';const csrf=csrfInput||decodeURIComponent(csrfCookie);const response=await fetch(updateUrl,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8','X-CSRFToken':csrf,'X-Requested-With':'XMLHttpRequest','Accept':'application/json'},body:body.toString(),credentials:'same-origin'});const contentType=response.headers.get('content-type')||'';const data=contentType.includes('application/json')?await response.json():{ok:false,message:response.status===403?'Security check failed (CSRF). Refresh SmartPOS and scan again.':response.status===404?'The barcode update endpoint was not found. Please deploy the latest SmartPOS update.':`The server could not save this barcode (HTTP ${response.status}). Please refresh and try again.`};if(!response.ok||!data.ok){say(data.message||'Barcode could not be saved.',true);busy=false;return;}if(barcodeInput)barcodeInput.value=data.barcode;say(data.message||'Barcode updated.',false);openBtn.disabled=true;openBtn.textContent='Barcode updated';setTimeout(()=>window.location.reload(),1200);}catch(e){say('Could not save the barcode. Check your connection and try again.',true);busy=false;}}
+ async function loadAnyScript(urls, globalName){if(window[globalName])return;let lastError=null;for(const src of urls){try{await new Promise((resolve,reject)=>{const el=document.createElement('script');el.src=src;el.async=true;el.onload=()=>resolve();el.onerror=()=>{el.remove();reject(new Error('Could not load '+src));};document.head.appendChild(el);});if(window[globalName])return;}catch(e){lastError=e;}}throw lastError||new Error('Barcode scanner library unavailable');}
+ async function startZXing(){say('Loading camera scanner…');try{if(!window.isSecureContext){throw new Error('Camera access requires HTTPS. Open SmartPOS using https://.');}if(!navigator.mediaDevices?.getUserMedia){throw new Error('This browser does not expose camera access. Try an updated Chrome browser.');}if(!window.ZXing)await loadAnyScript(['https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js','https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js'],'ZXing');const Reader=window.ZXing?.BrowserMultiFormatReader;if(!Reader)throw new Error('The ZXing library loaded without browser camera support. Check the deployed static files or use a USB/Bluetooth scanner.');zxingReader=new Reader();say('Requesting camera permission…');zxingControls=await zxingReader.decodeFromVideoDevice(undefined,video,(result,err)=>{if(result&&!busy)save(result.getText());});say('Camera ready. Point it at the printed barcode.');}catch(e){const msg=String(e?.message||'');if(/NotAllowedError|Permission/i.test(msg))say('Camera permission was denied. Allow camera access in your browser site settings, then reopen the scanner.',true);else if(/NotFoundError|Requested device not found/i.test(msg))say('No camera was found on this device. Use a USB/Bluetooth barcode scanner below.',true);else if(/HTTPS|secure context/i.test(msg))say(msg,true);else say('Camera scanner could not load. The scanner library could not be downloaded from the available CDN sources. Check internet access, refresh the page, or use a USB/Bluetooth scanner. Details: '+msg,true);}}
+ async function scanLoop(){if(modal.classList.contains('hidden')||busy)return;try{const detector=new BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e','code_128','code_39','itf','codabar','data_matrix','qr_code']});const codes=await detector.detect(video);if(codes.length&&codes[0].rawValue){await save(codes[0].rawValue);return;}}catch(e){}timer=setTimeout(scanLoop,220);}
+ openBtn.addEventListener('click',async()=>{modal.classList.remove('hidden');manual.value='';busy=false;if(!navigator.mediaDevices?.getUserMedia){say('Camera is unavailable. Use HTTPS and allow camera access, or use the scanner input below.',true);return;}if(!('BarcodeDetector' in window)){await startZXing();return;}try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});video.srcObject=stream;await video.play();say('Camera ready. Point it at the printed barcode.');scanLoop();}catch(e){say('Camera permission was denied or unavailable. Allow camera access, or use the scanner input below.',true);}});
+ document.getElementById('smartpos-close-barcode-scanner').addEventListener('click',close);modal.addEventListener('click',e=>{if(e.target===modal)close();});document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!modal.classList.contains('hidden'))close();});document.getElementById('smartpos-barcode-manual-save').addEventListener('click',()=>save(manual.value));manual.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();save(manual.value);}});
+})();
+</script>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>window.PM_BARCODE_CHECK_URL = "{% url 'inventory:barcode_check_api' %}";{% if product %} window.PM_BARCODE_EXCLUDE_ID = "{{ product.pk }}";{% endif %}</script>
+<script src="{% static 'js/pm-scanner.js' %}?v=2"></script>
+<script src="{% static 'js/pm-scan-fields.js' %}?v=1"></script>
+<script src="{% static 'js/pm-inline-add.js' %}?v=2"></script>
+{% endblock %}

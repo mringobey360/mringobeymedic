@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+{% block title %}Meals Today & Verification{% endblock %}
+{% block content %}
+<div class="max-w-6xl mx-auto space-y-6">
+    <header>
+        <div class="inline-flex items-center gap-2 rounded-full bg-amber-50 text-amber-700 px-3 py-1 text-xs font-semibold mb-3">
+            <span class="w-2 h-2 rounded-full bg-amber-500"></span> Manager control
+        </div>
+        <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-ink-900">Meals Today</h1>
+        <p class="text-sm text-ink-500 mt-2 max-w-2xl">Scanning the branch QR inside the meal window is what issues a meal. Employees who cannot scan report an issue; nothing is issued until you verify it. Missed meals create no cost and no debt.</p>
+    </header>
+
+    <nav class="flex flex-wrap items-center gap-2" aria-label="Choose day">
+        <a href="{% url 'accounts:meal_issues' %}" class="px-3 py-1.5 rounded-full text-xs font-semibold {% if is_today %}bg-brand-600 text-white{% else %}bg-slate-100 text-slate-700{% endif %}">Today</a>
+        <a href="{% url 'accounts:meal_issues' %}?date={{ yesterday|date:'Y-m-d' }}" class="px-3 py-1.5 rounded-full text-xs font-semibold {% if not is_today %}bg-brand-600 text-white{% else %}bg-slate-100 text-slate-700{% endif %}">Yesterday</a>
+        <span class="text-xs text-ink-400">Showing {{ day|date:"d M Y" }}</span>
+    </nav>
+
+    <section class="grid grid-cols-2 md:grid-cols-4 gap-3" aria-label="Meals summary">
+        <div class="card"><p class="text-xs text-ink-500">Scheduled</p><p class="text-2xl font-bold">{{ counts.scheduled }}</p></div>
+        <div class="card"><p class="text-xs text-ink-500">Claimed</p><p class="text-2xl font-bold text-green-700">{{ counts.claimed }}</p></div>
+        <div class="card"><p class="text-xs text-ink-500">Pending verification</p><p class="text-2xl font-bold text-amber-700">{{ counts.review }}</p></div>
+        <div class="card"><p class="text-xs text-ink-500">Missed</p><p class="text-2xl font-bold text-red-700">{{ counts.missed }}</p></div>
+        {% if counts.not_issued %}<div class="card col-span-2 md:col-span-4 border border-amber-200 bg-amber-50/40"><p class="text-xs text-ink-500">Not issued yet (checked in after the meal window)</p><p class="text-2xl font-bold text-amber-700">{{ counts.not_issued }}</p><p class="text-xs text-ink-500 mt-1">Use <strong>Emergency verify</strong> in the table below to pay one of these directly.</p></div>{% endif %}
+    </section>
+
+    {% if workday_reopen_requests %}
+    <section class="card border border-amber-200 bg-amber-50/40" aria-label="Workday reopening requests">
+      <h2 class="text-lg font-bold text-ink-900">Workday reopening requests</h2>
+      <p class="text-sm text-ink-600 mt-1">Review accidental closures. Approving restores today's workday and attendance so the employee can continue selling. Decisions are recorded.</p>
+      <div class="mt-3 space-y-3">
+      {% for req in workday_reopen_requests %}
+        <article class="rounded-xl border border-ink-100 bg-white p-4">
+          <div class="flex flex-col md:flex-row md:justify-between gap-3">
+            <div><p class="font-semibold">{% firstof req.employee.get_full_name req.employee.username %}</p><p class="text-xs text-ink-500">{{ req.pharmacy }} · {{ req.work_date|date:"d M Y" }} · Requested {{ req.requested_at|date:"H:i" }}</p><p class="text-sm mt-2">{{ req.reason }}</p></div>
+            <div class="flex flex-col gap-2 min-w-[220px]">
+              <form method="post" action="{% url 'accounts:workday_reopen_request_decide' req.pk 'approve' %}" data-confirm="Approve and reopen this employee's workday?">{% csrf_token %}<input name="decision_note" maxlength="500" class="form-input w-full mb-2" placeholder="Optional approval note"><button class="btn btn-primary w-full">Approve &amp; Reopen</button></form>
+              <form method="post" action="{% url 'accounts:workday_reopen_request_decide' req.pk 'reject' %}" data-confirm="Reject this reopening request?">{% csrf_token %}<input name="decision_note" maxlength="500" class="form-input w-full mb-2" placeholder="Reason for rejection"><button class="btn btn-secondary w-full">Reject Request</button></form>
+            </div>
+          </div>
+        </article>
+      {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+
+    {% if closed_workdays %}
+    <section class="card border border-blue-100 bg-blue-50/30" aria-label="Reopen workday">
+        <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+            <div>
+                <h2 class="text-lg font-bold text-ink-900">Recently closed workdays</h2>
+                <p class="text-sm text-ink-600 mt-1 max-w-3xl">If an employee closed their workday by mistake, you can reopen today’s workday. This also restores their open attendance state so they can continue working and submit a late-meal request when eligible.</p>
+            </div>
+            <span class="inline-flex rounded-full bg-white border border-blue-100 px-3 py-1.5 text-xs font-semibold text-blue-700">Today only</span>
+        </div>
+        <div class="mt-4 divide-y divide-ink-100 rounded-xl border border-ink-100 bg-white overflow-hidden">
+        {% for wd in closed_workdays %}
+            <div class="p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                <div>
+                    <p class="font-semibold text-ink-900">{% firstof wd.employee.get_full_name wd.employee.username %}</p>
+                    <p class="text-xs text-ink-500 mt-1">Closed at {{ wd.closed_at|date:"H:i" }}{% if wd.reopened_at %} · Last reopened {{ wd.reopened_at|date:"H:i" }}{% endif %}</p>
+                </div>
+                <form method="post" action="{% url 'accounts:meal_workday_reopen' wd.employee_id %}" class="flex flex-col sm:flex-row gap-2 w-full md:w-auto" data-confirm="Reopen this employee’s workday? Their attendance will be restored to open for today.">
+                    {% csrf_token %}
+                    <input name="reason" required minlength="3" maxlength="500" class="form-input sm:w-80" placeholder="Reason, e.g. Closed by mistake">
+                    <button class="btn btn-primary whitespace-nowrap">Reopen Workday</button>
+                </form>
+            </div>
+        {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    <section id="pending-issues" class="space-y-4" aria-label="Pending meal issues">
+        <h2 class="text-lg font-bold text-ink-900">Issues awaiting verification</h2>
+        {% for x in pending %}
+        <article class="card !p-0 overflow-hidden shadow-sm">
+            <div class="p-4 sm:p-5">
+                <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                    <div class="min-w-0">
+                        <h3 class="font-semibold text-ink-900">{% firstof x.employee.get_full_name x.employee.username %} <span class="text-ink-400 font-normal">· {{ x.get_meal_type_display }}</span>{% if x.is_late %} <span class="ml-1 inline-flex rounded-full bg-red-50 text-red-700 px-2 py-0.5 text-[11px] font-semibold">Late request</span>{% endif %}</h3>
+                        <p class="text-xs text-ink-500 mt-1">{{ x.reference }} · {{ x.date|date:"d M Y" }} · Window {{ x.window_start_at|date:"H:i" }}–{{ x.window_end_at|date:"H:i" }} · Reported {{ x.reported_at|date:"H:i" }}</p>
+                    </div>
+                    <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-50 text-amber-700 px-3 py-1.5 text-xs font-semibold self-start"><span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>Pending verification</span>
+                </div>
+                <div class="mt-4 rounded-lg bg-ink-50 border border-ink-100 p-3 sm:p-4">
+                    <p class="text-[11px] uppercase tracking-wider font-semibold text-ink-500 mb-1">Reason: {{ x.get_reason_display }}</p>
+                    <p class="text-sm text-ink-800 whitespace-pre-line break-words">{{ x.details|default:"No details provided." }}</p>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 mt-4">
+                    <form method="post" action="{% url 'accounts:meal_issue_decide' x.pk 'reopen' %}" class="rounded-xl border border-emerald-100 bg-emerald-50/40 p-3 space-y-3" data-confirm="Approve this request and reopen the meal for the employee to scan? The meal will NOT be recorded until the employee scans.">
+                        {% csrf_token %}
+                        <div><h4 class="text-sm font-semibold text-ink-900">Approve &amp; reopen for employee scan</h4><p class="text-xs text-ink-500 mt-0.5">The employee must scan the branch QR. This does not issue the meal on the manager's behalf.</p></div>
+                        <label class="block"><span class="text-xs font-medium text-ink-600">Manager note</span><input name="note" required minlength="3" maxlength="500" class="form-input w-full mt-1" placeholder="e.g. Employee was serving customers during breakfast"></label>
+                        <button type="submit" class="btn btn-success w-full">Reopen for scan</button>
+                    </form>
+                    <form method="post" action="{% url 'accounts:meal_issue_decide' x.pk 'verify' %}" class="rounded-xl border border-blue-100 bg-blue-50/40 p-3 space-y-3 lg:col-span-2" data-confirm="Verify this meal yourself now? It is recorded under your name and the employee does not need to scan.">
+                        {% csrf_token %}
+                        <div><h4 class="text-sm font-semibold text-ink-900">Verify directly (manager)</h4><p class="text-xs text-ink-500 mt-0.5">Records the meal now without a scan. Saved with your name, reason and time.</p></div>
+                        <div class="grid sm:grid-cols-2 gap-2">
+                            <select name="reason" required class="form-input"><option value="">Reason…</option>{% for value, label in manual_reasons %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select>
+                            <input name="note" required minlength="3" maxlength="500" class="form-input" placeholder="Note, e.g. Worked all morning, checked in late by mistake">
+                        </div>
+                        <button type="submit" class="btn btn-primary w-full">Verify meal now</button>
+                    </form>
+                    <form method="post" action="{% url 'accounts:meal_issue_decide' x.pk 'return' %}" class="rounded-xl border border-amber-100 bg-amber-50/40 p-3 space-y-3">
+                        {% csrf_token %}
+                        <div><h4 class="text-sm font-semibold text-ink-900">Return to employee</h4><p class="text-xs text-ink-500 mt-0.5">Ask the employee to correct the explanation and submit the request again.</p></div>
+                        <input name="note" required minlength="3" maxlength="500" class="form-input w-full" placeholder="What information is missing?">
+                        <button type="submit" class="btn btn-secondary w-full">Return for correction</button>
+                    </form>
+                    <form method="post" action="{% url 'accounts:meal_issue_decide' x.pk 'reject' %}" class="rounded-xl border border-red-100 bg-red-50/30 p-3 space-y-3">
+                        {% csrf_token %}
+                        <div><h4 class="text-sm font-semibold text-ink-900">Reject</h4><p class="text-xs text-ink-500 mt-0.5">Closes the request. No meal is issued.</p></div>
+                        <input name="note" required minlength="3" maxlength="500" class="form-input w-full" placeholder="Reason for rejection">
+                        <button type="submit" class="btn btn-secondary w-full">Reject request</button>
+                    </form>
+                </div>
+            </div>
+        </article>
+        {% empty %}
+        <div class="card !p-8 text-center"><h3 class="text-base font-semibold text-ink-900">No pending meal issues</h3><p class="text-sm text-ink-500 mt-1">Reported scanning problems will appear here.</p></div>
+        {% endfor %}
+    {% include "partials/pagination.html" with page_obj=pending_page page_param="pending_page" page_anchor="pending-issues" %}
+    </section>
+
+    {% if grantable_total %}
+    <section class="card border border-amber-200 bg-amber-50/40" aria-label="Outage recovery">
+        <h2 class="text-lg font-bold text-ink-900">Outage recovery</h2>
+        <p class="text-sm text-ink-600 mt-1 max-w-3xl">Use this only when the network, power or system failed and staff could not scan or report. It verifies one meal for every employee on <strong>{{ day|date:"d M" }}</strong> who has verified attendance and no recorded claim. A reason and note are required and are saved with your name and the time.</p>
+        <form method="post" action="{% url 'accounts:meal_bulk_grant' %}" class="mt-4 grid gap-3 md:grid-cols-[1fr_1fr_2fr_auto] items-end" data-confirm="Verify this meal for every unclaimed employee?">
+            {% csrf_token %}
+            <input type="hidden" name="date" value="{{ day|date:'Y-m-d' }}">
+            <label class="block"><span class="text-xs font-medium text-ink-600">Meal</span>
+                <select name="meal_type" required class="form-input w-full mt-1">{% for value, label in meal_choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select></label>
+            <label class="block"><span class="text-xs font-medium text-ink-600">Reason</span>
+                <select name="reason" required class="form-input w-full mt-1"><option value="">Choose…</option>{% for value, label in manual_reasons %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select></label>
+            <label class="block"><span class="text-xs font-medium text-ink-600">Note (required)</span>
+                <input name="note" required minlength="3" maxlength="500" class="form-input w-full mt-1" placeholder="e.g. Power cut 12:10–14:30, branch QR screen was off"></label>
+            <button type="submit" class="btn btn-primary">Verify all</button>
+        </form>
+    </section>
+    {% endif %}
+
+    <section id="meals-by-employee" class="card overflow-x-auto" aria-label="Meals by employee">
+        <h2 class="text-lg font-bold text-ink-900 mb-3">By employee <span class="text-sm font-normal text-ink-400">{{ day|date:"d M Y" }}</span></h2>
+        <table class="w-full text-sm"><thead><tr class="text-left text-ink-500 border-b border-ink-100"><th class="py-2">Employee</th><th>Meal</th><th>Status</th><th>Recorded</th><th>Action</th></tr></thead><tbody>
+        {% for r in rows %}
+        <tr class="border-b border-ink-100"><td class="py-3">{% firstof r.employee.get_full_name r.employee.username %}</td><td>{{ r.meal_label }}</td>
+        <td>{% if r.state == 'NOT_ISSUED' %}<span class="px-2 py-1 rounded-full bg-amber-100 text-amber-700">Not issued</span>{% elif r.state == 'CLAIMED' %}<span class="px-2 py-1 rounded-full bg-green-100 text-green-700">Claimed</span>{% elif r.state == 'VERIFIED' %}<span class="px-2 py-1 rounded-full bg-blue-100 text-blue-700">Manually verified</span>{% elif r.state == 'REVIEW' %}<span class="px-2 py-1 rounded-full bg-amber-100 text-amber-700">{% if r.late %}Late request pending{% else %}Pending verification{% endif %}</span>{% elif r.state == 'SCAN_REOPENED' %}<span class="px-2 py-1 rounded-full bg-emerald-100 text-emerald-700">Waiting for employee scan</span>{% elif r.state == 'MISSED' %}<span class="px-2 py-1 rounded-full bg-red-100 text-red-700">Missed</span>{% else %}<span class="px-2 py-1 rounded-full bg-slate-100 text-slate-600">Awaiting scan</span>{% endif %}</td>
+        <td>{% if r.ledger and r.ledger.claimed_at %}{{ r.ledger.claimed_at|date:"H:i" }}{% if r.ledger.manual_reason %}<span class="block text-[11px] text-ink-400">{{ r.ledger.get_manual_reason_display }} · {% firstof r.ledger.verified_by.get_full_name r.ledger.verified_by.username %}</span>{% endif %}{% else %}—{% endif %}</td>
+        <td>{% if r.state == 'NOT_ISSUED' %}{% if r.can_grant %}<details><summary class="text-xs text-brand-700 font-semibold cursor-pointer">Emergency verify</summary>
+            <form method="post" action="{% url 'accounts:meal_manual_grant_missing' %}" class="mt-2 grid gap-2 min-w-[240px]" data-confirm="Verify this meal manually? It is recorded under your name.">{% csrf_token %}
+                <input type="hidden" name="employee" value="{{ r.employee.pk }}"><input type="hidden" name="meal_type" value="{{ r.meal_type }}"><input type="hidden" name="date" value="{{ day|date:'Y-m-d' }}">
+                <select name="reason" required class="form-input"><option value="">Reason…</option>{% for value, label in manual_reasons %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select>
+                <input name="note" required minlength="3" maxlength="500" class="form-input" placeholder="Note, e.g. Worked all morning, checked in late">
+                <button class="btn btn-secondary">Confirm</button></form></details>{% else %}—{% endif %}{% elif r.state == 'SCAN_REOPENED' %}<details><summary class="text-xs text-emerald-700 font-semibold cursor-pointer">Waiting for employee scan</summary>{% if r.can_grant %}<form method="post" action="{% url 'accounts:meal_manual_grant' r.ledger.pk %}" class="mt-2 grid gap-2 min-w-[240px]" data-confirm="Use manager emergency fallback instead of employee scan?">{% csrf_token %}<select name="reason" required class="form-input"><option value="">Emergency reason…</option>{% for value, label in manual_reasons %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select><input name="note" maxlength="500" class="form-input" placeholder="Note (required for Other)"><button class="btn btn-secondary">Emergency verify instead</button></form>{% else %}<p class="text-xs text-ink-500 mt-2">The employee must scan the branch QR. Manager verification is unavailable for this record.</p>{% endif %}</details>{% elif r.state == 'MISSED' and is_today %}<details><summary class="text-xs text-brand-700 font-semibold cursor-pointer">Reopen for scan</summary>
+            <form method="post" action="{% url 'accounts:meal_reopen_scan' r.ledger.pk %}" class="mt-2 grid gap-2 min-w-[240px]" data-confirm="Reopen this missed meal for the employee to scan now?">{% csrf_token %}
+                <input name="reason" required minlength="3" maxlength="200" class="form-input" placeholder="Reason, e.g. employee was serving customers">
+                <input name="note" maxlength="500" class="form-input" placeholder="Additional note (optional)">
+                <button class="btn btn-primary">Reopen for employee scan</button></form></details>{% elif r.can_grant %}<details><summary class="text-xs text-brand-700 font-semibold cursor-pointer">Emergency verify</summary>
+            <form method="post" action="{% url 'accounts:meal_manual_grant' r.ledger.pk %}" class="mt-2 grid gap-2 min-w-[240px]" data-confirm="Verify this meal manually?">{% csrf_token %}
+                <select name="reason" required class="form-input"><option value="">Reason…</option>{% for value, label in manual_reasons %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select>
+                <input name="note" maxlength="500" class="form-input" placeholder="Note (required for Other)">
+                <button class="btn btn-secondary">Confirm</button></form></details>{% else %}—{% endif %}</td></tr>
+        {% empty %}<tr><td colspan="5" class="py-8 text-center text-ink-400">No meals scheduled on this day.</td></tr>{% endfor %}
+        </tbody></table>
+    </section>
+
+    {% include "partials/pagination.html" with page_obj=rows_page page_param="rows_page" page_anchor="meals-by-employee" %}
+
+    {% if recent %}
+    <section id="recent-decisions" class="card overflow-x-auto" aria-label="Recent decisions">
+        <h2 class="text-lg font-bold text-ink-900 mb-3">Recent decisions</h2>
+        <table class="w-full text-sm"><thead><tr class="text-left text-ink-500 border-b border-ink-100"><th class="py-2">Issue</th><th>Employee</th><th>Meal</th><th>Outcome</th><th>By</th><th>When</th><th>Note</th></tr></thead><tbody>
+        {% for x in recent %}<tr class="border-b border-ink-100"><td class="py-3">{{ x.reference }}</td><td>{% firstof x.employee.get_full_name x.employee.username %}</td><td>{{ x.get_meal_type_display }} · {{ x.date|date:"d M" }}{% if x.is_late %} <span class="text-[11px] text-red-700 font-semibold">Late</span>{% endif %}</td><td>{{ x.get_status_display }}</td><td>{% firstof x.decided_by.get_full_name x.decided_by.username "System" %}</td><td>{{ x.decided_at|date:"d M, H:i" }}</td><td>{{ x.decision_note|default:"—" }}</td></tr>{% endfor %}
+        </tbody></table>
+    </section>
+    {% include "partials/pagination.html" with page_obj=recent_page page_param="recent_page" page_anchor="recent-decisions" %}
+    {% endif %}
+</div>
+{% endblock %}

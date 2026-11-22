@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Customer Portfolio - HQ{% endblock %}
+{% block content %}
+<div class="max-w-6xl mx-auto">
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+        <div>
+            <h1 class="text-2xl font-bold text-ink-900 tracking-tight">Customer Portfolio</h1>
+            <p class="text-sm text-ink-500 mt-1">Every owner, every branch, and branch status in one manageable view.</p>
+        </div>
+        <a href="{% url 'hq:dashboard' %}" class="btn btn-nav btn-secondary text-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/></svg>&larr; HQ Dashboard</a>
+    </div>
+    <form method="get" class="flex gap-2 mb-4">
+        <input type="text" name="q" value="{{ q }}" placeholder="Search owner, phone, username or branch..." class="form-input max-w-md">
+        <button class="btn btn-secondary">Search</button>
+    </form>
+    <div class="card overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead><tr class="text-left border-b border-ink-200">
+                <th class="py-2 pr-4">Owner</th><th class="py-2 pr-4">Phone</th><th class="py-2 pr-4 text-center">Branches</th>
+                <th class="py-2 pr-4 text-center">Active</th><th class="py-2 pr-4">Branch portfolio</th><th class="py-2 pr-4">Account</th><th></th>
+            </tr></thead>
+            <tbody>
+            {% for owner in page_obj %}
+            <tr class="border-b border-ink-100 align-top">
+                <td class="py-3 pr-4"><a href="{% url 'hq:customer_detail' owner.pk %}" class="font-semibold text-brand-700">{% firstof owner.get_full_name owner.username %}</a><span class="block text-xs text-ink-400">@{{ owner.username }}</span></td>
+                <td class="py-3 pr-4">{{ owner.phone_number }}</td>
+                <td class="py-3 pr-4 text-center"><span class="inline-flex min-w-8 justify-center rounded-full bg-brand-100 text-brand-700 px-2 py-1 font-bold">{{ owner.branch_count }}</span></td>
+                <td class="py-3 pr-4 text-center">{{ owner.active_branch_count }} / {{ owner.branch_count }}</td>
+                <td class="py-3 pr-4"><div class="space-y-1">{% for branch in owner.managed_pharmacies.all %}<div><span class="font-medium">{{ branch.name }}</span> <span class="text-xs {% if branch.is_active %}text-emerald-600{% else %}text-amber-600{% endif %}">{% if branch.is_active %}Active{% else %}Locked{% endif %}</span></div>{% empty %}<span class="text-ink-400">No branches</span>{% endfor %}</div></td>
+                <td class="py-3 pr-4"><span class="badge {% if owner.is_active %}bg-emerald-100 text-emerald-700{% else %}bg-red-100 text-red-700{% endif %}">{% if owner.is_active %}Active{% else %}Inactive{% endif %}</span></td>
+                <td class="py-3"><a href="{% url 'hq:customer_detail' owner.pk %}" class="btn btn-secondary text-xs">Manage</a></td>
+            </tr>
+            {% empty %}<tr><td colspan="7" class="py-10 text-center text-ink-400">No customer owners found.</td></tr>{% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% include "partials/pagination.html" with page_obj=page_obj %}
+</div>
+{% endblock %}

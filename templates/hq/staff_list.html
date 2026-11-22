@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Staff & Users — HQ{% endblock %}
+{% block content %}
+<div class="max-w-6xl mx-auto">
+  <div class="flex items-center justify-between gap-3 mb-5">
+    <div><h1 class="text-2xl font-bold text-ink-900">Staff & Users</h1><p class="text-sm text-ink-500">Platform-wide account visibility and activation control.</p></div>
+    <a href="/admin/accounts/user/" class="btn btn-secondary text-sm">System Admin Users</a>
+  </div>
+  <form method="get" class="card mb-5 flex flex-wrap gap-2 items-end">
+    <div><label class="block text-xs font-medium mb-1">Search</label><input class="form-input" name="q" value="{{ q }}" placeholder="Name, username, phone, email"></div>
+    <div><label class="block text-xs font-medium mb-1">Role</label><select class="form-input" name="role"><option value="">All</option>{% for value,label in role_choices %}<option value="{{ value }}" {% if role == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+    <div><label class="block text-xs font-medium mb-1">Status</label><select class="form-input" name="status"><option value="">All</option><option value="active" {% if status == 'active' %}selected{% endif %}>Active</option><option value="inactive" {% if status == 'inactive' %}selected{% endif %}>Inactive</option></select></div>
+    <button class="btn btn-primary">Filter</button>
+  </form>
+  <div class="card overflow-x-auto"><table class="w-full text-sm"><thead><tr class="text-left border-b border-ink-200"><th class="py-3 pr-4">User</th><th class="py-3 pr-4">Phone</th><th class="py-3 pr-4">Role</th><th class="py-3 pr-4">Branches</th><th class="py-3 pr-4">Status</th><th class="py-3 pr-4">Actions</th></tr></thead><tbody>
+  {% for u in page_obj %}<tr class="border-b border-ink-100 hover:bg-slate-50/70 transition-colors"><td class="py-3 pr-4"><div class="flex items-center gap-3"><span class="spx-avatar spx-avatar--md">{% if u.profile_photo %}<img src="{{ u.profile_photo.url }}" alt="">{% else %}<span>{{ u.first_name.0|default:u.username.0|upper }}</span>{% endif %}</span><div class="min-w-0"><strong>{% firstof u.get_full_name u.username %}</strong><span class="block text-xs text-ink-400">{{ u.username }} · {{ u.email|default:'No email' }}</span>{% if not u.is_superuser or u.pk == request.user.pk %}<button type="button" class="mt-1 text-xs text-teal-700 underline" data-photo-user="{{ u.pk }}" data-photo-name="{{ u.get_full_name|default:u.username|escape }}" data-photo-url="{% if u.profile_photo %}{{ u.profile_photo.url }}{% endif %}">Change photo</button>{% endif %}</div></div></td><td class="py-3 pr-4">{{ u.phone_number|default:'—' }}</td><td class="py-3 pr-4">{% if u.is_superuser %}Platform Superadmin{% else %}{{ u.get_role_display }}{% endif %}</td><td class="py-3 pr-4">{% if u.is_admin_role %}{{ u.managed_pharmacies.count }}{% elif u.pharmacy %}{{ u.pharmacy.name }}{% else %}—{% endif %}</td><td class="py-3 pr-4"><span class="badge {% if u.is_active %}bg-emerald-100 text-emerald-700{% else %}bg-red-100 text-red-700{% endif %}">{% if u.is_active %}Active{% else %}Inactive{% endif %}</span></td><td class="py-3 pr-4"><div class="flex flex-wrap items-center gap-2">{% if not u.is_superuser and u.pk != request.user.pk %}<form method="post" action="{% url 'hq:staff_toggle_active' u.pk %}">{% csrf_token %}<button class="btn btn-secondary text-xs" type="submit">{% if u.is_active %}Deactivate{% else %}Activate{% endif %}</button></form><button type="button" class="btn text-xs bg-red-50 text-red-700 border border-red-200 hover:bg-red-100" data-delete-user="{{ u.pk }}" data-delete-name="{{ u.get_full_name|default:u.username|escape }}" data-delete-username="{{ u.username|escape }}">Delete account</button>{% elif u.pk == request.user.pk %}<span class="text-xs text-ink-400">Current account</span>{% else %}<span class="text-xs text-ink-400">Protected</span>{% endif %}</div></td></tr>
+  {% empty %}<tr><td colspan="6" class="py-8 text-center text-ink-400">No users found.</td></tr>{% endfor %}
+  </tbody></table></div>
+
+  <!-- Profile photo editor (System Owner). Submits via POST + CSRF to hq:staff_photo_update. -->
+  <div id="photoModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/60 p-4" role="dialog" aria-modal="true" aria-labelledby="photoModalTitle">
+    <div class="w-full max-w-sm overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+      <div class="flex items-start justify-between gap-3 border-b border-slate-100 p-5"><div><h2 id="photoModalTitle" class="text-lg font-bold text-slate-900">Profile photo</h2><p id="photoTargetName" class="text-sm text-slate-500"></p></div><button type="button" id="closePhotoModal" class="rounded-lg p-2 text-slate-400 hover:bg-slate-100" aria-label="Close">✕</button></div>
+      <form id="photoForm" method="post" enctype="multipart/form-data" action="" class="space-y-4 p-5">{% csrf_token %}
+        <div class="flex justify-center"><span class="spx-avatar" style="width:6rem;height:6rem;font-size:2rem"><img id="photoPreview" alt="" style="display:none"><span id="photoInitial"></span></span></div>
+        <input id="photoInput" class="form-input w-full" type="file" name="profile_photo" accept="image/*">
+        <p class="text-xs text-slate-500">JPG, PNG or WebP, up to 10 MB. It is compressed automatically.</p>
+        <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-between"><button type="submit" name="remove_photo" value="1" id="photoRemoveBtn" class="btn bg-red-50 text-red-700 border border-red-200 hover:bg-red-100" formnovalidate>Remove photo</button><button type="submit" id="photoSaveBtn" class="btn btn-primary" disabled>Save photo</button></div>
+      </form>
+    </div>
+  </div>
+  <script>
+  (() => {
+    const modal = document.getElementById('photoModal'), form = document.getElementById('photoForm');
+    const input = document.getElementById('photoInput'), preview = document.getElementById('photoPreview');
+    const initial = document.getElementById('photoInitial'), save = document.getElementById('photoSaveBtn');
+    const remove = document.getElementById('photoRemoveBtn');
+    function show(url, name) {
+      if (url) { preview.src = url; preview.style.display = 'block'; initial.textContent = ''; }
+      else { preview.removeAttribute('src'); preview.style.display = 'none'; initial.textContent = (name || '?').trim().charAt(0).toUpperCase(); }
+    }
+    function close() { modal.classList.add('hidden'); modal.classList.remove('flex'); input.value = ''; save.disabled = true; }
+    document.querySelectorAll('[data-photo-user]').forEach(b => b.addEventListener('click', () => {
+      form.action = `/hq/staff/${b.dataset.photoUser}/photo/`;
+      document.getElementById('photoTargetName').textContent = b.dataset.photoName;
+      remove.style.display = b.dataset.photoUrl ? '' : 'none';
+      show(b.dataset.photoUrl, b.dataset.photoName); input.value = ''; save.disabled = true;
+      modal.classList.remove('hidden'); modal.classList.add('flex');
+    }));
+    input.addEventListener('change', () => {
+      const f = input.files[0]; save.disabled = !f; if (!f) return;
+      if (f.size > 10 * 1024 * 1024) { alert('This photo is larger than 10 MB.'); input.value = ''; save.disabled = true; return; }
+      preview.src = URL.createObjectURL(f); preview.style.display = 'block'; initial.textContent = '';
+    });
+    document.getElementById('closePhotoModal').addEventListener('click', close);
+    modal.addEventListener('click', e => { if (e.target === modal) close(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && !modal.classList.contains('hidden')) close(); });
+    remove.addEventListener('click', e => { if (!confirm('Remove this profile photo?')) e.preventDefault(); });
+  })();
+  </script>
+
+  <!-- Shared, accessible confirmation modal. Deletion only submits via POST + CSRF. -->
+  <div id="deleteAccountModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/60 p-4" role="dialog" aria-modal="true" aria-labelledby="deleteModalTitle" aria-describedby="deleteModalDescription">
+    <div class="w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+      <div class="flex items-start gap-3 border-b border-slate-100 p-5"><div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-100 text-red-700"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2m-9 0 1 14h8l1-14M10 10v6m4-6v6" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="min-w-0 flex-1"><h2 id="deleteModalTitle" class="text-lg font-bold text-slate-900">Permanently delete account?</h2><p class="mt-1 text-sm text-slate-500">This action cannot be undone.</p></div><button type="button" id="closeDeleteModal" class="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="Close confirmation">✕</button></div>
+      <div class="space-y-4 p-5"><div class="rounded-xl border border-red-100 bg-red-50 p-3"><p class="text-sm text-red-900">You are about to delete <strong id="deleteTargetName">this user</strong> <span id="deleteTargetUsername" class="text-red-700"></span>. Depending on the system's database relationships, related records configured for cascading deletion may also be removed.</p></div><p id="deleteModalDescription" class="text-sm text-slate-600">Confirm you have reviewed this account and any data associated with it.</p><label for="deleteConfirmInput" class="block text-sm font-semibold text-slate-700">Type <span class="font-mono text-red-700">DELETE</span> to enable permanent deletion</label><input id="deleteConfirmInput" class="form-input w-full" autocomplete="off" placeholder="Type DELETE" aria-describedby="deleteInputHelp"><p id="deleteInputHelp" class="text-xs text-slate-500">The account will be removed only after you confirm below.</p></div>
+      <div class="flex flex-col-reverse gap-2 border-t border-slate-100 bg-slate-50 p-4 sm:flex-row sm:justify-end"><button type="button" id="cancelDeleteModal" class="btn btn-secondary">Cancel</button><form id="deleteAccountForm" method="post" action="">{% csrf_token %}<input type="hidden" name="confirm_delete" value="DELETE"><button id="confirmDeleteButton" type="submit" class="btn bg-red-600 text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40" disabled>Delete permanently</button></form></div>
+    </div>
+  </div>
+  <script>
+  (() => {
+    const modal = document.getElementById('deleteAccountModal');
+    const form = document.getElementById('deleteAccountForm');
+    const input = document.getElementById('deleteConfirmInput');
+    const confirmButton = document.getElementById('confirmDeleteButton');
+    const closeButtons = [document.getElementById('closeDeleteModal'), document.getElementById('cancelDeleteModal')];
+    let previousFocus = null;
+    function closeModal() { modal.classList.add('hidden'); modal.classList.remove('flex'); input.value = ''; confirmButton.disabled = true; if (previousFocus) previousFocus.focus(); }
+    document.querySelectorAll('[data-delete-user]').forEach(button => button.addEventListener('click', () => {
+      previousFocus = button; form.action = `/hq/staff/${button.dataset.deleteUser}/delete/`;
+      document.getElementById('deleteTargetName').textContent = button.dataset.deleteName || button.dataset.deleteUsername;
+      document.getElementById('deleteTargetUsername').textContent = `(@${button.dataset.deleteUsername})`;
+      modal.classList.remove('hidden'); modal.classList.add('flex'); input.value = ''; confirmButton.disabled = true; input.focus();
+    }));
+    input.addEventListener('input', () => { confirmButton.disabled = input.value.trim() !== 'DELETE'; });
+    closeButtons.forEach(button => button.addEventListener('click', closeModal));
+    modal.addEventListener('click', event => { if (event.target === modal) closeModal(); });
+    document.addEventListener('keydown', event => { if (event.key === 'Escape' && !modal.classList.contains('hidden')) closeModal(); });
+    form.addEventListener('submit', event => { if (input.value.trim() !== 'DELETE') event.preventDefault(); });
+  })();
+  </script>
+  {% include "partials/pagination.html" with page_obj=page_obj %}
+</div>
+{% endblock %}

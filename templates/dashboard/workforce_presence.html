@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Workforce Presence{% endblock %}
+{% block content %}
+<div class="pro">
+  <div class="pro-head">
+    <div class="pro-head-main">
+      <p class="pro-eyebrow">Team management</p>
+      <h1 class="pro-title">Workforce Presence</h1>
+      <p class="pro-sub">Where each employee is right now. Presence is checked periodically while an employee's workday page is active; it is not continuous GPS tracking.</p>
+    </div>
+    <div class="pro-tools">
+      <span class="pro-pill" id="wp-live"><i></i><span id="wp-updated">Updated {% now "H:i" %}</span></span>
+      <button type="button" class="btn btn-secondary" id="wp-refresh">Refresh</button>
+      <a href="{% url 'accounts:attendance_review' %}" class="btn btn-secondary">Attendance</a>
+    </div>
+  </div>
+
+  <div class="pro-kpis k4" aria-label="Presence summary">
+    <div class="pro-kpi acc"><span class="pro-kpi-l">Active employees</span><span class="pro-kpi-v" id="k-total">{{ total_staff }}</span></div>
+    <div class="pro-kpi ok"><span class="pro-kpi-l">At workplace</span><span class="pro-kpi-v ok" id="k-ok">{{ count_verified }}</span></div>
+    <div class="pro-kpi bad"><span class="pro-kpi-l">Outside workplace</span><span class="pro-kpi-v {% if count_outside %}bad{% endif %}" id="k-out">{{ count_outside }}</span></div>
+    <div class="pro-kpi warn"><span class="pro-kpi-l">Stale / unavailable</span><span class="pro-kpi-v {% if count_stale %}warn{% endif %}" id="k-stale">{{ count_stale }}</span></div>
+  </div>
+
+  <section class="pro-panel" aria-labelledby="wp-list-title">
+    <div class="pro-panel-h">
+      <div><h2 id="wp-list-title">Today's employee location status</h2><p>{{ today|date:"l, d M Y" }} · refreshes every minute</p></div>
+    </div>
+    <div class="pro-tw">
+      <table class="pro-table stack">
+        <thead><tr><th>Employee</th><th>Status</th><th>Distance</th><th>Accuracy</th><th>Last verified</th></tr></thead>
+        <tbody id="wp-list">
+          {% for row in workforce_presence %}
+          <tr class="s-{{ row.status }}">
+            <td class="first"><div class="pro-who"><span class="pro-av" aria-hidden="true">{{ row.employee.get_full_name|default:row.employee.username|slice:":1"|upper }}</span><span class="pro-cell-main">{{ row.employee.get_full_name|default:row.employee.username }}</span></div></td>
+            <td data-label="Status"><span class="pro-b {% if row.status == 'VERIFIED' %}ok{% elif row.status == 'OUTSIDE' %}bad{% elif row.status == 'STALE' or row.status == 'UNAVAILABLE' %}warn{% else %}plain{% endif %}">{{ row.label }}</span></td>
+            <td data-label="Distance" class="num">{% if row.attendance.last_presence_distance_m %}{{ row.attendance.last_presence_distance_m|floatformat:0 }} m{% else %}—{% endif %}</td>
+            <td data-label="Accuracy" class="num mut">{% if row.attendance.last_presence_accuracy_m %}±{{ row.attendance.last_presence_accuracy_m|floatformat:0 }} m{% else %}—{% endif %}</td>
+            <td data-label="Last verified" class="num mut">{% if row.attendance.last_presence_at %}{{ row.attendance.last_presence_at|date:"d M, H:i" }}{% else %}—{% endif %}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="5"><div class="pro-empty"><strong>No active employees</strong>No active employees are assigned to this branch.</div></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="pro-foot two">
+    <p><b>Automatic check interval:</b> every {{ presence_interval_minutes }} minutes.</p>
+    <p><b>Stale</b> means the employee's browser has not supplied a fresh location within the safety window; it does not by itself mean they left.</p>
+  </div>
+</div>
+
+<script>
+(function(){
+  const list=document.getElementById('wp-list'); if(!list) return;
+  const endpoint='{% url 'accounts:attendance_presence_status' %}';
+  const live=document.getElementById('wp-live'), stamp=document.getElementById('wp-updated');
+  const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const m=v=>v==null?'—':Math.round(v)+' m', a=v=>v==null?'—':'±'+Math.round(v)+' m';
+  const tone=s=>s==='VERIFIED'?'ok':s==='OUTSIDE'?'bad':(s==='STALE'||s==='UNAVAILABLE')?'warn':'plain';
+  const EMPTY='<tr><td colspan="5"><div class="pro-empty"><strong>No active employees</strong>No active employees are assigned to this branch.</div></td></tr>';
+  function row(r){
+    const ini=esc((r.name||'?').trim().charAt(0).toUpperCase());
+    const t=r.last_presence_at||'—';
+    return '<tr class="s-'+esc(r.status)+'"><td class="first"><div class="pro-who"><span class="pro-av" aria-hidden="true">'+ini+'</span><span class="pro-cell-main">'+esc(r.name)+'</span></div></td>'
+      +'<td data-label="Status"><span class="pro-b '+tone(r.status)+'">'+esc(r.label)+'</span></td>'
+      +'<td data-label="Distance" class="num">'+m(r.distance_m)+'</td>'
+      +'<td data-label="Accuracy" class="num mut">'+a(r.accuracy_m)+'</td>'
+      +'<td data-label="Last verified" class="num mut">'+esc(t)+'</td></tr>';
+  }
+  function kpi(id,n,cls){const e=document.getElementById(id); if(!e)return; e.textContent=n; if(cls){e.classList.toggle(cls,!!n);}}
+  async function refresh(){
+    try{
+      const r=await fetch(endpoint,{headers:{'X-Requested-With':'XMLHttpRequest'},credentials:'same-origin',cache:'no-store'});
+      if(!r.ok) throw new Error(r.status);
+      const data=await r.json(), rows=data.rows||[];
+      list.innerHTML=rows.length?rows.map(row).join(''):EMPTY;
+      kpi('k-total',rows.length);
+      kpi('k-ok',rows.filter(x=>x.status==='VERIFIED').length);
+      kpi('k-out',rows.filter(x=>x.status==='OUTSIDE').length,'bad');
+      kpi('k-stale',rows.filter(x=>x.status==='STALE'||x.status==='UNAVAILABLE').length,'warn');
+      live.classList.remove('err'); stamp.textContent='Updated '+new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+    }catch(e){ live.classList.add('err'); stamp.textContent='Offline — retrying'; }
+  }
+  document.getElementById('wp-refresh').addEventListener('click',refresh);
+  window.setInterval(()=>{ if(!document.hidden) refresh(); },60000);
+  document.addEventListener('visibilitychange',()=>{ if(!document.hidden) refresh(); });
+})();
+</script>
+{% endblock %}

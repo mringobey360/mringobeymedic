@@ -1,0 +1,40 @@
+from django.urls import path
+from . import views, restock_views
+
+app_name = 'inventory'
+
+urlpatterns = [
+    path('transfers/', views.stock_transfer_list_view, name='stock_transfer_list'),
+    path('transfers/search/', views.stock_transfer_search_view, name='stock_transfer_search'),
+    path('transfers/scan/', views.stock_transfer_scan_view, name='stock_transfer_scan'),
+    path('transfers/new/', views.stock_transfer_create_view, name='stock_transfer_create'),
+    path('transfers/<int:pk>/', views.stock_transfer_detail_view, name='stock_transfer_detail'),
+    path('transfers/<int:pk>/pdf/', views.stock_transfer_pdf_view, name='stock_transfer_pdf'),
+    path('', views.product_list_view, name='product_list'),
+    path('new/', views.product_create_view, name='product_create'),
+    path('api/barcode-check/', views.barcode_check_api, name='barcode_check_api'),
+    path('<int:pk>/barcode/auto-update/', views.product_barcode_auto_update_api, name='product_barcode_auto_update_api'),
+    path('category/quick-add/', views.category_quick_add_api, name='category_quick_add'),
+    path('unit/quick-add/', views.unit_quick_add_api, name='unit_quick_add'),
+    path('scan/resolve/', views.scan_resolve_api, name='scan_resolve'),
+    path('scan/register/', views.scan_register_view, name='scan_register'),
+    path('scan/<int:pk>/restock/', views.scan_restock_view, name='scan_restock'),
+    path('<int:pk>/edit/', views.product_edit_view, name='product_edit'),
+    path('<int:pk>/delete/', views.product_delete_view, name='product_delete'),
+    path('<int:pk>/merge/', views.product_merge_view, name='product_merge'),
+    path('sample-data/remove/', views.demo_products_remove_view, name='demo_remove'),
+    path('bulk-delete/', views.product_bulk_delete_view, name='product_bulk_delete'),
+    path('delete/review/', views.product_delete_review_view, name='product_delete_review'),
+    path('delete/backup/', views.product_delete_backup_view, name='product_delete_backup'),
+    path('<int:pk>/barcode/', views.product_barcode_view, name='product_barcode'),
+    path('<int:pk>/batches/', views.product_batches_view, name='product_batches'),
+    path('<int:pk>/batches/add/', views.batch_add_view, name='batch_add'),
+    path('<int:pk>/batches/<int:batch_pk>/edit/', views.batch_edit_view, name='batch_edit'),
+    path('bulk-upload/', views.bulk_upload_view, name='bulk_upload'),
+    path('bulk-upload/template/', views.bulk_upload_template_view, name='bulk_upload_template'),
+    path('bulk-upload/confirm/', views.bulk_upload_confirm_view, name='bulk_upload_confirm'),
+    path('bulk-upload/fix-template/', views.bulk_upload_fix_template_view, name='bulk_upload_fix_template'),
+    path('restock/template/', views.restock_template_view, name='restock_template'),
+    path('restock/history/', restock_views.restock_history_view, name='restock_history'),
+    path('restock/history/download/', restock_views.restock_history_export_view, name='restock_history_export'),
+]

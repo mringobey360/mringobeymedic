@@ -1,0 +1,75 @@
+{% extends "base.html" %}{% load humanize %}
+{% block title %}Plans &amp; billing · SmartPOS{% endblock %}
+{% block extra_head %}{% include 'marketplace/_mk_styles.html' %}{% endblock %}
+{% block content %}
+<div class="mk-page mk-wide">
+ <nav class="mk-crumbs" aria-label="Breadcrumb"><a href="{% url 'marketplace:seller_dashboard' %}">Seller Centre</a><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg><b>Plans &amp; billing</b></nav>
+ <header class="mk-hero">
+  <div class="mk-hero-main">
+   <span class="mk-hero-icon"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M8 3v4M16 3v4M3.5 10h17"/></svg></span>
+   <div><h1>Plans &amp; billing</h1><p>Choose the services your shop needs. Pay through SmartPOS checkout and your plan activates automatically after payment is verified.</p></div>
+  </div>
+ </header>
+
+ {% for store in stores %}
+ <section aria-labelledby="mk-plans-{{ store.id }}">
+  <div class="mk-block-h">
+   <div><h2 id="mk-plans-{{ store.id }}">{{ store.public_name }}</h2><p>Monthly plans for this shop</p></div>
+  </div>
+  <div class="mk-plans">
+   <article class="mk-plancard is-featured {% if store.online_service_active %}is-on{% endif %}">
+    <span class="mk-tag">{% if store.online_service_active %}Your plan{% else %}Recommended{% endif %}</span>
+    <h3>Online Selling {% if store.online_service_active %}<span class="mk-badge mk-b-active">Active</span>{% elif store.pending_online %}<span class="mk-badge mk-b-warn">Payment pending</span>{% endif %}</h3>
+    <div class="mk-price">TSh {{ online_price|floatformat:0|intcomma }} <small>/ month</small></div>
+    <p>Everything you need to run a professional online shop.</p>
+    <ul>
+     <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg>Publish your shop with its own public link</li>
+     <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg>Add products, digital downloads and listings</li>
+     <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg>Receive and manage customer orders</li>
+    </ul>
+    {% if store.online_service_active %}
+     {% if store.active_online_until %}<span class="mk-until">Active until {{ store.active_online_until|date:'d M Y' }}</span>{% endif %}
+    {% else %}
+     <form method="post" action="{% url 'marketplace:seller_request_service' store.id %}">{% csrf_token %}<input type="hidden" name="service" value="ONLINE_SELLING"><button class="btn btn-primary" type="submit">{% if store.pending_online %}Continue to payment{% else %}Activate Online Selling{% endif %}</button></form>
+    {% endif %}
+   </article>
+
+   <article class="mk-plancard {% if store.order_sms_active %}is-on{% endif %}">
+    <h3>Seller order SMS {% if store.order_sms_active %}<span class="mk-badge mk-b-active">Active</span>{% elif store.pending_sms %}<span class="mk-badge mk-b-warn">Payment pending</span>{% endif %}</h3>
+    <div class="mk-price">TSh {{ sms_price|floatformat:0|intcomma }} <small>/ month</small></div>
+    <p>Get an SMS the moment a customer places an order.</p>
+    <ul>
+     <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg>Up to 500 order-alert SMS per month</li>
+     <li><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg>Customers are never charged for receipts or feedback messages</li>
+    </ul>
+    {% if store.order_sms_active %}
+     <span class="mk-until">Active until {{ store.active_sms_until|date:'d M Y' }}</span>
+    {% else %}
+     <form method="post" action="{% url 'marketplace:seller_request_service' store.id %}">{% csrf_token %}<input type="hidden" name="service" value="ORDER_SMS"><button class="btn btn-secondary" type="submit">{% if store.pending_sms %}Continue to SMS payment{% else %}Add SMS alerts{% endif %}</button></form>
+    {% endif %}
+   </article>
+  </div>
+ </section>
+ {% endfor %}
+
+ <section aria-labelledby="mk-history">
+  <div class="mk-block-h"><div><h2 id="mk-history">Billing history</h2><p>Every service request and its current status</p></div></div>
+  <div class="mk-panel">
+   {% for item in service_requests %}
+   <article class="mk-request">
+    <div style="min-width:0">
+     <h3>{{ item.get_service_display }} <span class="mk-badge mk-b-{{ item.status|lower }}" style="margin-left:.3rem">{{ item.get_status_display }}</span></h3>
+     <div class="mk-muted">{{ item.store.public_name }} · Request #{{ item.pk }} · {{ item.created_at|date:'d M Y, H:i' }} · TSh {{ item.amount|floatformat:0|intcomma }}</div>
+     {% if item.admin_note %}<p class="mk-muted" style="margin:.4rem 0 0">Note from admin: {{ item.admin_note }}</p>{% endif %}
+    </div>
+    <div>
+     {% if item.status == 'AWAITING_PAYMENT' and item.subscription %}<a class="btn btn-primary btn-sm" href="{% url 'payments:marketplace_service_payment' item.subscription_id %}">Continue payment</a>{% endif %}
+    </div>
+   </article>
+   {% empty %}
+   <div class="mk-empty"><b>No billing activity yet</b>When you activate a plan, your payments and approvals are listed here.</div>
+   {% endfor %}
+  </div>
+ </section>
+</div>
+{% endblock %}

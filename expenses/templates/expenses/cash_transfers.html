@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Drawer & Mobile Money Transfers · SmartPOS{% endblock %}
+{% block content %}
+{% include "partials/_report_ui.html" %}
+<div class="rp">
+  <div class="rp-head">
+    <div>
+      <p class="rp-eyebrow">Cash control</p>
+      <h1 class="rp-title">Drawer &amp; Mobile Money Transfers</h1>
+      <p class="rp-sub">Every movement of money between the cash drawer and the mobile money account, with exact date, time and transaction reference.</p>
+    </div>
+    <div class="rp-actions">
+      <a class="btn btn-secondary" href="{% url 'expenses:cash' %}#cash-transfer">Record a transfer</a>
+      <a class="btn btn-primary" href="{% url 'expenses:cash_transfer_export' %}{% if querystring %}?{{ querystring }}{% endif %}">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M4 21h16"/></svg>
+        Download Excel{% if filtered %} (filtered){% endif %}</a>
+    </div>
+  </div>
+
+  <div class="rp-stats">
+    <div class="rp-stat"><span class="rp-ico slate"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h13l-3-3M17 17H4l3 3"/></svg></span><div><small>Transfers{% if filtered %} &middot; filtered{% endif %}</small><b>{{ totals.count|intcomma }}</b></div></div>
+    <div class="rp-stat"><span class="rp-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v12m0 0-4-4m4 4 4-4M5 20h14"/></svg></span><div><small>Mobile money &rarr; Drawer</small><b>TZS {{ totals.to_cash|floatformat:0|intcomma }}</b></div></div>
+    <div class="rp-stat"><span class="rp-ico amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V8m0 0-4 4m4-4 4 4M5 4h14"/></svg></span><div><small>Drawer &rarr; Mobile money</small><b>TZS {{ totals.to_mobile|floatformat:0|intcomma }}</b></div></div>
+  </div>
+
+  <div class="rp-panel">
+    <form method="get" class="rp-filters">
+      <div class="rp-chips" role="group" aria-label="Quick date range">
+        {% for c in quick %}<a class="rp-chip {% if c.active %}on{% endif %}" href="?from={{ c.from }}&to={{ c.to }}">{{ c.label }}</a>{% endfor %}
+      </div>
+      <div class="rp-fgrid">
+        <div class="wide"><label for="ct-q">Search</label><input id="ct-q" class="form-input" type="search" name="q" value="{{ f.q }}" placeholder="Transaction ID or reason"></div>
+        <div><label for="ct-from">From</label><input id="ct-from" class="form-input" type="date" name="from" value="{{ f.date_from|date:'Y-m-d' }}"></div>
+        <div><label for="ct-to">To</label><input id="ct-to" class="form-input" type="date" name="to" value="{{ f.date_to|date:'Y-m-d' }}"></div>
+        <div><label for="ct-dir">Direction</label>
+          <select id="ct-dir" class="form-input" name="direction"><option value="">All directions</option>
+            <option value="MOBILE_TO_CASH" {% if f.direction == 'MOBILE_TO_CASH' %}selected{% endif %}>Mobile &rarr; Drawer</option>
+            <option value="CASH_TO_MOBILE" {% if f.direction == 'CASH_TO_MOBILE' %}selected{% endif %}>Drawer &rarr; Mobile</option></select></div>
+        <div class="rp-fbtns"><button class="btn btn-primary" type="submit">Apply</button>{% if filtered %}<a class="btn btn-ghost" href="{% url 'expenses:cash_transfer_history' %}">Reset</a>{% endif %}</div>
+      </div>
+    </form>
+  </div>
+
+  <div class="rp-panel">
+    <div class="rp-panel-h"><h2>Transfer ledger</h2><span>Newest first &middot; {{ page_obj.paginator.count|intcomma }} record{{ page_obj.paginator.count|pluralize }}</span></div>
+    <div class="rp-scroll"><table class="rp-table">
+      <thead><tr><th>Date &amp; time</th><th>Direction</th><th class="rp-num">Amount</th><th>Transaction ID</th><th class="rp-hide-sm">Reason</th><th class="rp-hide-sm">Recorded by</th></tr></thead>
+      <tbody>
+      {% for t in page_obj %}
+        <tr>
+          <td><div class="rp-date">{{ t.created_at|date:"d M Y" }}</div><div class="rp-time">{{ t.created_at|time:"H:i:s" }}</div></td>
+          <td><span class="rp-pill {% if t.direction == 'MOBILE_TO_CASH' %}green{% else %}amber{% endif %}">{{ t.get_direction_display }}</span></td>
+          <td class="rp-num"><b>TZS {{ t.amount|floatformat:0|intcomma }}</b></td>
+          <td>{{ t.reference|default:"-" }}</td>
+          <td class="rp-hide-sm" style="color:var(--rp-mute)">{{ t.note|default:"-" }}</td>
+          <td class="rp-hide-sm">{{ t.created_by.get_full_name|default:t.created_by.username }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="6" style="padding:0"><div class="rp-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h13l-3-3M17 17H4l3 3"/></svg>No transfers {% if filtered %}match these filters{% else %}recorded yet{% endif %}.</div></td></tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+  </div>
+  {% include "partials/pagination.html" with page_obj=page_obj %}
+  <p class="rp-foot">Times are in East Africa Time. A wrong transfer is corrected by recording the opposite transfer, so the audit trail stays complete.</p>
+</div>
+{% endblock %}

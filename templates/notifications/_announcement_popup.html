@@ -1,0 +1,212 @@
+{# Login announcement pop-up: centred, dismissible, keyboard accessible. Data: notifications:api_announcement_popup #}
+<style>
+.annpop-root{position:fixed;inset:0;z-index:2147482600;display:none;align-items:center;justify-content:center;padding:max(1rem,env(safe-area-inset-top)) 1rem max(1rem,env(safe-area-inset-bottom))}
+.annpop-root.is-open{display:flex}
+.annpop-backdrop{position:absolute;inset:0;background:var(--sp-overlay,rgba(15,23,42,.5));-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);opacity:0;transition:opacity .25s ease}
+.annpop-root.is-visible .annpop-backdrop{opacity:1}
+.annpop-card{--annpop-accent:var(--sp-accent,#0f766e);--annpop-soft:var(--sp-accent-soft,#ccfbf1);position:relative;width:min(100%,30rem);max-height:min(88vh,40rem);display:flex;flex-direction:column;background:var(--sp-surface,#fff);color:var(--sp-text,#172033);border:1px solid var(--sp-border,#e2e8f0);border-radius:1.25rem;box-shadow:0 30px 80px -20px rgba(15,23,42,.45),0 8px 24px rgba(15,23,42,.12);overflow:hidden;opacity:0;transform:translateY(14px) scale(.96);transition:opacity .25s ease,transform .3s cubic-bezier(.2,.9,.3,1.2)}
+.annpop-root.is-visible .annpop-card{opacity:1;transform:none}
+.annpop-card[data-level="SUCCESS"]{--annpop-accent:#15803d;--annpop-soft:#dcfce7}
+.annpop-card[data-level="WARNING"]{--annpop-accent:#b45309;--annpop-soft:#fef3c7}
+.annpop-card[data-level="DANGER"]{--annpop-accent:#b91c1c;--annpop-soft:#fee2e2}
+.annpop-bar{height:5px;background:linear-gradient(90deg,var(--annpop-accent),color-mix(in srgb,var(--annpop-accent) 40%,#fff))}
+.annpop-head{display:flex;gap:.875rem;align-items:flex-start;padding:1.25rem 3.25rem .5rem 1.375rem}
+.annpop-ico{flex:none;width:2.75rem;height:2.75rem;border-radius:.875rem;background:var(--annpop-soft);color:var(--annpop-accent);display:grid;place-items:center}
+.annpop-ico svg{width:1.4rem;height:1.4rem}
+.annpop-eyebrow{display:flex;align-items:center;gap:.5rem;font-size:.6875rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--annpop-accent)}
+.annpop-chip{font-size:.625rem;letter-spacing:.06em;padding:.1rem .45rem;border-radius:999px;background:var(--annpop-accent);color:#fff}
+.annpop-title{margin:.25rem 0 0;font-size:1.1875rem;line-height:1.3;font-weight:800;overflow-wrap:anywhere}
+.annpop-time{margin-top:.2rem;font-size:.75rem;color:var(--sp-muted,#64748b)}
+.annpop-x{position:absolute;top:.875rem;right:.875rem;width:2.25rem;height:2.25rem;border-radius:999px;border:0;background:transparent;color:var(--sp-muted,#64748b);cursor:pointer;display:grid;place-items:center;transition:background .15s,color .15s}
+.annpop-x:hover{background:var(--sp-surface-3,#eef3f8);color:var(--sp-text,#172033)}
+.annpop-x svg{width:1.125rem;height:1.125rem}
+.annpop-body{padding:.5rem 1.375rem 1rem;overflow-y:auto;font-size:.9375rem;line-height:1.6;white-space:pre-line;overflow-wrap:anywhere;color:var(--sp-text,#172033)}
+.annpop-linkrow{padding:0 1.375rem 1.125rem}
+.annpop-linkrow[hidden]{display:none}
+.annpop-link{display:flex;align-items:center;gap:.75rem;padding:.75rem .875rem;border-radius:.875rem;border:1px solid color-mix(in srgb,var(--annpop-accent) 35%,var(--sp-border,#e2e8f0));background:var(--annpop-soft);color:var(--sp-text,#172033);text-decoration:none;transition:transform .12s,box-shadow .15s}
+.annpop-link:hover{transform:translateY(-1px);box-shadow:0 6px 16px -8px var(--annpop-accent)}
+.annpop-link:focus-visible{outline:3px solid var(--sp-focus,rgba(13,148,136,.4));outline-offset:2px}
+.annpop-link-ico{flex:none;width:2.25rem;height:2.25rem;border-radius:.625rem;background:var(--sp-surface,#fff);color:var(--annpop-accent);display:grid;place-items:center}
+.annpop-link-ico svg{width:1.1rem;height:1.1rem}
+.annpop-link-text{min-width:0;display:flex;flex-direction:column}
+.annpop-link-text strong{font-size:.9rem;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.annpop-link-text small{font-size:.72rem;color:var(--sp-muted,#64748b);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.annpop-link-go{flex:none;margin-left:auto;width:1.1rem;height:1.1rem;color:var(--annpop-accent)}
+.annpop-foot{display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap;padding:.875rem 1.375rem 1.125rem;border-top:1px solid var(--sp-border,#e2e8f0);background:var(--sp-surface-2,#f8fafc)}
+.annpop-pager{display:flex;align-items:center;gap:.5rem;font-size:.75rem;color:var(--sp-muted,#64748b)}
+.annpop-pager[hidden]{display:none}
+.annpop-dots{display:flex;gap:.3rem}
+.annpop-dot{width:.4rem;height:.4rem;border-radius:999px;background:var(--sp-border,#cbd5e1);transition:width .2s,background .2s}
+.annpop-dot.is-on{width:1.1rem;background:var(--annpop-accent)}
+.annpop-nav{border:1px solid var(--sp-border,#e2e8f0);background:var(--sp-surface,#fff);color:inherit;border-radius:.5rem;width:1.75rem;height:1.75rem;cursor:pointer;line-height:1}
+.annpop-nav:disabled{opacity:.4;cursor:default}
+.annpop-actions{display:flex;gap:.5rem;margin-left:auto}
+.annpop-btn{font:inherit;font-size:.875rem;font-weight:700;border-radius:.75rem;padding:.6rem 1.1rem;cursor:pointer;border:1px solid var(--sp-border,#e2e8f0);background:var(--sp-surface,#fff);color:var(--sp-text,#172033);transition:background .15s,transform .05s}
+.annpop-btn:hover{background:var(--sp-surface-3,#eef3f8)}
+.annpop-btn:active{transform:scale(.98)}
+.annpop-btn--primary{background:var(--annpop-accent);border-color:var(--annpop-accent);color:#fff}
+.annpop-btn--primary:hover{background:var(--annpop-accent);filter:brightness(.93)}
+.annpop-btn:focus-visible,.annpop-x:focus-visible,.annpop-nav:focus-visible{outline:3px solid var(--sp-focus,rgba(13,148,136,.4));outline-offset:2px}
+@media (max-width:480px){.annpop-actions{width:100%}.annpop-actions .annpop-btn{flex:1}}
+@media (prefers-reduced-motion:reduce){.annpop-backdrop,.annpop-card{transition:none}}
+.annpop-card:focus{outline:none}
+body.annpop-lock{overflow:hidden}
+</style>
+
+<div id="annpop" class="annpop-root" role="presentation" aria-hidden="true">
+  <div class="annpop-backdrop" data-annpop-close></div>
+  <section class="annpop-card" role="dialog" aria-modal="true" aria-labelledby="annpop-title" aria-describedby="annpop-body" data-level="INFO" tabindex="-1">
+    <div class="annpop-bar"></div>
+    <button type="button" class="annpop-x" data-annpop-close aria-label="Close announcement">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+    </button>
+    <header class="annpop-head">
+      <span class="annpop-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg></span>
+      <div style="min-width:0">
+        <div class="annpop-eyebrow">Announcement <span class="annpop-chip">New</span></div>
+        <h2 class="annpop-title" id="annpop-title"></h2>
+        <div class="annpop-time" id="annpop-time"></div>
+      </div>
+    </header>
+    <div class="annpop-body" id="annpop-body"></div>
+    <div class="annpop-linkrow" id="annpop-linkrow" hidden>
+      <a class="annpop-link" id="annpop-link" href="#">
+        <span class="annpop-link-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07l1.5-1.5"/></svg></span>
+        <span class="annpop-link-text"><strong id="annpop-link-label"></strong><small id="annpop-link-host"></small></span>
+        <svg class="annpop-link-go" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+      </a>
+    </div>
+    <footer class="annpop-foot">
+      <div class="annpop-pager" id="annpop-pager" hidden>
+        <button type="button" class="annpop-nav" id="annpop-prev" aria-label="Previous announcement">&#8249;</button>
+        <span class="annpop-dots" id="annpop-dots" aria-hidden="true"></span>
+        <span id="annpop-count"></span>
+        <button type="button" class="annpop-nav" id="annpop-next" aria-label="Next announcement">&#8250;</button>
+      </div>
+      <div class="annpop-actions">
+        <button type="button" class="annpop-btn" data-annpop-close>Close</button>
+        <button type="button" class="annpop-btn annpop-btn--primary" id="annpop-ack">Got it</button>
+      </div>
+    </footer>
+  </section>
+</div>
+
+<script>
+(function(){
+  if (window.__annPopInit || window.top !== window.self) return;
+  window.__annPopInit = true;
+  var FEED = "{% url 'notifications:api_announcement_popup' %}";
+  var DISMISS = "{% url 'notifications:api_announcement_popup_dismiss' %}";
+  var root, card, items = [], idx = 0, lastFocus = null;
+
+  function token(){
+    var m = document.querySelector('meta[name="csrf-token"]');
+    if (m && m.content && m.content !== 'NOTPROVIDED') return m.content;
+    var i = document.querySelector('input[name="csrfmiddlewaretoken"]');
+    return i ? i.value : '';
+  }
+  function send(ids, markRead){
+    try {
+      return fetch(DISMISS, {method:'POST', credentials:'same-origin', keepalive:true,
+        headers:{'Content-Type':'application/json','X-CSRFToken':token(),'X-Requested-With':'XMLHttpRequest'},
+        body: JSON.stringify({ids: ids, mark_read: !!markRead})});
+    } catch(e){ return null; }
+  }
+  function $(id){ return document.getElementById(id); }
+
+  function render(){
+    var n = items[idx]; if (!n) return;
+    card.setAttribute('data-level', ['SUCCESS','WARNING','DANGER'].indexOf(n.level) > -1 ? n.level : 'INFO');
+    $('annpop-title').textContent = n.title || 'Announcement';
+    $('annpop-body').textContent = n.message || '';
+    $('annpop-body').scrollTop = 0;
+    $('annpop-time').textContent = n.created_at_display || '';
+    var row = $('annpop-linkrow'), a = $('annpop-link');
+    if (n.action_url) {
+      a.href = n.action_url;
+      if (n.action_external) { a.target = '_blank'; a.rel = 'noopener noreferrer'; } else { a.removeAttribute('target'); a.removeAttribute('rel'); }
+      $('annpop-link-label').textContent = n.action_label || 'Open link';
+      var host = n.action_url;
+      try { host = n.action_external ? new URL(n.action_url).hostname.replace(/^www\./, '') : 'Inside SmartPOS'; } catch(e){}
+      $('annpop-link-host').textContent = host;
+      row.hidden = false;
+    } else { row.hidden = true; a.removeAttribute('href'); }
+    var many = items.length > 1;
+    $('annpop-pager').hidden = !many;
+    if (many){
+      $('annpop-count').textContent = (idx + 1) + ' of ' + items.length;
+      var dots = $('annpop-dots'); dots.textContent = '';
+      items.forEach(function(_, i){ var d = document.createElement('span'); d.className = 'annpop-dot' + (i === idx ? ' is-on' : ''); dots.appendChild(d); });
+      $('annpop-prev').disabled = idx === 0;
+      $('annpop-next').disabled = idx === items.length - 1;
+    }
+  }
+
+  function open(){
+    lastFocus = document.activeElement;
+    root.classList.add('is-open'); root.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('annpop-lock');
+    render();
+    requestAnimationFrame(function(){ root.classList.add('is-visible'); card.focus({preventScroll:true}); });
+    document.addEventListener('keydown', onKey, true);
+  }
+  function hide(){
+    root.classList.remove('is-visible');
+    document.removeEventListener('keydown', onKey, true);
+    setTimeout(function(){
+      root.classList.remove('is-open'); root.setAttribute('aria-hidden', 'true');
+      document.body.classList.remove('annpop-lock');
+      if (lastFocus && lastFocus.focus) { try { lastFocus.focus({preventScroll:true}); } catch(e){} }
+    }, 220);
+  }
+  // Close / X / Esc / backdrop: hide for this sign-in, keep unread in the bell.
+  function closeAll(){
+    send(items.map(function(n){ return n.id; }), false);
+    items = []; hide();
+  }
+  // Got it: mark this one read, then show the next or finish.
+  function acknowledge(){
+    var n = items[idx]; if (!n) return;
+    send([n.id], true);
+    items.splice(idx, 1);
+    if (!items.length) { hide(); return; }
+    if (idx >= items.length) idx = items.length - 1;
+    render();
+  }
+  function onKey(e){
+    if (e.key === 'Escape'){ e.preventDefault(); e.stopPropagation(); closeAll(); return; }
+    if (e.key === 'ArrowRight' && idx < items.length - 1){ idx++; render(); return; }
+    if (e.key === 'ArrowLeft' && idx > 0){ idx--; render(); return; }
+    if (e.key !== 'Tab') return;
+    var f = card.querySelectorAll('button:not([disabled])'); if (!f.length) return;
+    var first = f[0], last = f[f.length - 1];
+    if (e.shiftKey && (document.activeElement === first || document.activeElement === card)){ e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last){ e.preventDefault(); first.focus(); }
+  }
+
+  function init(){
+    root = $('annpop'); if (!root) return;
+    card = root.querySelector('.annpop-card');
+    root.querySelectorAll('[data-annpop-close]').forEach(function(el){ el.addEventListener('click', closeAll); });
+    $('annpop-ack').addEventListener('click', acknowledge);
+    $('annpop-link').addEventListener('click', function(){
+      var n = items[idx]; if (!n) return;
+      send([n.id], true);          // opening the link means it was read
+      if (!n.action_external) return;   // in-app: page navigates away
+      items.splice(idx, 1);              // external: opens in a new tab, move on
+      if (!items.length) hide(); else { if (idx >= items.length) idx = items.length - 1; render(); }
+    });
+    $('annpop-prev').addEventListener('click', function(){ if (idx > 0){ idx--; render(); } });
+    $('annpop-next').addEventListener('click', function(){ if (idx < items.length - 1){ idx++; render(); } });
+    fetch(FEED, {credentials:'same-origin', headers:{'X-Requested-With':'XMLHttpRequest','Accept':'application/json'}})
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(d){
+        if (!d || !d.announcements || !d.announcements.length) return;
+        items = d.announcements; idx = 0;
+        setTimeout(open, 500);
+      })
+      .catch(function(){});
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, {once:true}); else init();
+})();
+</script>

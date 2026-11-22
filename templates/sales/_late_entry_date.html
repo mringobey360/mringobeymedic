@@ -1,0 +1,4 @@
+{# Shared by Sales History and Needs Review: one consistent, compact late-entry block. #}
+<div class="font-medium">{{ sale.business_date|date:"D, d M Y" }}</div>
+<div class="mt-1"><span class="badge bg-violet-50 text-violet-700">Late entry</span></div>
+<div class="mt-1 text-[11px] leading-snug text-ink-500">Entered {{ sale.created_at|date:"d M Y, H:i" }}{% if sale.late_entry_reason_label %}<br>{{ sale.late_entry_reason_label }}{% endif %}{% if sale.late_entry_note %}<br>{{ sale.late_entry_note }}{% endif %}</div>

@@ -1,0 +1,37 @@
+<style>
+/* Shared, responsive layout for the batch add/edit forms (standalone page and workspace pop-up). */
+.bf{width:100%;max-width:880px;margin:0 auto;box-sizing:border-box}
+.bf *,.bf *::before,.bf *::after{box-sizing:border-box}
+.bf-head{margin-bottom:12px}
+.bf-title{font-size:clamp(17px,2.4vw,22px);font-weight:700;line-height:1.25;color:#0f172a;letter-spacing:-.01em;margin:0;overflow-wrap:anywhere}
+.bf-title small{display:block;font-size:12px;font-weight:600;color:#059669;letter-spacing:.04em;text-transform:uppercase;margin-bottom:2px}
+.bf-lead{font-size:13px;line-height:1.5;color:#64748b;margin:6px 0 0}
+.bf-notice{font-size:12px;line-height:1.45;border-radius:10px;padding:8px 12px;margin:0 0 12px;border:1px solid #e2e8f0;background:#f8fafc;color:#64748b}
+.bf-notice.is-warn{border-color:#fde68a;background:#fffbeb;color:#92400e}
+.bf-form{background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:14px}
+.bf-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 16px;align-items:start}
+.bf-field{min-width:0}
+.bf-field.is-wide{grid-column:1/-1}
+.bf-field label{display:block;font-size:13px;font-weight:600;color:#1e293b;margin-bottom:5px;line-height:1.3}
+.bf-field .form-input,.bf-field input,.bf-field select,.bf-field textarea{width:100%;max-width:100%;min-width:0}
+.bf-help{font-size:11.5px;line-height:1.4;color:#94a3b8;margin:4px 0 0}
+.bf-error{font-size:12px;line-height:1.4;color:#dc2626;margin:4px 0 0;font-weight:500}
+.bf-field.has-error input,.bf-field.has-error select{border-color:#f87171}
+.bf-preview{border:1px solid #d1fae5;background:#f0fdf4;border-radius:12px;padding:10px 12px;font-size:13px}
+.bf-preview b{display:block;color:#065f46;font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+.bf-preview span{display:block;color:#475569;margin-top:2px;overflow-wrap:anywhere}
+.bf-actions{display:flex;gap:10px;justify-content:flex-end;position:sticky;bottom:0;background:linear-gradient(to top,#fff 78%,rgba(255,255,255,0));padding:12px 0 calc(2px + env(safe-area-inset-bottom,0px));margin-top:2px}
+.bf-actions .btn{min-height:42px;justify-content:center}
+.bf-actions .btn-primary{min-width:140px}
+@media(max-width:640px){
+  .bf-form{padding:14px 12px;border-radius:14px;gap:12px}
+  .bf-grid{grid-template-columns:minmax(0,1fr);gap:12px}
+  .bf-field input,.bf-field select,.bf-field textarea{font-size:16px} /* stops iOS zoom-on-focus */
+  .bf-actions{flex-direction:column-reverse}
+  .bf-actions .btn{width:100%}
+}
+body.sp-modal-frame #app-content{padding:14px 16px 0!important}
+@media(max-width:640px){body.sp-modal-frame #app-content{padding:12px 10px 0!important}}
+body.sp-modal-frame .bf{max-width:none}
+@media(prefers-reduced-motion:reduce){.bf *{transition:none!important}}
+</style>

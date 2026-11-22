@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+{% block title %}Invite &amp; Earn · SmartPOS{% endblock %}
+{% block extra_head %}
+<style data-spa-page-style="smartpos-referrals-v2">
+#referral-page{--rp-ink:#0f172a;--rp-muted:#64748b;--rp-line:#e2e8f0;--rp-teal:#0f766e;--rp-teal-dark:#064e48;max-width:1120px;margin:0 auto;color:var(--rp-ink)}
+#referral-page *{box-sizing:border-box}
+#referral-page .rp-hero{position:relative;overflow:hidden;display:grid;grid-template-columns:minmax(0,1.35fr) minmax(230px,.65fr);gap:24px;align-items:center;padding:clamp(22px,4vw,38px);border-radius:24px;background:radial-gradient(ellipse at 95% 0%,rgba(94,234,212,.25),transparent 38%),linear-gradient(130deg,#063b36,#0f766e 65%,#134e4a);color:#fff;box-shadow:0 18px 45px -30px rgba(15,118,110,.7)}
+#referral-page .rp-eyebrow{display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.09);border-radius:999px;padding:6px 11px;color:#ccfbf1;font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase}
+#referral-page .rp-hero h1{margin:15px 0 0;color:#fff;font-size:clamp(27px,4vw,40px);font-weight:850;letter-spacing:-.04em;line-height:1.08}
+#referral-page .rp-hero p{max-width:610px;margin:12px 0 0;color:rgba(255,255,255,.78);font-size:14px;line-height:1.75}
+#referral-page .rp-reward{padding:20px;border-radius:18px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.09);backdrop-filter:blur(8px)}
+#referral-page .rp-reward small{display:block;color:#ccfbf1;font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase}
+#referral-page .rp-reward strong{display:block;margin:7px 0;font-size:clamp(30px,4vw,44px);line-height:1;font-weight:850;letter-spacing:-.04em;color:#fff}
+#referral-page .rp-reward span{font-size:12px;color:rgba(255,255,255,.75);line-height:1.5}
+#referral-page .rp-goal{margin-top:16px}#referral-page .rp-meter{height:12px;border-radius:999px;background:#e2e8f0;overflow:hidden;margin-top:12px}#referral-page .rp-meter i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#14b8a6,#0f766e);transition:width .9s cubic-bezier(.2,.8,.2,1)}#referral-page .rp-milestones{display:flex;justify-content:space-between;gap:10px;margin-top:9px;color:#64748b;font-size:11.5px;font-weight:650}
+#referral-page .rp-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:16px 0}
+#referral-page .rp-stat,#referral-page .rp-panel{background:var(--surface,#fff);border:1px solid var(--rp-line);border-radius:17px;padding:18px;min-width:0;box-shadow:0 4px 16px -14px rgba(15,23,42,.3)}
+#referral-page .rp-stat-label{font-size:12px;color:var(--rp-muted);font-weight:650;line-height:1.45}
+#referral-page .rp-stat-value{font-size:clamp(24px,3vw,31px);font-weight:850;letter-spacing:-.035em;line-height:1.1;margin-top:9px;color:var(--rp-ink);font-variant-numeric:tabular-nums}
+#referral-page .rp-layout{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(260px,.85fr);gap:16px;align-items:start}
+#referral-page .rp-panel h2{margin:0;color:var(--rp-ink);font-size:16px;font-weight:800;letter-spacing:-.02em}
+#referral-page .rp-sub{margin:6px 0 0;color:var(--rp-muted);font-size:12.5px;line-height:1.65}
+#referral-page .rp-code{display:inline-flex;align-items:center;margin-top:15px;padding:9px 13px;border-radius:10px;background:#f0fdfa;border:1px dashed #5eead4;color:#115e59;font:800 21px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.12em;max-width:100%;overflow-wrap:anywhere}
+#referral-page .rp-label{display:block;margin:17px 0 7px;color:#475569;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+#referral-page .rp-link-row{display:flex;gap:8px;min-width:0}
+#referral-page .rp-link{display:block;min-width:0;flex:1;width:100%;height:44px;border:1px solid #cbd5e1;border-radius:11px;background:#f8fafc;color:#334155;padding:0 12px;font-size:12px;outline:none}
+#referral-page .rp-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:42px;border:1px solid transparent;border-radius:11px;padding:0 14px;font-size:12.5px;font-weight:800;cursor:pointer;text-decoration:none;transition:transform .15s,background .15s,border-color .15s;white-space:nowrap}
+#referral-page .rp-btn:active{transform:translateY(1px)}#referral-page .rp-btn:focus-visible{outline:3px solid #99f6e4;outline-offset:2px}
+#referral-page .rp-btn-primary{background:#0f766e;color:#fff;box-shadow:0 6px 14px -9px rgba(15,118,110,.9)}#referral-page .rp-btn-primary:hover{background:#115e59}
+#referral-page .rp-btn-soft{background:#fff;color:#334155;border-color:#cbd5e1}#referral-page .rp-btn-soft:hover{background:#f8fafc}
+#referral-page .rp-btn-whatsapp{background:#e8fff2;border-color:#bbf7d0;color:#166534}
+#referral-page .rp-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+#referral-page .rp-note{display:flex;gap:10px;margin-top:15px;padding:12px;border-radius:12px;background:#f8fafc;color:#475569;font-size:12px;line-height:1.65}
+#referral-page .rp-steps{display:grid;gap:14px;margin-top:16px}
+#referral-page .rp-step{display:flex;gap:11px;align-items:flex-start}
+#referral-page .rp-step-num{display:flex;flex:none;align-items:center;justify-content:center;width:29px;height:29px;border-radius:9px;background:#ccfbf1;color:#115e59;font-size:12px;font-weight:850}
+#referral-page .rp-step strong{display:block;color:var(--rp-ink);font-size:12.5px;font-weight:800}
+#referral-page .rp-step span{display:block;margin-top:3px;color:var(--rp-muted);font-size:12px;line-height:1.55}
+#referral-page .rp-table-wrap{margin-top:16px;overflow-x:auto}
+#referral-page .rp-table{width:100%;border-collapse:collapse;font-size:12.5px;min-width:520px}
+#referral-page .rp-table th{padding:11px 12px;text-align:left;color:#64748b;font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;border-bottom:1px solid #e2e8f0;background:#f8fafc}
+#referral-page .rp-table td{padding:13px 12px;border-bottom:1px solid #f1f5f9;color:#334155;vertical-align:middle}
+#referral-page .rp-table tr:last-child td{border-bottom:0}
+#referral-page .rp-status{display:inline-flex;align-items:center;border-radius:999px;padding:5px 9px;font-size:10.5px;font-weight:800;background:#f1f5f9;color:#475569}
+#referral-page .rp-status[data-status="QUALIFIED"]{background:#d1fae5;color:#065f46}#referral-page .rp-status[data-status="USED"]{background:#dbeafe;color:#1d4ed8}#referral-page .rp-status[data-status="VOID"]{background:#fee2e2;color:#991b1b}
+#referral-page .rp-empty{padding:28px 14px;text-align:center;color:#64748b}
+#referral-page .rp-empty-icon{display:flex;align-items:center;justify-content:center;width:42px;height:42px;margin:0 auto 10px;border-radius:13px;background:#f0fdfa;color:#0f766e;font-size:20px}
+#referral-page .rp-flash{min-height:17px;margin-top:7px;font-size:12px;color:#047857;font-weight:700}
+@media(max-width:760px){#referral-page .rp-hero{grid-template-columns:1fr;gap:18px;border-radius:19px}#referral-page .rp-reward{display:flex;align-items:center;justify-content:space-between;gap:16px}#referral-page .rp-reward strong{font-size:32px}#referral-page .rp-stats{gap:8px}#referral-page .rp-stat{padding:13px}#referral-page .rp-layout{grid-template-columns:1fr}}
+@media(max-width:480px){#referral-page .rp-stats{grid-template-columns:1fr 1fr}#referral-page .rp-stat:last-child{grid-column:1/-1}#referral-page .rp-link-row{flex-direction:column}#referral-page .rp-link{flex:auto;width:100%}#referral-page .rp-link-row .rp-btn{width:100%}#referral-page .rp-actions{display:grid;grid-template-columns:1fr}#referral-page .rp-actions .rp-btn{width:100%}#referral-page .rp-panel{padding:15px}}
+@media(prefers-reduced-motion:reduce){#referral-page .rp-btn{transition:none}}
+</style>
+{% endblock %}
+{% block content %}
+<div id="referral-page" class="space-y-4">
+  {% if not enabled %}
+  <section class="rp-panel text-center" style="padding:clamp(28px,5vw,54px)">
+    <div class="rp-empty-icon" style="width:54px;height:54px;font-size:25px">↗</div>
+    <h1 class="text-xl font-extrabold">Invite &amp; Earn</h1>
+    <p class="rp-sub" style="max-width:480px;margin:8px auto 0">The SmartPOS referral programme is temporarily unavailable. Please check again later.</p>
+  </section>
+  {% else %}
+  <section class="rp-hero">
+    <div>
+      <span class="rp-eyebrow"><span aria-hidden="true">✦</span> SmartPOS rewards</span>
+      <h1>Invite {{ target_invites }} businesses.<br>Get {{ max_percent }}% off.</h1>
+      <p>Every business you invite that joins SmartPOS and pays earns you {{ percent_per_invite }}% off your next renewal. Invite {{ target_invites }} paying businesses and your discount reaches the full {{ max_percent }}% of what you pay.</p>
+    </div>
+    <div class="rp-reward">
+      <div><small>Reward per paid referral</small><strong>{{ percent_per_invite }}% off</strong><span>Earned for each eligible business that pays.</span></div>
+      <div aria-hidden="true" style="font-size:36px;line-height:1">🎁</div>
+    </div>
+  </section>
+
+  <section class="rp-panel rp-goal" aria-label="Progress to full discount">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap"><h2>Your progress</h2><span class="rp-sub" style="margin:0"><strong id="rp-goal-count">{% if qualified_total > target_invites %}{{ target_invites }}{% else %}{{ qualified_total }}{% endif %}</strong> of {{ target_invites }} paying invites &middot; <strong>{{ available_percent }}%</strong> of {{ max_percent }}% unlocked</span></div>
+    <div class="rp-meter" role="progressbar" aria-valuemin="0" aria-valuemax="{{ target_invites }}" aria-valuenow="{{ qualified_total }}"><i style="width:{% widthratio available_percent max_percent 100 %}%"></i></div>
+    <div class="rp-milestones"><span>Each paying invite adds {{ percent_per_invite }}%</span><span>{{ target_invites }} invites = {{ max_percent }}% off</span></div>
+  </section>
+
+  <section class="rp-stats" aria-label="Referral summary">
+    <div class="rp-stat"><div class="rp-stat-label">Discount available</div><div class="rp-stat-value" style="color:#059669">{{ available_percent }}%</div><div class="rp-sub">Ready for your next renewal</div></div>
+    <div class="rp-stat"><div class="rp-stat-label">Paid referrals</div><div class="rp-stat-value">{{ paid_count }}</div><div class="rp-sub">Businesses that qualified</div></div>
+    <div class="rp-stat"><div class="rp-stat-label">Awaiting payment</div><div class="rp-stat-value">{{ pending_count }}</div><div class="rp-sub">Invitations still in progress</div></div>
+  </section>
+
+  <div class="rp-layout">
+    <section class="rp-panel" aria-labelledby="rp-invite-title">
+      <h2 id="rp-invite-title">Your invitation link</h2>
+      <p class="rp-sub">Your personal link is generated automatically. Share it directly so your referral can be attributed to your account.</p>
+      <div class="rp-code" aria-label="Your invite code">{{ code.code }}</div>
+      <span id="ref-code-data" data-code="{{ code.code|escape }}" hidden></span>
+      <label class="rp-label" for="ref-link">Personal invitation URL</label>
+      <div class="rp-link-row">
+        <input id="ref-link" class="rp-link" type="url" readonly value="{{ invite_url }}" aria-label="Personal invitation URL">
+        <button type="button" class="rp-btn rp-btn-primary" id="ref-copy-link"><span aria-hidden="true">▢</span> Copy link</button>
+      </div>
+      <div class="rp-flash" id="ref-feedback" role="status" aria-live="polite"></div>
+      <div class="rp-actions">
+        <button type="button" class="rp-btn rp-btn-soft" id="ref-copy-code">Copy invite code</button>
+        <a class="rp-btn rp-btn-whatsapp" id="ref-share-whatsapp" href="https://wa.me/" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">◉</span> Share on WhatsApp</a>
+        <button type="button" class="rp-btn rp-btn-soft" id="ref-share-native">Share invitation…</button>
+      </div>
+      <div class="rp-note"><span aria-hidden="true">ⓘ</span><span>Discounts are earned after the invited business completes a qualifying paid subscription. Free trials alone do not qualify. Your total discount is capped at {{ max_percent }}% of the amount you pay and is applied automatically to an eligible renewal.</span></div>
+    </section>
+
+    <aside class="rp-panel">
+      <h2>How it works</h2>
+      <p class="rp-sub">Three simple steps to earn renewal savings.</p>
+      <div class="rp-steps">
+        <div class="rp-step"><div class="rp-step-num">1</div><div><strong>Share your invitation</strong><span>Copy your unique link or send it directly through WhatsApp.</span></div></div>
+        <div class="rp-step"><div class="rp-step-num">2</div><div><strong>Your friend registers</strong><span>They open your link and complete the SmartPOS registration process.</span></div></div>
+        <div class="rp-step"><div class="rp-step-num">3</div><div><strong>Earn your discount</strong><span>After their qualifying payment, your reward becomes available for your next renewal.</span></div></div>
+      </div>
+      <a href="{% url 'hq:packages_center' %}" class="rp-btn rp-btn-soft" style="margin-top:20px;width:100%">View subscription &amp; packages <span aria-hidden="true">→</span></a>
+    </aside>
+  </div>
+
+  <section class="rp-panel">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
+      <div><h2>Referral activity</h2><p class="rp-sub">Track invitations and see when rewards become available.</p></div>
+      <span class="rp-status">{{ invited|length }} total invite{{ invited|length|pluralize }}</span>
+    </div>
+    <div class="rp-table-wrap">
+      <table class="rp-table">
+        <thead><tr><th>Business</th><th>Invitation date</th><th>Status</th><th style="text-align:right">Reward</th></tr></thead>
+        <tbody>
+          {% for r in invited %}
+          <tr>
+            <td><strong style="color:#0f172a">{{ r.signup.business_name|default:"New business" }}</strong></td>
+            <td>{{ r.created_at|date:"d M Y" }}</td>
+            <td><span class="rp-status" data-status="{{ r.status }}">{{ r.get_status_display }}</span></td>
+            <td style="text-align:right;font-weight:800;color:{% if r.reward_percent %}#047857{% else %}#64748b{% endif %}">{% if r.reward_percent %}{{ r.reward_percent }}%{% else %}—{% endif %}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="4"><div class="rp-empty"><div class="rp-empty-icon">↗</div><strong style="display:block;color:#334155">Your referral journey starts here</strong><span style="display:block;margin-top:5px">Share your invitation link to see businesses appear in this list.</span></div></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="rp-sub" style="margin-top:12px">Rewards are automatically applied to an eligible renewal through <a href="{% url 'hq:packages_center' %}" style="color:#0f766e;font-weight:800;text-decoration:underline">Subscription &amp; Packages</a>.</p>
+  </section>
+  {% endif %}
+</div>
+{% if enabled %}
+<script data-spa-page-script="smartpos-referrals-v2">
+(function(){
+  var root=document.getElementById('referral-page'); if(!root || root.dataset.referralReady==='1') return; root.dataset.referralReady='1';
+  var link=document.getElementById('ref-link'), feedback=document.getElementById('ref-feedback');
+  var codeNode=document.getElementById('ref-code-data');
+  var inviteCode=codeNode ? (codeNode.getAttribute('data-code')||'') : '';
+  var shareText='Join SmartPOS using my invitation link. When you register through this link, your referral will be tracked: '+(link?link.value:'');
+  var wa=document.getElementById('ref-share-whatsapp'); if(wa) wa.href='https://wa.me/?text='+encodeURIComponent(shareText);
+  function announce(msg){if(feedback){feedback.textContent=msg;}}
+  function fallbackCopy(value){var area=document.createElement('textarea');area.value=value;area.setAttribute('readonly','');area.style.position='fixed';area.style.opacity='0';document.body.appendChild(area);area.select();var ok=false;try{ok=document.execCommand('copy')}catch(e){}area.remove();return ok?Promise.resolve():Promise.reject();}
+  function copy(value,label){var operation=(navigator.clipboard&&window.isSecureContext)?navigator.clipboard.writeText(value):fallbackCopy(value);operation.then(function(){announce(label+' copied successfully.')}).catch(function(){announce('Copy was blocked. Please select and copy the text manually.');if(link){link.focus();link.select()}})}
+  var copyLink=document.getElementById('ref-copy-link'); if(copyLink)copyLink.addEventListener('click',function(){if(link)copy(link.value,'Invitation link')});
+  var copyCode=document.getElementById('ref-copy-code'); if(copyCode)copyCode.addEventListener('click',function(){copy(inviteCode,'Invite code')});
+  var nativeShare=document.getElementById('ref-share-native'); if(nativeShare)nativeShare.addEventListener('click',function(){if(navigator.share){navigator.share({title:'SmartPOS invitation',text:shareText,url:link?link.value:''}).then(function(){announce('Invitation shared.')}).catch(function(e){if(e&&e.name!=='AbortError')announce('Unable to open sharing on this device.')})}else{copy(shareText,'Invitation message')}});
+})();
+</script>
+{% endif %}
+{% endblock %}

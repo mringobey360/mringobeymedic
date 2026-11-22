@@ -1,0 +1,378 @@
+{% extends "base.html" %}
+{% block title %}Bulk Upload{% endblock %}
+{% block content %}
+<style data-spa-page-style="bulk-upload-v54-11">
+.bu{max-width:72rem}
+.bu-grid{display:grid;gap:10px;grid-template-columns:repeat(4,minmax(0,1fr))}
+.bu-stat{border:1px solid #e2e8f0;border-radius:14px;background:#fff;padding:12px 14px;min-width:0}
+.bu-stat b{display:block;font-size:24px;line-height:1.1;font-weight:800;color:#0f172a}
+.bu-stat span{font-size:12px;color:#64748b;font-weight:600}
+.bu-stat.ok{border-color:#a7f3d0;background:#f0fdf4}.bu-stat.ok b{color:#047857}
+.bu-stat.warn{border-color:#fde68a;background:#fffbeb}.bu-stat.warn b{color:#b45309}
+.bu-stat.bad{border-color:#fecaca;background:#fef2f2}.bu-stat.bad b{color:#b91c1c}
+.bu-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between}
+.bu-chips{display:flex;flex-wrap:wrap;gap:6px}
+.bu-chip{border:1px solid #cbd5e1;background:#fff;border-radius:999px;padding:6px 12px;font-size:12.5px;font-weight:700;color:#334155;cursor:pointer}
+.bu-chip[aria-pressed="true"]{background:#0f766e;border-color:#0f766e;color:#fff}
+.bu-tools{display:flex;flex-wrap:wrap;gap:6px}
+.bu-link{border:0;background:none;color:#0f766e;font-weight:700;font-size:12.5px;cursor:pointer;padding:6px 4px;text-decoration:underline}
+.bu-wrap{border:1px solid #e2e8f0;border-radius:14px;background:#fff;overflow:auto;max-height:68vh}
+.bu-table{width:100%;border-collapse:separate;border-spacing:0;font-size:13px;min-width:720px}
+.bu-table th{position:sticky;top:0;z-index:2;background:#f8fafc;text-align:left;padding:9px 10px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#64748b;border-bottom:1px solid #e2e8f0;white-space:nowrap}
+.bu-table td{padding:9px 10px;border-bottom:1px solid #f1f5f9;vertical-align:top}
+.bu-table tr.bu-r.is-error td{background:#fef2f2}
+.bu-table tr.bu-r.is-warning td{background:#fffbeb}
+.bu-table tr.bu-r.is-off td{opacity:.55}
+.bu-table tr.bu-m td{padding-top:0;border-bottom:1px solid #e2e8f0}
+.bu-table tr.is-error+.bu-m td{background:#fef2f2}.bu-table tr.is-warning+.bu-m td{background:#fffbeb}
+.bu-table tr.is-off+.bu-m td{opacity:.55}
+.bu-name{font-weight:700;color:#0f172a;overflow-wrap:anywhere}
+.bu-sub{font-size:11.5px;color:#64748b;overflow-wrap:anywhere}
+.bu-num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.bu-pill{display:inline-block;border-radius:999px;padding:2px 9px;font-size:11px;font-weight:800;white-space:nowrap}
+.bu-pill.ok{background:#d1fae5;color:#047857}.bu-pill.warning{background:#fef3c7;color:#b45309}.bu-pill.error{background:#fee2e2;color:#b91c1c}.bu-pill.skipped{background:#e2e8f0;color:#475569}
+.bu-table tr.bu-r.is-skipped td{opacity:.6}
+.bu-msg{font-size:12.5px;line-height:1.45;margin:2px 0 0;padding-left:18px;position:relative;overflow-wrap:anywhere}
+.bu-msg:before{content:"";position:absolute;left:4px;top:.5em;width:7px;height:7px;border-radius:50%}
+.bu-msg.e{color:#b91c1c}.bu-msg.e:before{background:#dc2626}
+.bu-msg.w{color:#92400e}.bu-msg.w:before{background:#f59e0b}
+.bu-check{width:18px;height:18px;accent-color:#0f766e}
+.bu-sticky{position:sticky;bottom:0;z-index:5;background:rgba(255,255,255,.97);backdrop-filter:blur(8px);border:1px solid #e2e8f0;border-radius:14px;padding:12px 14px;box-shadow:0 -8px 24px -18px rgba(15,23,42,.5);display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.bu-alert{border-radius:12px;padding:12px 14px;font-size:13.5px;border:1px solid}
+.bu-alert.err{background:#fef2f2;border-color:#fecaca;color:#991b1b}
+.bu-alert.info{background:#f0fdfa;border-color:#99f6e4;color:#115e59}
+.bu-steps{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 16px;padding:0;list-style:none;counter-reset:s}
+.bu-steps li{counter-increment:s;display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:#94a3b8}
+.bu-steps li:before{content:counter(s);display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:#e2e8f0;color:#475569;font-size:12px}
+.bu-steps li.on{color:#0f766e}.bu-steps li.on:before{background:#0f766e;color:#fff}
+.bu-steps li.done{color:#047857}.bu-steps li.done:before{content:"\2713";background:#10b981;color:#fff}
+details.bu-help summary{cursor:pointer;font-weight:700;color:#0f172a}
+@media(max-width:700px){
+  .bu-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .bu-bar,.bu-sticky{align-items:stretch}
+  .bu-sticky .btn,.bu-tools .btn{flex:1 1 100%;justify-content:center}
+  .bu-hide-sm{display:none}
+  .bu-table{min-width:0}
+  .bu-table th.bu-hide-sm,.bu-table td.bu-hide-sm{display:none}
+}
+</style>
+
+<div class="bu">
+    <h1 class="text-2xl font-bold text-ink-900 tracking-tight mb-1">Bulk Upload Products</h1>
+    <p class="text-sm text-ink-500 mb-4">
+        Upload an Excel file, review a clean preview, untick any row you do not want, and import only what is correct. Rows with problems are never imported - download them, fix them and upload again.
+    </p>
+
+    <ol class="bu-steps" aria-label="Progress">
+        <li class="{% if preview or results %}done{% else %}on{% endif %}">Upload file</li>
+        <li class="{% if results %}done{% elif preview %}on{% endif %}">Review &amp; select</li>
+        <li class="{% if results %}on{% endif %}">Imported</li>
+    </ol>
+
+    {% if file_errors %}
+    <div class="bu-alert err mb-4" role="alert">
+        <strong>The file could not be checked.</strong>
+        <ul style="margin:6px 0 0 18px;list-style:disc">{% for e in file_errors %}<li>{{ e }}</li>{% endfor %}</ul>
+    </div>
+    {% endif %}
+
+    {# ======================================================= STEP 3: DONE #}
+    {% if results %}
+    <div class="card mb-5">
+        <h2 class="font-semibold mb-1">{% if results.committed %}Import complete{% else %}Import was not saved{% endif %}</h2>
+        {% if results.reference %}<p class="text-xs text-ink-500 mb-3">Reference: <strong>{{ results.reference }}</strong> &middot; Mode: <strong>{{ results.mode }}</strong></p>{% endif %}
+        <div class="bu-grid mb-3">
+            <div class="bu-stat ok"><b>{{ imported_count }}</b><span>rows imported</span></div>
+            <div class="bu-stat"><b>{{ results.new_products }}</b><span>new products</span></div>
+            <div class="bu-stat"><b>{{ results.new_batches }}</b><span>new batches</span></div>
+            <div class="bu-stat {% if left_out %}warn{% endif %}"><b>{{ left_out|length }}</b><span>rows not imported</span></div>
+            {% if skipped_count %}<div class="bu-stat"><b>{{ skipped_count }}</b><span>unchanged rows ignored</span></div>{% endif %}
+        </div>
+        {% if results.committed and results.import_pk %}
+        <div class="flex flex-wrap gap-2 mb-3">
+            <a class="btn btn-primary" href="{% url 'inventory:restock_history_export' %}?import={{ results.import_pk }}">Download batches added (Excel)</a>
+            <a class="btn btn-secondary" href="{% url 'inventory:restock_history' %}?import={{ results.import_pk }}">View in Restock History</a>
+        </div>
+        {% endif %}
+        {% if results.errors %}
+        <div class="bu-alert err mb-3" role="alert">{% for err in results.errors %}<p>{{ err.message }}</p>{% endfor %}</div>
+        {% endif %}
+        {% if left_out %}
+        <div class="bu-alert info mb-3">
+            {{ left_out|length }} row(s) were not imported. Download them in a ready-to-fix Excel: each row has a <strong>problems</strong> column explaining what to change, and the wrong cells are highlighted. Correct them and upload the file again - you will see a new preview first.
+        </div>
+        <form method="post" action="{% url 'inventory:bulk_upload_fix_template' %}" class="mb-3">
+            {% csrf_token %}<input type="hidden" name="token" value="{{ token }}">
+            {% for r in left_out_rows %}<input type="hidden" name="rows" value="{{ r }}">{% endfor %}
+            <button class="btn btn-primary" type="submit">Download template of rows not imported</button>
+        </form>
+        <div class="bu-wrap" style="max-height:40vh">
+            <table class="bu-table">
+                <thead><tr><th>Row</th><th>Product</th><th>Reason</th></tr></thead>
+                <tbody>
+                {% for x in left_out %}
+                <tr class="bu-r {% if x.status == 'error' %}is-error{% endif %}">
+                    <td>{{ x.row }}</td>
+                    <td><div class="bu-name">{{ x.name }}</div>{% for m in x.messages|slice:":3" %}<div class="bu-sub">{{ m }}</div>{% endfor %}</td>
+                    <td><span class="bu-pill {% if x.status == 'error' %}error{% else %}warning{% endif %}">{{ x.reason }}</span></td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+        <div class="mt-4 flex flex-wrap gap-2">
+            <a class="btn btn-primary" href="{% url 'inventory:product_list' %}">Go to products</a>
+            <a class="btn btn-secondary" href="{% url 'inventory:bulk_upload' %}">Upload another file</a>
+        </div>
+    </div>
+    {% endif %}
+
+    {# ======================================================= STEP 2: PREVIEW #}
+    {% if preview %}
+    {% with s=preview.summary %}
+    <div class="card mb-4">
+        <div class="bu-bar mb-3">
+            <div>
+                <h2 class="font-semibold">Review before importing</h2>
+                <p class="text-xs text-ink-500">{{ preview.file_name }} &middot; {{ preview.mode_label }} &middot; nothing is saved until you press Import.</p>
+            </div>
+            <a class="btn btn-secondary" href="{% url 'inventory:bulk_upload' %}">Cancel / upload a different file</a>
+        </div>
+        <div class="bu-grid mb-3">
+            <div class="bu-stat"><b>{{ s.total }}</b><span>rows in file</span></div>
+            <div class="bu-stat ok"><b>{{ s.ok }}</b><span>ready</span></div>
+            <div class="bu-stat warn"><b>{{ s.warning }}</b><span>need a quick look</span></div>
+            <div class="bu-stat bad"><b>{{ s.error }}</b><span>have errors (cannot import)</span></div>
+            {% if s.skipped %}<div class="bu-stat"><b>{{ s.skipped }}</b><span>unchanged (no quantity entered)</span></div>{% endif %}
+        </div>
+        {% if s.skipped %}<div class="bu-alert info" role="status"><strong>{{ s.skipped }} row(s) will be ignored</strong> because Purchase Quantity is empty. They stay exactly as they are - you do not need to delete them from the file. Only rows where you entered a quantity are imported as new batches.</div>{% endif %}
+        {% if s.error %}
+        <div class="bu-alert err" role="status">
+            <strong>{{ s.error }} row(s) cannot be imported yet</strong> (for example a selling price lower than the buying price, a missing value or a wrong date).
+            They are unticked and the reason is written under each row.
+            <ul style="margin:6px 0 0 18px;list-style:disc">
+                <li>Press <strong>Import selected rows</strong> to save the {{ s.ok|add:s.warning }} good row(s) now.</li>
+                <li>Press <strong>Download rows with errors</strong> to get an Excel with only the problem rows, correct them, and upload that file again.</li>
+            </ul>
+        </div>
+        {% elif s.warning %}
+        <div class="bu-alert info" role="status">No errors found. {{ s.warning }} row(s) have notes worth checking - you can untick any of them.</div>
+        {% else %}
+        <div class="bu-alert info" role="status">All rows passed validation.</div>
+        {% endif %}
+    </div>
+
+    <form method="post" action="{% url 'inventory:bulk_upload_confirm' %}" id="bu-form">
+        {% csrf_token %}
+        <input type="hidden" name="token" value="{{ preview.token }}">
+
+        <div class="bu-bar mb-2">
+            <div class="bu-chips" role="group" aria-label="Filter rows">
+                <button type="button" class="bu-chip" data-filter="all" aria-pressed="true">All ({{ s.total }})</button>
+                <button type="button" class="bu-chip" data-filter="ok" aria-pressed="false">Ready ({{ s.ok }})</button>
+                <button type="button" class="bu-chip" data-filter="warning" aria-pressed="false">Check ({{ s.warning }})</button>
+                <button type="button" class="bu-chip" data-filter="error" aria-pressed="false">Errors ({{ s.error }})</button>
+                {% if s.skipped %}<button type="button" class="bu-chip" data-filter="skipped" aria-pressed="false">Unchanged ({{ s.skipped }})</button>{% endif %}
+            </div>
+            <div class="bu-tools">
+                <button type="button" class="bu-link" id="bu-sel-ready">Select ready only</button>
+                <button type="button" class="bu-link" id="bu-sel-all">Select all valid</button>
+                <button type="button" class="bu-link" id="bu-sel-none">Deselect all</button>
+            </div>
+        </div>
+
+        <div class="bu-wrap mb-3">
+            <table class="bu-table">
+                <thead><tr>
+                    <th style="width:36px"><input type="checkbox" class="bu-check" id="bu-master" aria-label="Select all valid rows"></th>
+                    <th>Row</th><th>Product</th>
+                    <th class="bu-hide-sm">Quantity</th>
+                    <th class="bu-num bu-hide-sm">Cost / unit</th>
+                    <th class="bu-num bu-hide-sm">Price</th>
+                    <th class="bu-hide-sm">Expiry</th>
+                    <th>Result</th>
+                </tr></thead>
+                <tbody>
+                {% for r in preview.rows %}
+                <tr class="bu-r is-{{ r.status }}" data-status="{{ r.status }}" data-row="{{ r.row }}">
+                    <td>
+                        <input type="checkbox" class="bu-check bu-pick" name="rows" value="{{ r.row }}"
+                               {% if r.status == 'error' or r.status == 'skipped' %}disabled{% else %}checked{% endif %}
+                               aria-label="Import row {{ r.row }}">
+                    </td>
+                    <td>{{ r.row }}</td>
+                    <td>
+                        <div class="bu-name">{{ r.display.name }}</div>
+                        <div class="bu-sub">{% if r.display.sku %}SKU {{ r.display.sku }}{% endif %}{% if r.display.category %}{% if r.display.sku %} &middot; {% endif %}{{ r.display.category }}{% endif %}{% if r.display.batch %} &middot; Batch {{ r.display.batch }}{% endif %}</div>
+                    </td>
+                    <td class="bu-hide-sm">{{ r.display.qty|default:"-" }}</td>
+                    <td class="bu-num bu-hide-sm">{{ r.display.cost|default:"-" }}</td>
+                    <td class="bu-num bu-hide-sm">{{ r.display.price|default:"-" }}</td>
+                    <td class="bu-hide-sm">{{ r.display.expiry|default:"-" }}</td>
+                    <td>
+                        <span class="bu-pill {{ r.status }}">{% if r.status == 'error' %}Error{% elif r.status == 'warning' %}Check{% elif r.status == 'skipped' %}Unchanged{% else %}Ready{% endif %}</span>
+                        <div class="bu-sub" style="margin-top:3px">{{ r.action }}</div>
+                    </td>
+                </tr>
+                {% if r.errors or r.warnings %}
+                <tr class="bu-m" data-status="{{ r.status }}" data-row-for="{{ r.row }}">
+                    <td></td>
+                    <td colspan="7">
+                        {% for e in r.errors %}<p class="bu-msg e"><strong>{{ e.label }}:</strong> {{ e.message }}</p>{% endfor %}
+                        {% for w in r.warnings %}<p class="bu-msg w"><strong>{{ w.label }}:</strong> {{ w.message }}</p>{% endfor %}
+                    </td>
+                </tr>
+                {% endif %}
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="bu-sticky">
+            <div>
+                <strong id="bu-count">0</strong> <span class="text-sm text-ink-500">of {{ s.total }} rows selected to import</span>
+                <div class="bu-sub" id="bu-left">&nbsp;</div>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <button type="button" class="btn btn-secondary" id="bu-download">Download rows with errors &amp; deselected rows</button>
+                <button type="submit" class="btn btn-primary" id="bu-submit">Import selected rows</button>
+            </div>
+        </div>
+    </form>
+
+    <script>
+    (function () {
+        var form = document.getElementById('bu-form');
+        if (!form) return;
+        var picks = Array.prototype.slice.call(form.querySelectorAll('.bu-pick'));
+        var master = document.getElementById('bu-master');
+        var count = document.getElementById('bu-count');
+        var left = document.getElementById('bu-left');
+        var submit = document.getElementById('bu-submit');
+        var rows = Array.prototype.slice.call(form.querySelectorAll('tr[data-row]'));
+        var msgRows = Array.prototype.slice.call(form.querySelectorAll('tr[data-row-for]'));
+        var total = {{ s.total }} - {{ s.skipped|default:0 }};
+        var filter = 'all';
+
+        function refresh() {
+            var n = 0;
+            picks.forEach(function (p) {
+                if (p.checked) n++;
+                p.closest('tr').classList.toggle('is-off', !p.checked && !p.disabled);
+                var m = form.querySelector('tr[data-row-for="' + p.value + '"]');
+                if (m) m.classList.toggle('is-off', !p.checked);
+            });
+            count.textContent = n;
+            var notImported = total - n;
+            left.textContent = notImported ? (notImported + ' row(s) will be left out - download them to correct and upload again') : 'All rows will be imported';
+            submit.disabled = n === 0;
+            submit.textContent = n ? 'Import ' + n + ' selected row' + (n === 1 ? '' : 's') : 'Select rows to import';
+            master.checked = n > 0 && n === picks.length;
+            master.indeterminate = n > 0 && n < picks.length;
+        }
+        function setAll(test) { picks.forEach(function (p) { p.checked = test(p); }); refresh(); }
+        function applyFilter() {
+            rows.forEach(function (tr) { tr.style.display = (filter === 'all' || tr.dataset.status === filter) ? '' : 'none'; });
+            msgRows.forEach(function (tr) { tr.style.display = (filter === 'all' || tr.dataset.status === filter) ? '' : 'none'; });
+        }
+
+        picks.forEach(function (p) { p.addEventListener('change', refresh); });
+        master.addEventListener('change', function () { setAll(function () { return master.checked; }); });
+        document.getElementById('bu-sel-all').addEventListener('click', function () { setAll(function () { return true; }); });
+        document.getElementById('bu-sel-none').addEventListener('click', function () { setAll(function () { return false; }); });
+        document.getElementById('bu-sel-ready').addEventListener('click', function () {
+            setAll(function (p) { return p.closest('tr').dataset.status === 'ok'; });
+        });
+        Array.prototype.forEach.call(form.querySelectorAll('.bu-chip'), function (chip) {
+            chip.addEventListener('click', function () {
+                filter = chip.dataset.filter;
+                Array.prototype.forEach.call(form.querySelectorAll('.bu-chip'), function (c) { c.setAttribute('aria-pressed', c === chip ? 'true' : 'false'); });
+                applyFilter();
+            });
+        });
+
+        document.getElementById('bu-download').addEventListener('click', function () {
+            var f = document.createElement('form');
+            f.method = 'post';
+            f.action = "{% url 'inventory:bulk_upload_fix_template' %}";
+            f.style.display = 'none';
+            function add(n, v) { var i = document.createElement('input'); i.type = 'hidden'; i.name = n; i.value = v; f.appendChild(i); }
+            add('csrfmiddlewaretoken', form.querySelector('[name=csrfmiddlewaretoken]').value);
+            add('token', form.querySelector('[name=token]').value);
+            var any = false;
+            picks.forEach(function (p) { if (!p.checked) { add('rows', p.value); any = true; } });
+            if (!any) { alert('Every row is selected, so there is nothing to fix. Untick the rows you want to correct first.'); return; }
+            document.body.appendChild(f);
+            f.submit();
+            setTimeout(function () { document.body.removeChild(f); }, 1500);
+        });
+
+        form.addEventListener('submit', function (e) {
+            if (submit.disabled) { e.preventDefault(); return; }
+            submit.disabled = true;
+            submit.textContent = 'Importing...';
+        });
+        refresh();
+    })();
+    </script>
+    {% endwith %}
+    {% endif %}
+
+    {# ======================================================= STEP 1: UPLOAD #}
+    {% if not preview and not results %}
+    <div class="card mb-5">
+        <h2 class="font-semibold text-ink-900 mb-2">1. Get a template</h2>
+        <p class="text-sm text-ink-600 mb-3">The template has dropdowns for units, text formatting for barcodes/SKUs, and a guide sheet.</p>
+        <div class="flex flex-wrap gap-2 items-end">
+            <a href="{% url 'inventory:bulk_upload_template' %}" class="btn btn-secondary"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M4 21h16"/></svg> Opening stock / new products template</a>
+        </div>
+        <div class="mt-4 pt-4 border-t border-ink-100">
+            <p class="text-sm text-ink-600 mb-2"><strong>Purchase / Restock template</strong> - prefilled with your branch's current stock, SKU, barcode and suggested quantities. <strong>Purchase Quantity stays blank for you to enter.</strong></p>
+            <div class="flex flex-wrap gap-2 items-end">
+                <a href="{% url 'inventory:restock_template' %}" class="btn btn-primary">Download all products</a>
+                <a href="{% url 'inventory:restock_template' %}?low_stock=1" class="btn btn-secondary">Download low stock only</a>
+                <form method="get" action="{% url 'inventory:restock_template' %}" class="flex gap-2 items-end">
+                    <label class="text-sm"><span class="block text-xs text-ink-500 mb-1">Category</span><select name="category" class="form-input">
+                        <option value="">Choose category…</option>
+                        {% for category in categories %}<option value="{{ category.id }}">{{ category.name }}</option>{% endfor %}
+                    </select></label>
+                    <button class="btn btn-secondary" type="submit">Download category</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <form method="post" enctype="multipart/form-data" class="card space-y-4 mb-5">
+        {% csrf_token %}
+        <h2 class="font-semibold text-ink-900">2. Upload &amp; preview</h2>
+        <div>
+            <label class="block text-sm font-medium mb-1">{{ form.import_mode.label }}</label>
+            {{ form.import_mode }}
+            {% if form.import_mode.errors %}<p class="text-xs text-red-600 mt-1">{{ form.import_mode.errors.0 }}</p>{% endif %}
+        </div>
+        <div>
+            <label class="block text-sm font-medium mb-1">{{ form.excel_file.label }}</label>
+            {{ form.excel_file }}
+            {% if form.excel_file.errors %}<p class="text-xs text-red-600 mt-1">{{ form.excel_file.errors.0 }}</p>{% endif %}
+        </div>
+        <button type="submit" class="btn btn-primary">Check file &amp; show preview</button>
+        <p class="text-xs text-ink-500">Nothing is saved at this step.</p>
+    </form>
+
+    <div class="card mb-5">
+        <details class="bu-help">
+            <summary>How packaging, modes and validation work</summary>
+            <div class="text-sm text-ink-600 space-y-2 mt-3">
+                <p><strong>Packaging:</strong> for tablets bought in boxes of 100 - Purchase Unit = BOX, Units per Purchase Unit = 100, Purchase Quantity = 5, Purchase Price = 4200 (price of one box). The system stores <strong>500 tablets</strong> at <strong>TSh 42 each</strong>.</p>
+                <p><strong>Opening Stock:</strong> every upload creates new batches; it never adds to an old batch, even if the batch number is the same.</p>
+                <p><strong>Restock / Purchase:</strong> tops up a batch only when product, batch number, expiry, cost, price and packaging all match exactly; otherwise a new batch is created. Rows must match an existing product (SKU required).</p>
+                <p><strong>Automatic cleaning:</strong> extra spaces are removed, SKU is upper-cased, categories match existing ones regardless of case, units like "tablets" or "btl" are understood, prices like "TSh 4,200" are read correctly, and dates such as 31/01/2027 are converted.</p>
+                <p><strong>Checks:</strong> required fields, whole-number quantities, negative or absurd values, past expiry dates, duplicate rows, SKU/barcode clashes (in the file and in your catalog), barcodes damaged by Excel, selling below cost, near-duplicate product names and unit conflicts with existing stock.</p>
+                <p><strong>Expiry date</strong> is optional only for products that do not expire (requires_expiry = NO).</p>
+            </div>
+        </details>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

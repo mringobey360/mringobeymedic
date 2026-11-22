@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Remove Meal Override{% endblock %}
+{% block content %}
+<div class="max-w-lg mx-auto"><div class="card">
+<h1 class="text-xl font-bold mb-2">Remove Meal Override?</h1>
+<p class="text-sm text-ink-600 mb-5">This will restore the employee's normal weekly meal policy for <strong>{{ adjustment.date|date:"d M Y" }}</strong>.</p>
+<form method="post" class="flex gap-3">{% csrf_token %}<button class="btn btn-danger" type="submit">Yes, Remove Override</button><a class="btn btn-secondary" href="{% url 'accounts:employee_compensation' employee.pk %}">Cancel</a></form>
+</div></div>
+{% endblock %}

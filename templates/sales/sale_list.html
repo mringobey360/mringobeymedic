@@ -1,0 +1,627 @@
+{% extends "base.html" %}
+{% block title %}Sales History{% endblock %}
+{% block content %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
+    <h1 class="text-2xl font-bold text-ink-900 tracking-tight">Sales History</h1>
+    <a href="{% url 'sales:returns' %}" class="btn btn-secondary btn-nav text-sm" aria-label="Returns and Voids">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
+        <span>Returns &amp; Voids</span>
+    </a>
+</div>
+
+<form id="sales-history-filters" method="get" class="card mb-4 p-4 space-y-3" role="search" aria-label="Search sales history">
+    <div class="flex flex-col lg:flex-row gap-3 lg:items-end">
+        <div class="flex-1 min-w-0">
+            <label for="sales-history-q" class="form-label">Find a sale</label>
+            <div class="relative">
+                <input id="sales-history-q" name="q" type="search" value="{{ request.GET.q|default:'' }}" class="form-input w-full pr-10" placeholder="Product, sale #, customer, phone or who sold it…" autocomplete="off" />
+                <span class="absolute right-3 top-1/2 -translate-y-1/2 text-ink-400" aria-hidden="true">⌕</span>
+            </div>
+            <p class="text-xs text-ink-500 mt-1">Search updates automatically as you type.</p>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-2 gap-3 lg:w-[330px]">
+            <div><label for="sales-date-from" class="form-label">From date</label><input id="sales-date-from" name="date_from" type="date" value="{{ request.GET.date_from|default:'' }}" class="form-input w-full" /></div>
+            <div><label for="sales-date-to" class="form-label">To date</label><input id="sales-date-to" name="date_to" type="date" value="{{ request.GET.date_to|default:'' }}" class="form-input w-full" /></div>
+        </div>
+    </div>
+    <div class="flex flex-col sm:flex-row sm:items-end gap-3">
+        <div class="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div><label for="sales-payment" class="form-label">Payment method</label><select id="sales-payment" name="payment" class="form-input w-full"><option value="">All payment methods</option><option value="CASH" {% if request.GET.payment == 'CASH' %}selected{% endif %}>Cash</option><option value="MOBILE_MONEY" {% if request.GET.payment == 'MOBILE_MONEY' %}selected{% endif %}>Mobile Money</option><option value="DEBT" {% if request.GET.payment == 'DEBT' %}selected{% endif %}>Debt / Credit</option></select></div>
+            <div><label for="sales-status" class="form-label">Sale status</label><select id="sales-status" name="status" class="form-input w-full"><option value="">All statuses</option><option value="COMPLETED" {% if request.GET.status == 'COMPLETED' %}selected{% endif %}>Completed</option><option value="PARTIALLY_RETURNED" {% if request.GET.status == 'PARTIALLY_RETURNED' %}selected{% endif %}>Partly returned</option><option value="VOIDED" {% if request.GET.status == 'VOIDED' %}selected{% endif %}>Voided</option></select></div>
+            <div><label for="sales-employee" class="form-label">Sold by</label><select id="sales-employee" name="employee" class="form-input w-full"><option value="">Everyone</option><option value="me" {% if employee_id == 'me' %}selected{% endif %}>Me (my sales)</option>{% for u in sellers %}{% if not u.is_me %}<option value="{{ u.id }}" {% if employee_id == u.id|stringformat:"s" %}selected{% endif %}>{{ u.name }} · {{ u.role }}</option>{% endif %}{% endfor %}</select></div>
+            <div><label for="sales-entry" class="form-label">Entry type</label><select id="sales-entry" name="entry" class="form-input w-full"><option value="">All sales</option><option value="late" {% if request.GET.entry == 'late' %}selected{% endif %}>Late entries only</option></select></div>
+        </div>
+        <div class="flex gap-2"><button type="submit" class="btn btn-primary">Search</button><a href="{% url 'sales:sale_list' %}" class="btn btn-secondary" id="sales-history-clear">Clear</a></div>
+    </div>
+    <div class="text-xs text-ink-500" aria-live="polite">Dates use the sale’s business date. Late entries are filed under the day the sale really happened.</div>
+</form>
+
+{% if has_filters %}
+<div class="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border border-brand-100 bg-brand-50/60 px-4 py-2.5 text-sm text-brand-900" role="status">
+    <span class="font-semibold">{{ history_summary.count }} sale{{ history_summary.count|pluralize }}</span>
+    <span>TZS {{ history_summary.total|floatformat:0 }}</span>
+    {% if selected_seller %}<span class="text-brand-800">Sold by <strong>{{ selected_seller.name }}</strong></span>{% endif %}
+    <a href="{% url 'sales:sale_list' %}" class="ml-auto text-xs font-semibold text-brand-700 underline">Clear filters</a>
+</div>
+{% endif %}
+
+<div class="card overflow-x-auto">
+    <table class="w-full text-sm">
+        <thead>
+            <tr class="text-left text-ink-500 border-b border-ink-100">
+                <th class="py-2 pr-4">Sale #</th>
+                <th class="py-2 pr-4">Date/Time</th>
+                <th class="py-2 pr-4">Served By</th>
+                <th class="py-2 pr-4">Items</th>
+                <th class="py-2 pr-4">Payment</th>
+                <th class="py-2 pr-4 text-right">Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for sale in page_obj %}
+            <tr class="border-b border-ink-100 align-top">
+                <td class="py-3 pr-4 font-medium">#{{ sale.sale_number|default:sale.id }}
+                    {% if sale.status == 'VOIDED' %}<div><span class="badge bg-red-100 text-red-700">Voided</span></div>
+                    {% elif sale.status == 'PARTIALLY_RETURNED' %}<div><span class="badge bg-amber-100 text-amber-700">Partly returned</span></div>{% endif %}
+                    {% if sale.has_pending_return %}<div class="mt-1"><span class="badge bg-blue-100 text-blue-700">Return pending</span></div>{% endif %}
+                </td>
+                <td class="py-3 pr-4">{% if sale.is_late_entry %}{% include 'sales/_late_entry_date.html' %}{% else %}{{ sale.created_at|date:"d M Y, H:i" }}{% endif %}{% if sale.customer_contact %}<div class="text-xs text-ink-500 mt-1"><span class="font-medium">{{ sale.customer_contact.name }}</span>{% if sale.customer_contact.phone %} · {{ sale.customer_contact.phone }}{% endif %}</div>{% elif sale.customer_name %}<div class="text-xs text-ink-500 mt-1"><span class="font-medium">{{ sale.customer_name }}</span>{% if sale.customer_phone %} · {{ sale.customer_phone }}{% endif %}</div>{% endif %}</td>
+                <td class="py-3 pr-4">
+                    <a href="?{% for k, v in request.GET.items %}{% if k != 'employee' and k != 'page' %}{{ k }}={{ v|urlencode }}&amp;{% endif %}{% endfor %}employee={% if sale.seller_is_me %}me{% else %}{{ sale.served_by_id }}{% endif %}" class="font-medium text-ink-900 hover:text-brand-700" title="Show everything {{ sale.seller_name }} sold">{{ sale.seller_name }}</a>
+                    <div class="mt-1 flex flex-wrap items-center gap-1">
+                        <span class="badge {% if sale.seller_role_key == 'owner' %}bg-amber-100 text-amber-800{% elif sale.seller_role_key == 'manager' %}bg-blue-100 text-blue-800{% else %}bg-slate-100 text-slate-600{% endif %}">{{ sale.seller_role_label }}</span>
+                        {% if sale.seller_is_me %}<span class="badge bg-brand-100 text-brand-800">You</span>{% endif %}
+                    </div>
+                </td>
+                <td class="py-3 pr-4">
+                    {% for item in sale.items.all %}
+                        <div class="text-xs">
+                            <span class="{% if item.quantity == 0 %}line-through text-ink-400{% endif %}">{{ item.product.name }} x{% if item.quantity == 0 %}{{ item.returned_quantity }}{% else %}{{ item.quantity }}{% endif %}</span>
+                            {% if item.returned_quantity and item.quantity %}<span class="text-red-600">({{ item.returned_quantity }} returned)</span>{% endif %}
+                            {% if item.quantity == 0 %}<span class="text-red-600">(returned)</span>{% endif %}
+                        </div>
+                    {% endfor %}
+                </td>
+                <td class="py-3 pr-4">
+                    <span class="badge {% if sale.payment_method == 'DEBT' %}bg-amber-100 text-amber-700{% else %}bg-green-100 text-green-700{% endif %}">
+                        {{ sale.payment_summary }}
+                    </span>
+                </td>
+                <td class="py-3 pr-4 text-right font-medium">
+                    TZS {{ sale.total_amount|floatformat:0 }}
+                    {% if sale.returned_total > 0 %}<div class="text-[11px] font-normal text-ink-400">was TZS {{ sale.original_total|floatformat:0 }}</div>{% endif %}
+                    {% if sale.payment_method == 'DEBT' %}<div class="text-[11px] font-normal text-ink-500">Paid now TZS {{ sale.paid_at_sale|floatformat:0 }} · Credit TZS {{ sale.credit_amount|floatformat:0 }}{% if sale.debt %} · <a class="underline" href="{% url 'sales:debt_detail' sale.debt.pk %}">Trace</a>{% endif %}</div>{% endif %}
+                    <div class="row-actions">
+                        <a target="_blank" rel="noopener" href="{% url 'sales:receipt_pdf' sale.pk %}" class="row-action">Download Receipt (PDF)</a>
+                        {% if sale.can_request_return and not sale.has_pending_return %}
+                        <button type="button" class="row-action row-action-danger" data-return-sale="{{ sale.pk }}" data-return-number="{{ sale.sale_number|default:sale.id }}" data-return-info="{% url 'sales:return_info' sale.pk %}" data-return-post="{% url 'sales:return_request' sale.pk %}">Return / Void</button>
+                        {% endif %}
+                        {% if sale.customer_contact and sale.customer_contact.phone and sale.payment_method != 'DEBT' or sale.customer_phone and sale.customer_phone and sale.payment_method != 'DEBT' %}
+                        <button type="button" class="row-action" data-edit-customer
+                            data-sale-id="{{ sale.pk }}"
+                            data-customer-name="{{ sale.customer_contact.name|default:sale.customer_name }}"
+                            data-customer-phone="{{ sale.customer_contact.phone|default:sale.customer_phone }}"
+                            data-can-receipt-sms="{% if sale.status != 'VOIDED' %}1{% else %}0{% endif %}"
+                            data-edit-url="{% url 'sales:edit_sale_customer_contact' sale.pk %}">Edit Phone</button>
+                        <form data-receipt-form data-no-global-loading data-allow-resubmit="true" method="post" action="{% url 'sales:send_receipt_sms' sale.pk %}">{% csrf_token %}{% if sale.receipt_sms_sent_at %}<button type="submit" class="row-action" data-receipt-action="resend">Resend Receipt</button>{% else %}<button type="submit" class="row-action" data-receipt-action="send">Send Receipt SMS</button>{% endif %}</form>
+                        {% elif sale.payment_method == 'DEBT' and sale.debt.is_settled and sale.customer_contact and sale.customer_contact.phone or sale.payment_method == 'DEBT' and sale.debt.is_settled and sale.customer_phone and sale.customer_phone %}
+                        <button type="button" class="row-action" data-edit-customer
+                            data-sale-id="{{ sale.pk }}"
+                            data-customer-name="{{ sale.customer_contact.name|default:sale.customer_name }}"
+                            data-customer-phone="{{ sale.customer_contact.phone|default:sale.customer_phone }}"
+                            data-can-receipt-sms="{% if sale.status != 'VOIDED' %}1{% else %}0{% endif %}"
+                            data-edit-url="{% url 'sales:edit_sale_customer_contact' sale.pk %}">Edit Phone</button>
+                        <form data-receipt-form data-no-global-loading data-allow-resubmit="true" method="post" action="{% url 'sales:send_receipt_sms' sale.pk %}">{% csrf_token %}{% if sale.receipt_sms_sent_at %}<button type="submit" class="row-action" data-receipt-action="resend">Resend Receipt</button>{% else %}<button type="submit" class="row-action" data-receipt-action="send">Send Receipt SMS</button>{% endif %}</form>
+                        {% else %}
+                        <button type="button" class="row-action" data-edit-customer
+                            data-sale-id="{{ sale.pk }}"
+                            data-customer-name="{{ sale.customer_contact.name|default:sale.customer_name }}"
+                            data-customer-phone="{{ sale.customer_contact.phone|default:sale.customer_phone }}"
+                            data-can-receipt-sms="{% if sale.payment_method != 'DEBT' and sale.status != 'VOIDED' or sale.payment_method == 'DEBT' and sale.debt.is_settled and sale.status != 'VOIDED' %}1{% else %}0{% endif %}"
+                            data-edit-url="{% url 'sales:edit_sale_customer_contact' sale.pk %}">Add Phone</button>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6" class="py-8 text-center text-ink-400">No sales recorded yet.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% include "partials/pagination.html" with page_obj=page_obj %}
+
+<!-- Customer contact editor -->
+<div id="customer-contact-modal" class="sp-modal-fit hidden fixed inset-0 z-[70] items-end sm:items-center justify-center bg-slate-900/60 sm:px-4" role="dialog" aria-modal="true" aria-labelledby="customer-contact-title">
+    <div class="w-full sm:max-w-md bg-white shadow-2xl rounded-t-3xl sm:rounded-2xl overflow-hidden">
+        <div class="flex items-start gap-3 px-5 pt-5 pb-4 border-b border-ink-100">
+            <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0" aria-hidden="true">☎</div>
+            <div class="min-w-0 flex-1">
+                <h2 id="customer-contact-title" class="font-semibold text-lg text-ink-900">Customer Receipt Contact</h2>
+                <p class="text-sm text-ink-500 mt-0.5">Correct the number before sending or resending the receipt.</p>
+            </div>
+            <button id="customer-contact-close" type="button" class="p-2 rounded-lg text-ink-400 hover:text-ink-700 hover:bg-ink-100" aria-label="Close">✕</button>
+        </div>
+        <form id="customer-contact-form" class="p-5 space-y-4">
+            {% csrf_token %}
+            <input type="hidden" id="customer-contact-edit-url">
+            <div>
+                <label class="form-label" for="customer-contact-name">Customer name</label>
+                <input id="customer-contact-name" type="text" maxlength="150" class="form-input w-full" placeholder="Customer name">
+            </div>
+            <div>
+                <label class="form-label" for="customer-contact-phone">Mobile phone number</label>
+                <input id="customer-contact-phone" type="tel" inputmode="tel" autocomplete="tel" maxlength="20" class="form-input w-full" placeholder="+255712345678" required>
+                <p class="text-xs text-ink-500 mt-1">Use international format, e.g. +255712345678.</p>
+            </div>
+            <div id="customer-contact-error" class="hidden text-sm text-red-600" role="alert"></div>
+            <div id="customer-contact-success" class="hidden text-sm text-green-700" role="status"></div>
+            <div class="flex gap-2 pt-1">
+                <button id="customer-contact-cancel" type="button" class="btn btn-secondary flex-1">Cancel</button>
+                <button id="customer-contact-save" type="submit" class="btn btn-primary flex-1">Save Phone</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+/* Keep Return / Void as the reference layout for all modal sizing. */
+#return-modal > .w-full { max-height:94dvh; min-height:0; }
+#return-body { display:flex; flex:1 1 auto; flex-direction:column; min-height:0; overflow:hidden; }
+#return-body .return-scroll { flex:1 1 auto; min-height:0; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; }
+#return-body .return-footer { flex:0 0 auto; padding-bottom:max(1rem,env(safe-area-inset-bottom,0px)); }
+@media(min-width:640px){#return-modal > .w-full{max-height:90dvh}}
+</style>
+
+<!-- Return / Void dialog: bottom sheet on phones, centred dialog on larger screens -->
+<div id="return-modal" class="sp-modal-fit hidden fixed inset-0 z-[110] items-end sm:items-center justify-center bg-slate-900/60 sm:px-4" role="dialog" aria-modal="true" aria-labelledby="return-modal-title">
+    <div class="w-full sm:max-w-xl bg-white shadow-2xl flex flex-col rounded-t-3xl sm:rounded-2xl max-h-[94vh] sm:max-h-[90vh] overflow-hidden">
+        <div class="sm:hidden mx-auto mt-2 h-1 w-10 rounded-full bg-ink-200" aria-hidden="true"></div>
+
+        <div class="flex items-start gap-3 px-5 pt-4 sm:pt-5 pb-4 border-b border-ink-100">
+            <span class="w-10 h-10 rounded-xl bg-red-50 text-red-600 flex items-center justify-center shrink-0" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H11"/></svg>
+            </span>
+            <div class="min-w-0 flex-1">
+                <h2 id="return-modal-title" class="font-semibold text-lg text-ink-900 leading-tight">Return / Void items</h2>
+                <p id="return-modal-sub" class="text-sm text-ink-500 mt-0.5"></p>
+            </div>
+            <button id="return-close" type="button" class="-mr-1 -mt-1 p-2 rounded-lg text-ink-400 hover:text-ink-700 hover:bg-ink-100 transition" aria-label="Close">
+                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+            </button>
+        </div>
+
+        <div id="return-loading" class="flex items-center justify-center gap-2.5 text-sm text-ink-500 py-12 px-5 text-center">
+            <span class="return-spinner" aria-hidden="true"></span><span id="return-loading-text">Loading sale…</span>
+        </div>
+
+        <div id="return-body" class="hidden">
+            <div class="return-scroll">
+
+                <section>
+                    <div class="flex items-center justify-between gap-3">
+                        <h3 class="return-step"><span>1</span>Items to return</h3>
+                        <label class="inline-flex items-center gap-2 rounded-lg bg-red-50 border border-red-100 px-2.5 py-1.5 text-xs font-semibold text-red-700 cursor-pointer select-none">
+                            <input type="checkbox" id="return-void-all" class="sp-check-danger"> Void entire sale
+                        </label>
+                    </div>
+                    <p class="text-xs text-ink-500 mt-1.5 ml-7">Use − and + to choose how many units come back.</p>
+                    <div id="return-items" class="mt-2.5 rounded-xl border border-ink-100 overflow-hidden"></div>
+                </section>
+
+                <section>
+                    <h3 class="return-step"><span>2</span>Reason <em>(required)</em></h3>
+                    <div id="return-reasons" class="flex flex-wrap gap-1.5 mt-2.5">
+                        <button type="button" class="reason-chip" data-reason="Wrong medicine selected">Wrong medicine</button>
+                        <button type="button" class="reason-chip" data-reason="Wrong quantity entered">Wrong quantity</button>
+                        <button type="button" class="reason-chip" data-reason="Customer changed their mind">Changed mind</button>
+                        <button type="button" class="reason-chip" data-reason="Damaged or expired product">Damaged / expired</button>
+                        <button type="button" class="reason-chip" data-reason="Prescription was changed">Prescription changed</button>
+                    </div>
+                    <textarea id="return-reason" rows="2" maxlength="500" class="form-input w-full mt-2.5" placeholder="Pick a reason above or type your own…"></textarea>
+                </section>
+
+                <section id="return-owner-options" class="hidden">
+                    <h3 class="return-step"><span>3</span>What happens to the items?</h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2.5">
+                        <label class="dispo-card is-checked">
+                            <input type="radio" name="return-disposition" value="RESTOCK" checked>
+                            <span><b>Return to stock</b><small>Can be sold again</small></span>
+                        </label>
+                        <label class="dispo-card">
+                            <input type="radio" name="return-disposition" value="WRITE_OFF">
+                            <span><b>Write off</b><small>Damaged / cannot be resold</small></span>
+                        </label>
+                    </div>
+                </section>
+
+                <p id="return-note" class="return-note"></p>
+            </div>
+
+            <div class="return-footer">
+                <div id="return-summary" class="return-summary" aria-live="polite"></div>
+                <p id="return-error" class="hidden text-sm text-red-600 mt-2" role="alert"></p>
+                <div class="mt-3 grid gap-2" style="grid-template-columns: minmax(0,1fr) minmax(0,1.7fr);">
+                    <button id="return-cancel" type="button" class="btn btn-secondary w-full">Cancel</button>
+                    <button id="return-submit" type="button" class="btn btn-primary w-full whitespace-nowrap">Submit</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+onPharmacyContentReady(function () {
+    /* Professional Sale History live search.
+       Product-name matching is handled case-insensitively by the server. Preserve
+       focus and caret across the GET refresh so users can keep typing a full name
+       instead of having to click the search field after every update. */
+    const historyForm = document.getElementById('sales-history-filters');
+    const historyStorageKey = 'smartpos-sale-history-search-focus';
+    if (historyForm && !historyForm.dataset.autoSearchBound) {
+        historyForm.dataset.autoSearchBound = '1';
+        const searchInput = document.getElementById('sales-history-q');
+        const fromInput = document.getElementById('sales-date-from');
+        const toInput = document.getElementById('sales-date-to');
+        let searchTimer;
+
+        try {
+            const saved = sessionStorage.getItem(historyStorageKey);
+            if (saved && searchInput) {
+                const state = JSON.parse(saved);
+                sessionStorage.removeItem(historyStorageKey);
+                if (state && state.restoreFocus) {
+                    searchInput.focus({preventScroll: true});
+                    const caret = Math.min(Number(state.caret) || searchInput.value.length, searchInput.value.length);
+                    searchInput.setSelectionRange(caret, caret);
+                }
+            }
+        } catch (e) { /* Storage may be disabled; search still works normally. */ }
+
+        if (searchInput) searchInput.addEventListener('input', function () {
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(function () {
+                try {
+                    sessionStorage.setItem(historyStorageKey, JSON.stringify({
+                        restoreFocus: true,
+                        caret: searchInput.selectionStart == null ? searchInput.value.length : searchInput.selectionStart
+                    }));
+                } catch (e) { /* Optional focus restoration only. */ }
+                historyForm.requestSubmit();
+            }, 450);
+        });
+        [fromInput, toInput, document.getElementById('sales-payment'), document.getElementById('sales-status'), document.getElementById('sales-employee'), document.getElementById('sales-entry')].forEach(function (field) {
+            if (field) field.addEventListener('change', function () {
+                try { sessionStorage.removeItem(historyStorageKey); } catch (e) {}
+                historyForm.requestSubmit();
+            });
+        });
+        historyForm.addEventListener('submit', function () {
+            const pageField = historyForm.querySelector('input[name="page"]');
+            if (pageField) pageField.remove();
+        });
+    }
+    /* ---- receipt SMS: friendly toast confirmation (no browser confirm/alert) ---- */
+    if (!window.__pharmacyReceiptToastBound) {
+        window.__pharmacyReceiptToastBound = true;
+        document.addEventListener('submit', function (event) {
+            const form = event.target;
+            if (!(form instanceof HTMLFormElement) || !form.hasAttribute('data-receipt-form')) return;
+            if (form.dataset.receiptConfirmed === 'true') return;
+
+            event.preventDefault();
+            const button = form.querySelector('[data-receipt-action]');
+            if (!button || button.disabled) return;
+
+            const isResend = button.dataset.receiptAction === 'resend';
+            const actionTitle = isResend ? 'Resend receipt?' : 'Send receipt SMS?';
+            const actionText = isResend
+                ? 'A new receipt message will be sent to the customer. One Premium Receipt SMS credit will be used.'
+                : 'The receipt download link will be sent to the customer. One Premium Receipt SMS credit will be used.';
+
+            showToast(actionText, 'info', {
+                title: actionTitle,
+                icon: 'send',
+                actionLabel: isResend ? 'Resend now' : 'Send now',
+                duration: 12000,
+                key: 'receipt-sms-confirm-' + (form.action || '') + '-' + (isResend ? 'resend' : 'send'),
+                onAction: function () {
+                    form.dataset.receiptConfirmed = 'true';
+                    button.disabled = true;
+                    button.dataset.originalText = button.textContent;
+                    button.textContent = isResend ? 'Resending…' : 'Sending…';
+                    // Native submit bypasses this delegated handler while preserving
+                    // the normal Django CSRF-protected POST flow.
+                    form.submit();
+                }
+            });
+        });
+    }
+
+    /* ---- customer receipt contact editor ---- */
+    const contactModal=document.getElementById('customer-contact-modal');
+    if(contactModal){
+        const contactForm=document.getElementById('customer-contact-form');
+        const contactName=document.getElementById('customer-contact-name');
+        const contactPhone=document.getElementById('customer-contact-phone');
+        const contactUrl=document.getElementById('customer-contact-edit-url');
+        const contactError=document.getElementById('customer-contact-error');
+        const contactSuccess=document.getElementById('customer-contact-success');
+        const contactSave=document.getElementById('customer-contact-save');
+        const escapeHtml=(value)=>{const d=document.createElement('div');d.textContent=value==null?'':String(value);return d.innerHTML;};
+        const closeContact=()=>{
+            contactModal.classList.add('hidden'); contactModal.classList.remove('flex');
+            document.body.style.overflow='';
+        };
+        const openContact=(btn)=>{
+            contactUrl.value=btn.dataset.editUrl||'';
+            contactName.value=btn.dataset.customerName||'';
+            contactPhone.value=btn.dataset.customerPhone||'';
+            contactError.classList.add('hidden'); contactSuccess.classList.add('hidden');
+            contactModal.classList.remove('hidden'); contactModal.classList.add('flex');
+            document.body.style.overflow='hidden';
+            setTimeout(()=>contactPhone.focus(),50);
+        };
+        document.querySelectorAll('[data-edit-customer]').forEach(btn=>btn.addEventListener('click',()=>openContact(btn)));
+        document.getElementById('customer-contact-close').addEventListener('click',closeContact);
+        document.getElementById('customer-contact-cancel').addEventListener('click',closeContact);
+        contactModal.addEventListener('click',e=>{if(e.target===contactModal) closeContact();});
+        contactForm.addEventListener('submit',async e=>{
+            e.preventDefault();
+            contactError.classList.add('hidden'); contactSuccess.classList.add('hidden');
+            const url=contactUrl.value, phone=contactPhone.value.trim();
+            if(!phone){contactError.textContent='Customer phone number is required.';contactError.classList.remove('hidden');return;}
+            contactSave.disabled=true; contactSave.textContent='Saving…';
+            try{
+                const csrfInput=document.querySelector('#customer-contact-form input[name=csrfmiddlewaretoken]') || document.querySelector('input[name=csrfmiddlewaretoken]');
+                const csrfToken=csrfInput ? csrfInput.value : '';
+                const fd=new FormData();
+                fd.append('customer_name',contactName.value.trim());
+                fd.append('customer_phone',phone);
+                if(csrfToken) fd.append('csrfmiddlewaretoken',csrfToken);
+                const res=await fetch(url,{
+                    method:'POST',
+                    body:fd,
+                    credentials:'same-origin',
+                    headers:{'X-Requested-With':'XMLHttpRequest','Accept':'application/json','X-CSRFToken':csrfToken}
+                });
+                const raw=await res.text();
+                let data=null;
+                try { data=raw ? JSON.parse(raw) : {}; }
+                catch(parseErr){
+                    if(res.status===403) throw new Error('Security check failed. Please refresh the page and try again.');
+                    if(res.status===401 || res.redirected) throw new Error('Your session has expired. Please sign in again.');
+                    throw new Error('The server returned an unexpected response. Please refresh the page and try again.');
+                }
+                if(!res.ok || !data.success) throw new Error(data.error||data.message||'Could not update customer phone.');
+                contactSuccess.textContent=data.message||'Customer phone updated successfully.';
+                contactSuccess.classList.remove('hidden');
+                // Update the matching sale row immediately. A cash sale that was
+                // created without a customer must become fully actionable after
+                // the contact is saved — no page refresh should be required.
+                const buttons=document.querySelectorAll('[data-edit-customer]');
+                const saleButton=Array.from(buttons).find(btn=>btn.dataset.editUrl===url);
+                if(saleButton){
+                    const normalizedPhone=data.phone||phone;
+                    const normalizedName=data.name||contactName.value.trim();
+                    saleButton.dataset.customerPhone=normalizedPhone;
+                    saleButton.dataset.customerName=normalizedName;
+                    saleButton.textContent='Edit Phone';
+
+                    const row=saleButton.closest('tr');
+                    const summary=row ? row.querySelector('td:nth-child(2) .text-xs') : null;
+                    if(summary){
+                        const name=escapeHtml(normalizedName);
+                        const safePhone=escapeHtml(normalizedPhone);
+                        summary.innerHTML='<span class="font-medium">'+name+'</span> · '+safePhone;
+                    } else if(row){
+                        const dateCell=row.querySelector('td:nth-child(2)');
+                        if(dateCell){
+                            const summaryEl=document.createElement('div');
+                            summaryEl.className='text-xs text-ink-500 mt-1';
+                            summaryEl.innerHTML='<span class="font-medium">'+escapeHtml(normalizedName)+'</span> · '+escapeHtml(normalizedPhone);
+                            dateCell.appendChild(summaryEl);
+                        }
+                    }
+
+                    // Only eligible sales may expose the receipt action. Cash and
+                    // mobile-money sales become eligible immediately after contact save;
+                    // unsettled debt and voided sales remain protected.
+                    if(saleButton.dataset.canReceiptSms==='1'){
+                        const actions=saleButton.parentElement;
+                        let actionForm=actions.querySelector('[data-receipt-form]');
+                        if(!actionForm){
+                            actionForm=document.createElement('form');
+                            actionForm.method='post';
+                            actionForm.action='{% url "sales:send_receipt_sms" 0 %}'.replace('/0/','/'+saleButton.dataset.saleId+'/');
+                            actionForm.setAttribute('data-receipt-form','');
+                            actionForm.setAttribute('data-no-global-loading','');
+                            actionForm.setAttribute('data-allow-resubmit','true');
+                            const hidden=document.createElement('input');
+                            hidden.type='hidden'; hidden.name='csrfmiddlewaretoken'; hidden.value=csrfToken;
+                            actionForm.appendChild(hidden);
+                            const sendButton=document.createElement('button');
+                            sendButton.type='submit'; sendButton.className='row-action';
+                            sendButton.textContent='Send Receipt SMS';
+                            sendButton.setAttribute('data-receipt-action','send');
+                            actionForm.appendChild(sendButton);
+                            actions.appendChild(actionForm);
+                        }
+                    }
+                }
+                setTimeout(closeContact,900);
+            }catch(err){
+                contactError.textContent=err.message||'Could not update customer phone.';
+                contactError.classList.remove('hidden');
+            }finally{
+                contactSave.disabled=false; contactSave.textContent='Save Phone';
+            }
+        });
+    }
+
+    const modal=document.getElementById('return-modal');
+    if(!modal) return;
+    const loading=document.getElementById('return-loading'), loadingText=document.getElementById('return-loading-text'), body=document.getElementById('return-body');
+    const itemsEl=document.getElementById('return-items'), voidAll=document.getElementById('return-void-all'), reasonEl=document.getElementById('return-reason'), chipsEl=document.getElementById('return-reasons');
+    const summaryEl=document.getElementById('return-summary'), noteEl=document.getElementById('return-note'), errorEl=document.getElementById('return-error');
+    const ownerBox=document.getElementById('return-owner-options');
+    const submitBtn=document.getElementById('return-submit'), subEl=document.getElementById('return-modal-sub');
+    let state=null, opener=null, requestId=0;
+    const esc=s=>{const d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML};
+    const money=n=>'TZS '+Math.round(n).toLocaleString('en-US');
+
+    function openModal(){modal.classList.remove('hidden');modal.classList.add('flex');document.body.style.overflow='hidden';}
+    function closeModal(){
+        modal.classList.add('hidden');modal.classList.remove('flex');document.body.style.overflow='';
+        state=null;requestId++;                                   // ignore any sale still loading
+        if(opener&&document.body.contains(opener)) opener.focus({preventScroll:true});
+    }
+    function showError(msg){errorEl.textContent=msg||'';errorEl.classList.toggle('hidden',!msg);}
+
+    /* ---- disposition cards (owner only) ---- */
+    const dispoInputs=()=>Array.from(modal.querySelectorAll('input[name="return-disposition"]'));
+    const dispoValue=()=>(dispoInputs().find(i=>i.checked)||{}).value||'RESTOCK';
+    function syncDispo(){dispoInputs().forEach(i=>i.closest('.dispo-card').classList.toggle('is-checked',i.checked));}
+    dispoInputs().forEach(i=>i.addEventListener('change',syncDispo));
+
+    /* ---- reason chips ---- */
+    const CHIPS=Array.from(chipsEl.querySelectorAll('[data-reason]')).map(b=>b.dataset.reason);
+    function syncChips(){const v=reasonEl.value.trim();chipsEl.querySelectorAll('[data-reason]').forEach(b=>b.classList.toggle('is-active',b.dataset.reason===v));}
+    chipsEl.addEventListener('click',e=>{
+        const b=e.target.closest('[data-reason]'); if(!b) return;
+        const cur=reasonEl.value.trim();
+        if(cur===b.dataset.reason) reasonEl.value='';                          // tap again to undo
+        else reasonEl.value=(!cur||CHIPS.includes(cur))?b.dataset.reason:cur+'. '+b.dataset.reason;
+        syncChips();showError('');
+    });
+    reasonEl.addEventListener('input',syncChips);
+
+    /* ---- quantities ---- */
+    function inputs(){return Array.from(itemsEl.querySelectorAll('input[data-item-id]'));}
+    function clamp(i){
+        const max=parseInt(i.max,10)||0; let v=parseInt(i.value,10);
+        if(isNaN(v)||v<0) v=0; if(v>max) v=max; return v;
+    }
+    // Keeps every row in sync: refund preview, -/+ button states, summary and submit button.
+    function recalc(){
+        let total=0, units=0;
+        inputs().forEach(i=>{
+            const v=clamp(i), max=parseInt(i.max,10)||0, price=parseFloat(i.dataset.price)||0;
+            if(i.value!=='' && String(v)!==i.value) i.value=v;          // clamp typed values, but let the field be empty while typing
+            total+=v*price; units+=v;
+            const row=i.closest('.return-row');
+            row.classList.toggle('is-selected',v>0);
+            row.querySelector('[data-step="-1"]').disabled=i.disabled||v<=0;
+            row.querySelector('[data-step="1"]').disabled=i.disabled||v>=max;
+            row.querySelector('.return-row-refund').textContent=v?('Refund '+money(v*price)):'';
+        });
+        const allSelected=inputs().length>0 && inputs().every(i=>(parseInt(i.max,10)||0)===0 || clamp(i)===parseInt(i.max,10)) && units>0;
+        voidAll.checked=allSelected;
+        summaryEl.classList.toggle('has-value',units>0);
+        summaryEl.innerHTML=units
+            ? '<span><strong>'+units+'</strong> unit'+(units===1?'':'s')+' will be '+(allSelected?'voided':'returned')+'</span><strong>'+money(total)+'</strong>'
+            : '<span>Choose the quantity to return for each item.</span>';
+        submitBtn.disabled=!units;
+        const destructive=!!(state&&state.is_owner&&allSelected);
+        submitBtn.classList.toggle('btn-danger',destructive);
+        submitBtn.classList.toggle('btn-primary',!destructive);
+        if(state) submitBtn.textContent=state.is_owner?(allSelected?'Void sale now':'Return items now'):'Send request to owner';
+    }
+
+    function build(data){
+        state=data;
+        subEl.textContent='Sale #'+data.sale_number+' · '+data.payment_method;
+        ownerBox.classList.toggle('hidden',!data.is_owner);
+        noteEl.textContent=data.is_owner
+            ? 'Stock, totals and any linked debt are corrected immediately and recorded in the audit trail.'
+            : 'The shop owner must approve this before stock and totals change. You will be notified of the decision.';
+        itemsEl.innerHTML=data.items.map(it=>{
+            const blocked=it.available<=0;
+            const flag=blocked?(it.pending?'Awaiting approval':'Fully returned'):(it.already_returned?it.already_returned+' already returned':(it.pending?it.pending+' awaiting approval':''));
+            return '<div class="return-row'+(blocked?' is-blocked':'')+'">'
+                +'<div class="return-row-info">'
+                +'<p class="return-row-name">'+esc(it.name)+'</p>'
+                +'<p class="return-row-meta">Sold '+esc(it.sold)+' · '+money(parseFloat(it.unit_price))+' each</p>'
+                +(flag?'<span class="return-row-flag">'+esc(flag)+'</span>':'')
+                +'</div>'
+                +'<div class="return-row-control">'
+                +'<div class="qty-stepper'+(blocked?' is-disabled':'')+'">'
+                +'<button type="button" class="qty-btn" data-step="-1" aria-label="Decrease quantity of '+esc(it.name)+'">&minus;</button>'
+                +'<input type="number" inputmode="numeric" min="0" max="'+it.available+'" value="0" data-item-id="'+it.id+'" data-price="'+esc(it.unit_price)+'" '+(blocked?'disabled':'')+' class="qty-input" aria-label="Quantity to return for '+esc(it.name)+'">'
+                +'<button type="button" class="qty-btn" data-step="1" aria-label="Increase quantity of '+esc(it.name)+'">+</button>'
+                +'</div>'
+                +'<span class="return-row-max">'+(blocked?'Nothing to return':'Up to '+it.available)+'</span>'
+                +'<span class="return-row-refund"></span>'
+                +'</div>'
+                +'</div>';
+        }).join('');
+        reasonEl.value=''; syncChips(); voidAll.checked=false; showError('');
+        const first=dispoInputs()[0]; if(first) first.checked=true; syncDispo();
+        loading.classList.add('hidden'); body.classList.remove('hidden');
+        modal.querySelector('.return-scroll').scrollTop=0;
+        recalc();
+    }
+
+    /* ---- open (bound per button, so revisiting the page never stacks handlers) ---- */
+    document.querySelectorAll('[data-return-sale]').forEach(btn=>{
+        btn.addEventListener('click',async()=>{
+            const myId=++requestId; opener=btn;
+            state=null; loading.classList.remove('hidden'); loadingText.textContent='Loading sale…'; loading.querySelector('.return-spinner').classList.remove('hidden');
+            body.classList.add('hidden'); showError('');
+            subEl.textContent='Sale #'+btn.dataset.returnNumber;
+            modal.dataset.postUrl=btn.dataset.returnPost;
+            openModal();
+            try{
+                const r=await fetch(btn.dataset.returnInfo,{cache:'no-store'}); const d=await r.json();
+                if(myId!==requestId) return;
+                if(r.ok&&d.success) build(d);
+                else {loadingText.textContent=d.error||'This sale cannot be returned.'; loading.querySelector('.return-spinner').classList.add('hidden');}
+            }catch(err){
+                if(myId!==requestId) return;
+                loadingText.textContent='Network error. Please close this window and try again.'; loading.querySelector('.return-spinner').classList.add('hidden');
+            }
+        });
+    });
+
+    // - / + buttons
+    itemsEl.addEventListener('click',e=>{
+        const b=e.target.closest('.qty-btn'); if(!b||b.disabled) return;
+        const input=b.parentElement.querySelector('input'); const max=parseInt(input.max,10)||0;
+        input.value=Math.min(max,Math.max(0,clamp(input)+parseInt(b.dataset.step,10)));
+        recalc();
+    });
+    itemsEl.addEventListener('input',recalc);
+    // Empty field -> show 0 again once the user leaves it
+    itemsEl.addEventListener('focusout',e=>{ if(e.target.matches('input[data-item-id]')){ e.target.value=clamp(e.target); recalc(); } });
+    itemsEl.addEventListener('focusin',e=>{ if(e.target.matches('input[data-item-id]')) e.target.select(); });
+    voidAll.addEventListener('change',()=>{ inputs().forEach(i=>{ if(!i.disabled) i.value=voidAll.checked?i.max:0; }); recalc(); });
+    document.getElementById('return-close').onclick=closeModal;
+    document.getElementById('return-cancel').onclick=closeModal;
+    modal.addEventListener('click',e=>{if(e.target===modal) closeModal();});
+    // One Escape handler for the whole app: drop the one from a previous visit before adding ours.
+    if(window.__returnModalKeydown) document.removeEventListener('keydown',window.__returnModalKeydown);
+    window.__returnModalKeydown=e=>{if(e.key==='Escape'&&!modal.classList.contains('hidden')) closeModal();};
+    document.addEventListener('keydown',window.__returnModalKeydown);
+
+    submitBtn.addEventListener('click',async()=>{
+        if(!state) return;
+        const reason=reasonEl.value.trim();
+        if(reason.length<3){showError('Please pick or type a reason for this return.');reasonEl.focus();return;}
+        const lines=inputs().map(i=>({item_id:parseInt(i.dataset.itemId,10),quantity:clamp(i)})).filter(x=>x.quantity>0);
+        if(!lines.length){showError('Select at least one item to return.');return;}
+        showError(''); submitBtn.disabled=true; const label=submitBtn.textContent; submitBtn.textContent='Please wait…';
+        try{
+            const r=await fetch(modal.dataset.postUrl,{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':getCookie('csrftoken')},
+                body:JSON.stringify({items:lines,reason:reason,full_void:voidAll.checked,disposition:state.is_owner?dispoValue():'RESTOCK'})});
+            const d=await r.json();
+            if(r.ok&&d.success){document.body.style.overflow='';window.location.reload();return;}
+            showError(d.error||'Could not save this return.');
+        }catch(err){showError('Network error. Please try again.');}
+        submitBtn.disabled=false; submitBtn.textContent=label;
+    });
+});
+</script>
+{% endblock %}

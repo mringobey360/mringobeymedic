@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}{% if r.ok %}{{ r.title }}{% else %}Scan not accepted{% endif %}{% endblock %}
+{% block content %}
+<div class="max-w-md mx-auto">
+  <div class="card p-0 overflow-hidden text-center">
+    {% if r.ok %}
+    <div class="bg-emerald-600 text-white px-6 pt-8 pb-6">
+      <div class="mx-auto w-16 h-16 rounded-full bg-white/20 grid place-items-center">
+        <svg class="w-9 h-9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>
+      </div>
+      <h1 class="text-2xl font-bold mt-4">{{ r.title }}</h1>
+      <p class="text-sm text-white/85 mt-1">{{ r.subtitle }}</p>
+    </div>
+    <div class="px-6 py-5 text-left">
+      <p class="text-[11px] uppercase tracking-[.14em] font-bold text-ink-400 mb-2">Receipt</p>
+      <dl class="divide-y divide-ink-100 text-sm">
+        <div class="flex justify-between py-2.5"><dt class="text-ink-500">Employee</dt><dd class="font-semibold text-right">{{ r.employee }}</dd></div>
+        <div class="flex justify-between py-2.5"><dt class="text-ink-500">Branch</dt><dd class="font-semibold text-right">{{ r.branch }}</dd></div>
+        <div class="flex justify-between py-2.5"><dt class="text-ink-500">Recorded</dt><dd class="font-semibold text-right">{{ r.time }} · {{ r.date }}</dd></div>
+        <div class="flex justify-between py-2.5"><dt class="text-ink-500">Method</dt><dd class="font-semibold text-right">Live branch QR</dd></div>
+        {% if r.is_meal %}
+        <div class="flex justify-between py-2.5"><dt class="text-ink-500">Meal window</dt><dd class="font-semibold text-right">{{ r.window }}</dd></div>
+        <div class="flex justify-between py-2.5"><dt class="text-ink-500">Allowance</dt><dd class="font-semibold text-right">TZS {{ r.amount }}</dd></div>
+        <div class="flex justify-between py-2.5"><dt class="text-ink-500">Status</dt><dd class="text-right"><span class="px-2 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-semibold">Claimed · settles {{ r.settles }}</span></dd></div>
+        {% endif %}
+      </dl>
+      <div class="mt-4 rounded-xl bg-ink-50 border border-ink-100 p-3 text-xs text-ink-600 leading-5">{{ r.note }}</div>
+      <div class="mt-5 space-y-2">
+        {% if r.is_meal or r.action == 'CHECKOUT' %}<a href="{% url 'accounts:meal_history' %}" class="btn btn-nav btn-secondary w-full text-center"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>View Meal History</a>{% endif %}
+        <a href="{% url 'dashboard:home' %}" class="btn btn-nav btn-primary w-full text-center"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>Back to Dashboard</a>
+      </div>
+    </div>
+    {% else %}
+    <div class="bg-amber-500 text-white px-6 pt-8 pb-6">
+      <div class="mx-auto w-16 h-16 rounded-full bg-white/20 grid place-items-center text-3xl font-bold">!</div>
+      <h1 class="text-2xl font-bold mt-4">Scan not accepted</h1>
+      <p class="text-sm text-white/90 mt-1">Nothing was recorded.</p>
+    </div>
+    <div class="px-6 py-5 text-left">
+      <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 leading-6">{{ r.message }}</div>
+      <div class="mt-5 space-y-2">
+        <a href="{% url 'accounts:attendance_qr_scanner' %}" class="btn btn-primary w-full text-center">Scan again</a>
+        <a href="{% url 'dashboard:home' %}" class="btn btn-nav btn-secondary btn-nav w-full text-center">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg><span>Back to Dashboard</span>
+    </a>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

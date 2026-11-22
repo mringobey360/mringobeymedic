@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Attendance Exception Review{% endblock %}
+{% block content %}
+<div class="max-w-6xl mx-auto space-y-6">
+    <header class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+        <div>
+            <div class="inline-flex items-center gap-2 rounded-full bg-amber-50 text-amber-700 px-3 py-1 text-xs font-semibold mb-3">
+                <span class="w-2 h-2 rounded-full bg-amber-500"></span> Manager control
+            </div>
+            <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-ink-900">Attendance Exception Review</h1>
+            <p class="text-sm text-ink-500 mt-2 max-w-2xl">Review attendance requests that could not be verified automatically. Every decision is made by a manager and recorded for accountability.</p>
+        </div>
+        <div class="rounded-xl border border-ink-100 bg-white px-4 py-3 min-w-32 shadow-sm">
+            <p class="text-xs font-medium text-ink-500">Pending reviews</p>
+            <p class="text-2xl font-bold text-ink-900 mt-1">{{ page_obj.paginator.count|default:0 }}</p>
+        </div>
+    </header>
+
+    <div class="flex items-start gap-3 rounded-xl border border-blue-100 bg-blue-50/70 p-4 text-sm text-blue-900">
+        <span class="mt-0.5 shrink-0 font-bold">i</span>
+        <p><strong>Manual review required.</strong> GPS-unavailable requests are never approved automatically. Check the employee, date and explanation before making a decision.</p>
+    </div>
+
+    <section class="space-y-4" aria-label="Attendance requests">
+        {% for x in requests %}
+        <article class="card !p-0 overflow-hidden shadow-sm">
+            <div class="p-4 sm:p-5">
+                <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                    <div class="flex items-start gap-3 min-w-0">
+                        <span class="w-11 h-11 rounded-xl bg-brand-50 text-brand-700 flex items-center justify-center font-bold shrink-0">{{ x.employee.get_full_name|default:x.employee.username|slice:":1"|upper }}</span>
+                        <div class="min-w-0">
+                            <h2 class="font-semibold text-ink-900">{% firstof x.employee.get_full_name x.employee.username %}</h2>
+                            <p class="text-xs text-ink-500 mt-1">{{ x.employee.username }} <span class="mx-1">·</span> Attendance date: {{ x.date|date:"d M Y" }}</p>
+                            <p class="text-xs text-ink-500 mt-1">Submitted {{ x.requested_at|date:"d M Y, H:i" }}</p>
+                        </div>
+                    </div>
+                    <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-50 text-amber-700 px-3 py-1.5 text-xs font-semibold self-start"><span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>Pending review</span>
+                </div>
+                <div class="mt-4 rounded-lg bg-ink-50 border border-ink-100 p-3 sm:p-4">
+                    <p class="text-[11px] uppercase tracking-wider font-semibold text-ink-500 mb-1">Employee explanation</p>
+                    <p class="text-sm text-ink-800 whitespace-pre-line break-words">{{ x.reason|default:"No explanation provided." }}</p>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 mt-4">
+                    <form method="post" action="{% url 'accounts:attendance_exception_decide' x.pk 'approve' %}" class="rounded-xl border border-emerald-100 bg-emerald-50/40 p-3 space-y-3" data-confirm="Approve this attendance exception?">
+                        {% csrf_token %}
+                        <div><h3 class="text-sm font-semibold text-ink-900">Approve attendance</h3><p class="text-xs text-ink-500 mt-0.5">Confirm the exception after reviewing the details.</p></div>
+                        <label class="block"><span class="text-xs font-medium text-ink-600">Manager note <span class="font-normal">(optional)</span></span><input name="note" maxlength="500" class="form-input w-full mt-1" placeholder="Add an approval note"></label>
+                        <button type="submit" class="btn btn-success w-full">Approve request</button>
+                    </form>
+                    <form method="post" action="{% url 'accounts:attendance_exception_decide' x.pk 'reject' %}" class="rounded-xl border border-red-100 bg-red-50/30 p-3 space-y-3" data-confirm="Reject this attendance exception?">
+                        {% csrf_token %}
+                        <div><h3 class="text-sm font-semibold text-ink-900">Reject request</h3><p class="text-xs text-ink-500 mt-0.5">A reason helps explain the decision to the employee.</p></div>
+                        <label class="block"><span class="text-xs font-medium text-ink-600">Reason for rejection</span><input name="note" required minlength="3" maxlength="500" class="form-input w-full mt-1" placeholder="Enter the reason"></label>
+                        <button type="submit" class="btn btn-secondary w-full">Reject request</button>
+                    </form>
+                </div>
+            </div>
+        </article>
+        {% empty %}
+        <div class="card !p-8 sm:!p-12 text-center">
+            <div class="mx-auto w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-4">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4 4L19 6"/><circle cx="12" cy="12" r="10"/></svg>
+            </div>
+            <h2 class="text-base font-semibold text-ink-900">No pending attendance exceptions</h2>
+            <p class="text-sm text-ink-500 mt-1 max-w-md mx-auto">You’re all caught up. New requests that require manager review will appear here.</p>
+        </div>
+        {% endfor %}
+    </section>
+    {% include "partials/pagination.html" with page_obj=page_obj %}
+</div>
+{% endblock %}

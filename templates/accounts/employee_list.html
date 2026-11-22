@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}Employees{% endblock %}
+{% block content %}
+<style data-spa-page-style="employee-list">
+  @keyframes elflash{0%,60%{background:#ecfdf5}100%{background:transparent}}
+  tr.is-new{animation:elflash 3.2s ease-out}
+  tr.is-new td.first{box-shadow:inset 3px 0 0 #059669}
+</style>
+<div class="pro">
+  <div class="pro-head">
+    <div class="pro-head-main">
+      <p class="pro-eyebrow">Team management</p>
+      <h1 class="pro-title">Employees</h1>
+      <p class="pro-sub">Manage staff accounts, salary settings and device access for this branch.</p>
+    </div>
+    <div class="pro-tools">
+      <a href="{% url 'accounts:employee_create' %}" class="btn btn-primary" data-edit-modal data-em-kicker="New employee"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Add Employee</a>
+    </div>
+  </div>
+
+  <section class="pro-panel" aria-label="Employee list">
+    <div class="pro-panel-h">
+      <div><h2>Team members</h2><p>{{ page_obj.paginator.count }} employee{{ page_obj.paginator.count|pluralize }} in this branch.</p></div>
+    </div>
+    <div class="pro-tw">
+      <table class="pro-table stack">
+        <thead>
+          <tr><th>Name</th><th>Username</th><th>Phone</th><th>Status</th><th>Joined</th><th class="r">Actions</th></tr>
+        </thead>
+        <tbody>
+          {% for emp in page_obj %}
+          <tr class="{% if emp.pk == highlight_id %}is-new{% endif %}" {% if emp.pk == highlight_id %}data-highlight-row{% endif %}>
+            <td class="first">
+              <div class="pro-who">
+                <span class="pro-av" aria-hidden="true">{{ emp.get_full_name|default:emp.username|slice:":1"|upper }}</span>
+                <div class="pro-cell-main">{{ emp.get_full_name|default:"-" }}</div>
+              </div>
+            </td>
+            <td data-label="Username" class="mut">{{ emp.username }}</td>
+            <td data-label="Phone" class="num">{{ emp.phone_number|default:"—" }}</td>
+            <td data-label="Status">
+              {% if emp.is_active %}<span class="pro-b ok">Active</span>{% else %}<span class="pro-b plain">Deactivated</span>{% endif %}
+            </td>
+            <td data-label="Joined" class="num mut">{{ emp.created_at|date:"d M Y" }}</td>
+            <td class="acts r">
+              <div class="pro-actions">
+                <a href="{% url 'accounts:employee_edit' emp.pk %}" class="pro-link bd" data-em-kicker="Edit employee"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg>Edit</a>
+                <a href="{% url 'accounts:employee_compensation' emp.pk %}" class="pro-link bd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 12h10"/><circle cx="12" cy="12" r="2.5"/></svg>Salary &amp; Meals</a>
+                <form method="post" action="{% url 'accounts:employee_reset_pin' emp.pk %}"
+                      data-confirm="Reset this employee's PIN?"
+                      data-confirm-detail="Their PIN and remembered devices are removed. They must sign in with their password and create a new PIN.">
+                  {% csrf_token %}<button type="submit" class="pro-link bd">Reset PIN</button>
+                </form>
+                <form method="post" action="{% url 'accounts:employee_release_device' emp.pk %}"
+                      data-confirm="Release this employee's device?"
+                      data-confirm-detail="Use this if they are stuck as 'signed in on another device' (e.g. a lost phone). The other device is signed out and they can sign in anywhere.">
+                  {% csrf_token %}<button type="submit" class="pro-link bd">Release device</button>
+                </form>
+                <form method="post" action="{% url 'accounts:employee_toggle_active' emp.pk %}"
+                      data-confirm="{% if emp.is_active %}Deactivate this employee?{% else %}Activate this employee?{% endif %}"
+                      data-confirm-detail="They will {% if emp.is_active %}no longer{% else %}immediately{% endif %} be able to log in.">
+                  {% csrf_token %}<button type="submit" class="pro-link bd {% if emp.is_active %}danger{% endif %}">{% if emp.is_active %}Deactivate{% else %}Activate{% endif %}</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="6"><div class="pro-empty"><strong>No employees added yet</strong>Add your first employee to give them access to this branch.</div></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  {% include "partials/pagination.html" with page_obj=page_obj %}
+</div>
+<script>
+(function () {
+  var row = document.querySelector('[data-highlight-row]');
+  if (row && row.scrollIntoView) row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  // Keep the address bar clean after a successful add/edit.
+  if (/[?&](added|updated)=/.test(location.search) && history.replaceState) {
+    history.replaceState(null, '', location.pathname);
+  }
+})();
+</script>
+{% endblock %}

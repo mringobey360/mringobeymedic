@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% block title %}Client Testimonials - HQ{% endblock %}
+{% block content %}
+<style>
+.tm{max-width:1120px;margin:0 auto}
+.tm h1{font-size:1.5rem;font-weight:800;letter-spacing:-.02em;margin:0}
+.tm .sub{color:#64748b;font-size:.9rem;margin:.25rem 0 1.1rem}
+.tm-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
+.tm-kpi{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:14px 16px}
+.tm-kpi small{display:block;font-size:.68rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#64748b}
+.tm-kpi b{display:block;font-size:1.55rem;color:#0f172a;margin-top:2px}
+.tm-card{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:16px;margin-bottom:16px}
+.tm-set{display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between}
+.tm-set form{display:flex;flex-wrap:wrap;gap:18px;align-items:center}
+.tm-set label{display:inline-flex;gap:8px;align-items:center;font-size:.9rem;font-weight:600}
+.tm-set input[type=number]{width:64px;border:1px solid #cbd5e1;border-radius:8px;padding:5px 8px}
+.tm-state{display:inline-flex;align-items:center;gap:6px;font-size:.8rem;font-weight:700;padding:5px 12px;border-radius:999px}
+.tm-state.on{background:#dcfce7;color:#166534}.tm-state.off{background:#fee2e2;color:#991b1b}
+.tm-tabs{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:14px;border-bottom:1px solid #e2e8f0}
+.tm-tabs a{padding:9px 14px;font-weight:650;font-size:.9rem;color:#64748b;border-bottom:2px solid transparent;text-decoration:none}
+.tm-tabs a.on{color:#0f766e;border-color:#0f766e}
+.tm table{width:100%;border-collapse:collapse;font-size:.88rem}
+.tm th{text-align:left;font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:#64748b;padding:8px 10px;border-bottom:1px solid #e2e8f0}
+.tm td{padding:11px 10px;border-bottom:1px solid #f1f5f9;vertical-align:top}
+.tm .stars{color:#f59e0b;letter-spacing:2px;white-space:nowrap}
+.tm .stars i{color:#cbd5e1;font-style:normal}
+.tm-pill{display:inline-block;font-size:.7rem;font-weight:700;padding:3px 10px;border-radius:999px;background:#f1f5f9;color:#475569}
+.tm-pill.APPROVED,.tm-pill.ANSWERED{background:#dcfce7;color:#166534}
+.tm-pill.PENDING,.tm-pill.AUTHORIZED{background:#fef3c7;color:#92400e}
+.tm-pill.REJECTED,.tm-pill.REVOKED,.tm-pill.DECLINED{background:#fee2e2;color:#991b1b}
+.tm-btn{display:inline-flex;align-items:center;border:1px solid #cbd5e1;background:#fff;color:#0f172a;border-radius:9px;padding:6px 12px;font-size:.8rem;font-weight:650;cursor:pointer}
+.tm-btn:hover{border-color:#0f172a}
+.tm-btn.ok{background:#0f766e;border-color:#0f766e;color:#fff}.tm-btn.no{color:#b91c1c;border-color:#fecaca}
+.tm-btn.main{background:#0f172a;color:#fff;border-color:#0f172a;padding:9px 16px;font-size:.85rem}
+.tm-acts{display:flex;gap:6px;flex-wrap:wrap}
+.tm-acts form{margin:0}
+.tm-bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:12px}
+.tm-sel{border:1px solid #cbd5e1;border-radius:9px;padding:8px 10px;background:transparent;color:inherit}
+.tm-bar input[type=text]{border:1px solid #cbd5e1;border-radius:9px;padding:8px 12px;min-width:240px}
+.tm-cm{max-width:46ch;line-height:1.5;color:#0f172a}
+.tm-empty{text-align:center;color:#64748b;padding:34px 0}
+.tm-pg{display:flex;gap:8px;justify-content:center;margin-top:14px;font-size:.85rem}
+.tm-scroll{overflow-x:auto}
+@media(prefers-color-scheme:dark){html[data-theme=dark] .tm-kpi,html[data-theme=dark] .tm-card{background:#0d1722;border-color:#1a2a3b}
+html[data-theme=dark] .tm-kpi b,html[data-theme=dark] .tm-cm,html[data-theme=dark] .tm-btn{color:#f1f5f9}
+html[data-theme=dark] .tm-btn{background:#0d1722}}
+</style>
+<div class="tm">
+  <h1>Client Testimonials</h1>
+  <p class="sub">You choose who receives the rating popup: everyone, one role, or specific people. Nothing appears on the public page until you approve it.</p>
+
+  <div class="tm-card tm-set">
+    <form method="post" action="{% url 'testimonials:admin_settings' %}">{% csrf_token %}
+      <span class="tm-state {% if cfg.enabled %}on{% else %}off{% endif %}">● Popups {% if cfg.enabled %}ON{% else %}OFF{% endif %}</span>
+      <label><input type="checkbox" name="enabled" {% if cfg.enabled %}checked{% endif %}> Enable rating popups</label>
+      <label><input type="checkbox" name="show_on_landing" {% if cfg.show_on_landing %}checked{% endif %}> Show approved reviews on landing page</label>
+      <label>Remind again after <input type="number" name="snooze_days" min="1" max="60" value="{{ cfg.snooze_days }}"> days</label>
+      <button class="tm-btn main" type="submit">Save settings</button>
+    </form>
+  </div>
+
+  <div class="tm-kpis">
+    <div class="tm-kpi"><small>Invitations</small><b>{{ stats.invited }}</b></div>
+    <div class="tm-kpi"><small>Waiting</small><b>{{ stats.waiting }}</b></div>
+    <div class="tm-kpi"><small>Response rate</small><b>{{ stats.response_rate }}%</b></div>
+    <div class="tm-kpi"><small>Pending review</small><b>{{ stats.pending }}</b></div>
+    <div class="tm-kpi"><small>Approved</small><b>{{ stats.approved }}</b></div>
+    <div class="tm-kpi"><small>Avg. approved</small><b>{{ stats.average }} ★</b></div>
+  </div>
+
+  <nav class="tm-tabs" aria-label="Testimonial sections">
+    <a href="?tab=reviews" class="{% if tab == 'reviews' %}on{% endif %}">Reviews</a>
+    <a href="?tab=customers" class="{% if tab == 'customers' %}on{% endif %}">Select customers</a>
+    <a href="?tab=invitations" class="{% if tab == 'invitations' %}on{% endif %}">Invitations</a>
+    <a href="?tab=audit" class="{% if tab == 'audit' %}on{% endif %}">Audit trail</a>
+  </nav>
+
+  {% if tab == 'reviews' %}
+  <div class="tm-bar"><div class="tm-acts">
+    <a class="tm-btn" href="?tab=reviews">All</a><a class="tm-btn" href="?tab=reviews&status=PENDING">Pending</a>
+    <a class="tm-btn" href="?tab=reviews&status=APPROVED">Approved</a><a class="tm-btn" href="?tab=reviews&status=REJECTED">Rejected</a></div></div>
+  <div class="tm-card tm-scroll"><table>
+    <thead><tr><th>Rating</th><th>User</th><th>Comment</th><th>Public as</th><th>Status</th><th>Date</th><th></th></tr></thead><tbody>
+    {% for r in page_obj %}
+    <tr>
+      <td><span class="stars" aria-label="{{ r.rating }} of 5">{% for n in "12345" %}{% if forloop.counter <= r.rating %}★{% else %}<i>★</i>{% endif %}{% endfor %}</span></td>
+      <td>{% firstof r.customer.get_full_name r.customer.username %}<br><small style="color:#64748b">@{{ r.customer.username }}{% if r.reviewer_role %} · {{ r.reviewer_role }}{% endif %}</small></td>
+      <td class="tm-cm">{{ r.comment }}</td>
+      <td>{{ r.public_name }}{% if r.public_business %}<br><small style="color:#64748b">{{ r.public_business }}</small>{% endif %}</td>
+      <td><span class="tm-pill {{ r.status }}">{{ r.get_status_display }}</span>{% if r.moderated_by %}<br><small style="color:#64748b">{{ r.moderated_by.username }}</small>{% endif %}</td>
+      <td>{{ r.created_at|date:"d M Y" }}</td>
+      <td><div class="tm-acts">
+        {% if r.status != 'APPROVED' %}<form method="post" action="{% url 'testimonials:admin_moderate' r.pk 'approve' %}">{% csrf_token %}<button class="tm-btn ok">Approve</button></form>{% endif %}
+        {% if r.status == 'PENDING' %}<form method="post" action="{% url 'testimonials:admin_moderate' r.pk 'reject' %}">{% csrf_token %}<button class="tm-btn no">Reject</button></form>{% endif %}
+        {% if r.status == 'APPROVED' %}<form method="post" action="{% url 'testimonials:admin_moderate' r.pk 'unpublish' %}">{% csrf_token %}<button class="tm-btn">Unpublish</button></form>{% endif %}
+      </div></td>
+    </tr>
+    {% empty %}<tr><td colspan="7" class="tm-empty">No reviews yet.</td></tr>{% endfor %}
+  </tbody></table></div>
+
+  {% elif tab == 'customers' %}
+  <form method="get" class="tm-bar"><input type="hidden" name="tab" value="customers">
+    <div class="tm-acts"><input type="text" name="q" value="{{ q }}" placeholder="Search name, phone or username…">
+    <select name="role" class="tm-sel"><option value="">All users</option>{% for v,l in roles %}<option value="{{ v }}" {% if role == v %}selected{% endif %}>{{ l }}</option>{% endfor %}</select>
+    <button class="tm-btn">Filter</button></div></form>
+  <div class="tm-card" style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between">
+    <span style="font-size:.88rem;color:#475569">Reach everyone shown by the current filter (owners, assistant managers and employees), or tick specific people below.</span>
+    <form method="post" action="{% url 'testimonials:admin_invite' %}" onsubmit="return confirm('Authorise the rating popup for ALL users in this filter?')">{% csrf_token %}
+      <input type="hidden" name="scope" value="filter"><input type="hidden" name="role" value="{{ role }}"><input type="hidden" name="q" value="{{ q }}">
+      <button class="tm-btn main" type="submit">Authorise all{% if role %} ({{ role|lower }}){% endif %}</button></form>
+  </div>
+  <form method="post" action="{% url 'testimonials:admin_invite' %}">{% csrf_token %}
+  <div class="tm-bar"><label style="font-size:.85rem;font-weight:600"><input type="checkbox" id="tmAll"> Select all on this page</label>
+    <button class="tm-btn main" type="submit">Authorise popup for selected</button></div>
+  <div class="tm-card tm-scroll"><table>
+    <thead><tr><th></th><th>User</th><th>Role</th><th>Branch</th><th>Phone</th><th>Latest invitation</th></tr></thead><tbody>
+    {% for u in page_obj %}
+    <tr>
+      <td><input type="checkbox" name="customers" value="{{ u.pk }}" class="tmChk" {% if u.t_invite and u.t_invite.status == 'AUTHORIZED' %}disabled{% endif %}></td>
+      <td>{% firstof u.get_full_name u.username %}<br><small style="color:#64748b">@{{ u.username }}</small></td>
+      <td>{{ u.get_role_display }}</td>
+      <td>{{ u.pharmacy.name|default:"—" }}</td>
+      <td>{{ u.phone_number|default:"—" }}</td>
+      <td>{% if u.t_invite %}<span class="tm-pill {{ u.t_invite.status }}">{{ u.t_invite.get_status_display }}</span> <small style="color:#64748b">{{ u.t_invite.authorized_at|date:"d M Y" }}</small>{% else %}<span class="tm-pill">Never invited</span>{% endif %}</td>
+    </tr>
+    {% empty %}<tr><td colspan="6" class="tm-empty">No users found.</td></tr>{% endfor %}
+  </tbody></table></div></form>
+  <script>(function(){var a=document.getElementById('tmAll');if(a)a.addEventListener('change',function(){document.querySelectorAll('.tmChk:not(:disabled)').forEach(function(c){c.checked=a.checked})})})();</script>
+
+  {% elif tab == 'invitations' %}
+  <div class="tm-bar"><div class="tm-acts">
+    <a class="tm-btn" href="?tab=invitations">All</a><a class="tm-btn" href="?tab=invitations&status=AUTHORIZED">Waiting</a>
+    <a class="tm-btn" href="?tab=invitations&status=ANSWERED">Answered</a><a class="tm-btn" href="?tab=invitations&status=DECLINED">Declined</a></div></div>
+  <div class="tm-card tm-scroll"><table>
+    <thead><tr><th>Customer</th><th>Status</th><th>Authorised by</th><th>Authorised</th><th>Shown</th><th>Responded</th><th></th></tr></thead><tbody>
+    {% for i in page_obj %}
+    <tr>
+      <td>{% firstof i.customer.get_full_name i.customer.username %}</td>
+      <td><span class="tm-pill {{ i.status }}">{{ i.get_status_display }}</span></td>
+      <td>{{ i.authorized_by.username|default:"—" }}</td>
+      <td>{{ i.authorized_at|date:"d M Y H:i" }}</td>
+      <td>{{ i.first_shown_at|date:"d M Y H:i"|default:"Not yet" }}</td>
+      <td>{{ i.responded_at|date:"d M Y H:i"|default:"—" }}</td>
+      <td>{% if i.status == 'AUTHORIZED' %}<form method="post" action="{% url 'testimonials:admin_revoke' i.pk %}">{% csrf_token %}<button class="tm-btn no">Revoke</button></form>{% endif %}</td>
+    </tr>
+    {% empty %}<tr><td colspan="7" class="tm-empty">No invitations yet. Use “Select customers”.</td></tr>{% endfor %}
+  </tbody></table></div>
+
+  {% else %}
+  <div class="tm-card tm-scroll"><table>
+    <thead><tr><th>When</th><th>Action</th><th>By</th><th>Customer</th><th>Detail</th></tr></thead><tbody>
+    {% for a in page_obj %}
+    <tr><td>{{ a.created_at|date:"d M Y H:i" }}</td><td>{{ a.action }}</td><td>{{ a.actor.username|default:"—" }}</td><td>{{ a.target_user.username|default:"—" }}</td><td>{{ a.detail }}</td></tr>
+    {% empty %}<tr><td colspan="5" class="tm-empty">No activity yet.</td></tr>{% endfor %}
+  </tbody></table></div>
+  {% endif %}
+
+  {% if page_obj.paginator.num_pages > 1 %}
+  <div class="tm-pg">
+    {% if page_obj.has_previous %}<a class="tm-btn" href="?tab={{ tab }}&q={{ q|urlencode }}&status={{ status }}&page={{ page_obj.previous_page_number }}">Previous</a>{% endif %}
+    <span>Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+    {% if page_obj.has_next %}<a class="tm-btn" href="?tab={{ tab }}&q={{ q|urlencode }}&status={{ status }}&page={{ page_obj.next_page_number }}">Next</a>{% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

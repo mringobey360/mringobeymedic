@@ -1,0 +1,12 @@
+{% load humanize %}
+<div class="w-16 h-16 mx-auto rounded-full bg-green-50 text-green-600 flex items-center justify-center">
+  <svg class="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"/></svg>
+</div>
+<h1 class="mt-5 text-lg font-bold text-ink-900">Payment confirmed</h1>
+<p class="mt-2 text-sm text-ink-500 leading-6">
+  {{ txn.get_purpose_display }} payment of <strong class="text-ink-700">{{ txn.currency }} {{ txn.amount|floatformat:0|intcomma }}</strong> was received.
+  {% if txn.confirmation_code %}Confirmation code: <strong class="text-ink-700">{{ txn.confirmation_code }}</strong>.{% endif %}
+</p>
+<p class="mt-1 text-xs text-ink-400">Redirecting you now&hellip;</p>
+<a href="{% url 'payments:receipt' txn.merchant_reference %}" class="mt-5 block rounded-2xl border border-ink-200 bg-white hover:bg-ink-50 text-ink-700 text-sm font-bold py-3 transition">View / download receipt</a>
+<a href="{{ final_url }}" class="mt-3 block rounded-2xl bg-brand-700 hover:bg-brand-800 text-white text-sm font-bold py-3 transition">Continue</a>

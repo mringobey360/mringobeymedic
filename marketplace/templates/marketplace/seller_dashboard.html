@@ -1,0 +1,199 @@
+{% extends "base.html" %}{% load humanize %}
+{% block title %}Dashboard · Seller Centre · SmartPOS{% endblock %}
+{% block extra_head %}{% include 'marketplace/_mk_styles.html' %}{% endblock %}
+{% block content %}
+<div class="mk-page mk-wide">
+
+ {% if request.user.is_superuser or request.user.is_staff %}{% include 'marketplace/_mk_nav.html' with active='seller' %}{% endif %}
+
+ {% for store in stores %}
+ {# ---------- 1. Welcome banner: who you are, what state the shop is in, one primary action ---------- #}
+ <header class="mk-welcome">
+  <div class="mk-welcome-id">
+   <span class="mk-avatar" aria-hidden="true">{% if store.logo %}<img src="{{ store.logo.url }}" alt="">{% elif request.user.profile_photo %}<img src="{{ request.user.profile_photo.url }}" alt="">{% else %}{{ store.public_name|slice:":1"|upper }}{% endif %}</span>
+   <div style="min-width:0">
+    <h1>{{ store.public_name }}</h1>
+    <p>Welcome back{% if request.user.first_name %}, {{ request.user.first_name }}{% endif %}. Here is how your online shop is doing.</p>
+    <div class="mk-chipline">
+     {% if store.online_service_active %}<span class="mk-badge is-live">Online Selling active</span>{% else %}<span class="mk-badge">Online Selling not active</span>{% endif %}
+     {% if store.is_published %}<span class="mk-badge is-live">Shop published</span>{% else %}<span class="mk-badge">Not published</span>{% endif %}
+    </div>
+   </div>
+  </div>
+  <div class="mk-actions">
+   {% if store.online_service_active %}
+    <a class="btn btn-light" href="{% url 'marketplace:seller_new_listing' store.id %}">+ Add new</a>
+    <a class="btn btn-ghost-light" href="{% url 'marketplace:seller_store_public' store.slug %}" target="_blank" rel="noopener">View my shop ↗</a>
+   {% else %}
+    <a class="btn btn-light" href="{% url 'marketplace:seller_service_requests' %}">Activate Online Selling</a>
+    <a class="btn btn-ghost-light" href="{% url 'marketplace:seller_store_setup' %}">Edit shop profile</a>
+   {% endif %}
+  </div>
+ </header>
+
+ {% if not store.online_service_active %}
+ <div class="mk-alert" role="status">
+  <span><b>Your shop is not live yet.</b> {% if store.pending_online %}Your Online Selling payment is waiting to be completed.{% else %}Activate Online Selling to publish your shop, add products and receive orders.{% endif %}</span>
+  <a class="btn btn-primary btn-sm" href="{% if store.pending_online %}{% url 'payments:marketplace_service_payment' store.pending_online.pk %}{% else %}{% url 'marketplace:seller_service_requests' %}{% endif %}">{% if store.pending_online %}Continue to payment{% else %}See plans{% endif %}</a>
+ </div>
+ {% elif store.new_order_count %}
+ <div class="mk-alert" role="status">
+  <span><b>{{ store.new_order_count }} new order{{ store.new_order_count|pluralize }}</b> waiting for you. Confirm quickly to keep customers happy.</span>
+  <a class="btn btn-primary btn-sm" href="{% url 'marketplace:seller_store_orders' store.id %}?view=new">Review orders</a>
+ </div>
+ {% endif %}
+
+ {# ---------- 2. Getting started: only until the shop is fully set up ---------- #}
+ {% if store.setup_done < store.setup_total %}
+ <section class="mk-start" aria-labelledby="mk-start-{{ store.id }}">
+  <div class="mk-start-side">
+   <div>
+    <p class="mk-eyebrow" style="margin:0 0 .3rem">Getting started</p>
+    <h2 id="mk-start-{{ store.id }}">Set up your shop in {{ store.setup_total }} steps</h2>
+   </div>
+   <p>Finish these steps and your shop is ready for customers. You can leave and come back at any time.</p>
+   <div>
+    <div class="mk-progress-label"><span>{{ store.setup_done }} of {{ store.setup_total }} done</span><span>{{ store.setup_pct }}%</span></div>
+    <div class="mk-progress" role="progressbar" aria-valuenow="{{ store.setup_pct }}" aria-valuemin="0" aria-valuemax="100" style="margin-top:.4rem"><i style="width:{{ store.setup_pct }}%"></i></div>
+   </div>
+   {% if store.setup_next %}<a class="btn btn-primary" href="{{ store.setup_next.url }}">{{ store.setup_next.label }} →</a>{% endif %}
+  </div>
+  <ol class="mk-steplist">
+   {% for step in store.setup_steps %}
+   <li><a class="mk-step {% if step.done %}is-done{% elif step == store.setup_next %}is-next{% endif %}" href="{{ step.url }}">
+    <span class="mk-step-dot">{% if step.done %}<svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg>{% else %}{{ forloop.counter }}{% endif %}</span>
+    <span><b>{{ step.label }}</b><small>{{ step.hint }}</small></span>
+    <span class="mk-step-go">Open →</span>
+   </a></li>
+   {% endfor %}
+  </ol>
+ </section>
+ {% endif %}
+
+ {# ---------- 3. Four headline numbers ---------- #}
+ <section class="mk-metrics" aria-label="Shop summary">
+  <a class="mk-metric" href="{% url 'marketplace:seller_store_orders' store.id %}">
+   <div class="mk-metric-top"><span>Sales · last 30 days</span><i><svg viewBox="0 0 24 24"><path d="M3 17l5-5 4 4 8-9"/><path d="M15 7h5v5"/></svg></i></div>
+   <strong><small>TSh</small>{{ store.revenue_30d|default:0|floatformat:0|intcomma }}</strong>
+   <em>All time: TSh {{ store.revenue_total|default:0|floatformat:0|intcomma }}</em>
+  </a>
+  <a class="mk-metric" href="{% url 'marketplace:seller_store_orders' store.id %}?view=new">
+   <div class="mk-metric-top"><span>New orders</span><i class="is-amber"><svg viewBox="0 0 24 24"><path d="M6 3h12v17l-2.5-1.4L13 20l-2.5-1.4L8 20l-2-1.4V3z"/><path d="M9 8h6M9 12h6"/></svg></i></div>
+   <strong>{{ store.new_order_count }}</strong>
+   <em>{% if store.new_order_count %}Need your confirmation{% else %}You are all caught up{% endif %}</em>
+  </a>
+  <a class="mk-metric" href="{% url 'marketplace:seller_store_orders' store.id %}?view=open">
+   <div class="mk-metric-top"><span>Open orders</span><i class="is-blue"><svg viewBox="0 0 24 24"><path d="M1 3h4l2.7 12.4a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.5L21 7H6"/><circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/></svg></i></div>
+   <strong>{{ store.open_order_count }}</strong>
+   <em>{{ store.delivered_count }} delivered so far</em>
+  </a>
+  <a class="mk-metric" href="{% url 'marketplace:seller_store_products' store.id %}">
+   <div class="mk-metric-top"><span>Products</span><i class="is-slate"><svg viewBox="0 0 24 24"><path d="M3 7.5l9-4 9 4-9 4-9-4z"/><path d="M3 7.5v9l9 4 9-4v-9"/></svg></i></div>
+   <strong>{{ store.product_count }}</strong>
+   <em>{{ store.category_count }} categor{{ store.category_count|pluralize:"y,ies" }}</em>
+  </a>
+ </section>
+
+ {# ---------- 4. Recent activity on the left, shortcuts + share link on the right ---------- #}
+ <div class="mk-cols">
+  <div class="mk-col">
+   <section class="mk-panel" aria-labelledby="mk-sales-{{ store.id }}">
+    <div class="mk-panel-h"><div><h2 id="mk-sales-{{ store.id }}">Sales this week</h2><span class="mk-muted">Paid orders, last 7 days</span></div><strong class="mk-week-total">TSh {{ store.sales_week_total|default:0|floatformat:0|intcomma }}</strong></div>
+    <div class="mk-bars" role="img" aria-label="Paid sales for the last 7 days">
+     {% for d in store.sales_week %}
+     <div class="mk-bar{% if forloop.last %} is-today{% endif %}" title="{{ d.full }}: TSh {{ d.amount|floatformat:0|intcomma }}">
+      <span class="mk-bar-val">{% if d.amount %}{{ d.amount|floatformat:0|intcomma }}{% endif %}</span>
+      <span class="mk-bar-track"><i style="height:{{ d.pct }}%"></i></span>
+      <span class="mk-bar-day">{{ d.label }}</span>
+     </div>
+     {% endfor %}
+    </div>
+   </section>
+
+   <section class="mk-panel" aria-labelledby="mk-recent-{{ store.id }}">
+    <div class="mk-panel-h"><h2 id="mk-recent-{{ store.id }}">Recent orders</h2>{% if store.recent_orders %}<a href="{% url 'marketplace:seller_store_orders' store.id %}">View all →</a>{% endif %}</div>
+    {% if store.recent_orders %}
+    <ul class="mk-feed">
+     {% for o in store.recent_orders %}
+     <li><a href="{% url 'marketplace:seller_order_detail' store.id o.reference %}">
+      <span class="mk-feed-ico {% if o.status == 'new' %}is-new{% endif %}">{{ o.customer_name|slice:":1"|upper }}</span>
+      <span style="min-width:0"><b>{{ o.customer_name }}</b><small>{% for item in o.items.all|slice:":2" %}{{ item.name }}{% if not forloop.last %}, {% endif %}{% endfor %} · {{ o.created_at|naturaltime }}</small></span>
+      <span class="mk-feed-end"><strong>TSh {{ o.total|floatformat:0|intcomma }}</strong><span class="mk-badge mk-b-{{ o.status }}">{{ o.get_status_display }}</span></span>
+     </a></li>
+     {% endfor %}
+    </ul>
+    {% else %}
+    <div class="mk-empty"><b>No orders yet</b>{% if store.online_service_active %}Share your shop link with customers. Orders will appear here as soon as they are paid.{% else %}Orders will appear here once your shop is live.{% endif %}</div>
+    {% endif %}
+   </section>
+  </div>
+
+  <div class="mk-col">
+   {% if store.out_of_stock_count or store.low_stock_count or store.hidden_count %}
+   <section class="mk-panel" aria-label="Needs attention">
+    <div class="mk-panel-h"><h3>Needs attention</h3></div>
+    <ul class="mk-attn">
+     {% if store.out_of_stock_count %}<li><a href="{% url 'marketplace:seller_store_products' store.id %}?view=out"><span class="mk-dot is-bad"></span><span>{{ store.out_of_stock_count }} product{{ store.out_of_stock_count|pluralize }} out of stock</span><em>Restock →</em></a></li>{% endif %}
+     {% if store.low_stock_count %}<li><a href="{% url 'marketplace:seller_store_products' store.id %}?view=low"><span class="mk-dot is-warn"></span><span>{{ store.low_stock_count }} product{{ store.low_stock_count|pluralize }} running low</span><em>Review →</em></a></li>{% endif %}
+     {% if store.hidden_count %}<li><a href="{% url 'marketplace:seller_store_products' store.id %}?view=hidden"><span class="mk-dot"></span><span>{{ store.hidden_count }} hidden product{{ store.hidden_count|pluralize }}</span><em>Show →</em></a></li>{% endif %}
+    </ul>
+   </section>
+   {% endif %}
+
+   <section class="mk-panel" aria-label="Shortcuts">
+    <div class="mk-panel-h"><h3>Shortcuts</h3></div>
+    <nav class="mk-shortcuts">
+     {% if store.online_service_active %}
+     <a href="{% url 'marketplace:seller_product_add' store.id %}"><i><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg></i><span>Add a product<small>Photos, price and stock</small></span><svg class="go" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></a>
+     {% endif %}
+     <a href="{% url 'marketplace:seller_store_products' store.id %}"><i><svg viewBox="0 0 24 24"><path d="M3 7.5l9-4 9 4-9 4-9-4z"/><path d="M3 7.5v9l9 4 9-4v-9"/></svg></i><span>Manage products<small>Edit, restock, hide or feature</small></span><svg class="go" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></a>
+     {% if store.listing_new_inquiries %}<a href="{% url 'marketplace:seller_store_inquiries' store.id %}"><i><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg></i><span>Customer enquiries<small>{{ store.listing_new_inquiries }} new</small></span><svg class="go" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></a>{% endif %}
+     <a href="{% url 'marketplace:seller_payment_settings' store.id %}"><i><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/></svg></i><span>Payment connection<small>Get paid directly</small></span><svg class="go" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></a>
+     <a href="{% url 'marketplace:seller_store_setup' %}"><i><svg viewBox="0 0 24 24"><path d="M3 9l1.5-5h15L21 9"/><path d="M4 9v11h16V9"/></svg></i><span>Shop profile<small>Name, logo and description</small></span><svg class="go" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></a>
+     <a href="{% url 'marketplace:seller_service_requests' %}"><i><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M8 3v4M16 3v4M3.5 10h17"/></svg></i><span>Plans &amp; billing<small>{% if store.online_service_active %}Online Selling active{% else %}Activate your plan{% endif %}</small></span><svg class="go" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></a>
+    </nav>
+   </section>
+
+   {% if store.online_service_active %}
+   <section class="mk-panel" aria-label="Share your shop">
+    <div class="mk-panel-h"><h3>Your shop link</h3></div>
+    <div class="mk-panel-b">
+     <div class="mk-link-box"><code id="mk-link-{{ store.id }}">{{ request.scheme }}://{{ request.get_host }}{% url 'marketplace:seller_store_public' store.slug %}</code></div>
+     <div class="mk-actions"><button type="button" class="btn btn-primary btn-sm" data-mk-copy="mk-link-{{ store.id }}">Copy link</button><a class="btn btn-secondary btn-sm" href="{% url 'marketplace:seller_store_public' store.slug %}" target="_blank" rel="noopener">Open ↗</a></div>
+     <p class="mk-muted" style="margin:0">Share it on WhatsApp, Instagram or your receipts.</p>
+    </div>
+   </section>
+   {% endif %}
+  </div>
+ </div>
+ {% empty %}
+ {# ---------- No shop yet: a friendly, single-purpose first screen ---------- #}
+ <header class="mk-welcome">
+  <div class="mk-welcome-id">
+   <span class="mk-avatar" aria-hidden="true">★</span>
+   <div><h1>Welcome to Seller Centre</h1><p>Open your own online shop in minutes. Customers can browse, order and pay online, and you manage everything from here.</p></div>
+  </div>
+  <div class="mk-actions"><a class="btn btn-light" href="{% url 'marketplace:seller_store_setup' %}">Create my online shop</a></div>
+ </header>
+ <section class="mk-kinds" aria-label="How it works">
+  <div class="mk-kind" style="cursor:default"><span class="mk-kind-ico"><svg viewBox="0 0 24 24"><path d="M3 9l1.5-5h15L21 9"/><path d="M4 9v11h16V9"/></svg></span><h2>1. Create your shop</h2><p>Choose a name and logo. Your public shop link is created for you.</p></div>
+  <div class="mk-kind" style="cursor:default"><span class="mk-kind-ico"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M8 3v4M16 3v4M3.5 10h17"/></svg></span><h2>2. Activate your plan</h2><p>Pay the simple monthly fee. Your shop switches on automatically after payment.</p></div>
+  <div class="mk-kind" style="cursor:default"><span class="mk-kind-ico"><svg viewBox="0 0 24 24"><path d="M3 7.5l9-4 9 4-9 4-9-4z"/><path d="M3 7.5v9l9 4 9-4v-9"/></svg></span><h2>3. Add products and sell</h2><p>Upload products, share your link and receive orders from customers.</p></div>
+ </section>
+ {% endfor %}
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+document.addEventListener('click', function (e) {
+  var btn = e.target.closest('[data-mk-copy]');
+  if (!btn) return;
+  var src = document.getElementById(btn.getAttribute('data-mk-copy'));
+  if (!src) return;
+  var text = src.textContent.trim(), label = btn.textContent;
+  function done(ok) { btn.textContent = ok ? 'Copied ✓' : 'Press Ctrl+C'; setTimeout(function () { btn.textContent = label; }, 1800); }
+  if (navigator.clipboard && window.isSecureContext) { navigator.clipboard.writeText(text).then(function () { done(true); }, function () { done(false); }); }
+  else { var r = document.createRange(); r.selectNodeContents(src); var s = window.getSelection(); s.removeAllRanges(); s.addRange(r); try { done(document.execCommand('copy')); } catch (_) { done(false); } }
+});
+</script>
+{% endblock %}

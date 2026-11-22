@@ -1,0 +1,27 @@
+{% load humanize cart_tags %}{% with qty=cart|get_item:product.pk %}
+<article class="sp-card mp-product-card mv-card" data-product-id="{{ product.pk }}" data-name="{{ product.name }}" data-in-cart="{{ qty }}">
+  <div class="mv-media">
+    <a class="sp-card-media" href="{% url 'marketplace:detail' product.slug %}" aria-label="{{ product.name }}{% if product.has_trailer %} – watch trailer{% endif %}"{% if product.has_trailer %} data-mv-media{% endif %}>
+      {% if product.image %}<img class="sp-card-bg" loading="lazy" decoding="async" src="{{ product.image.url }}" alt="" aria-hidden="true" data-no-heal><img loading="lazy" decoding="async" width="400" height="500" src="{{ product.image.url }}" alt="{{ product.name }} poster">{% else %}<span class="sp-card-ph"><svg class="i"><use href="#i-image"/></svg></span>{% endif %}
+      {% if product.has_trailer %}<video class="mv-video" muted loop playsinline preload="none" disablepictureinpicture aria-hidden="true" tabindex="-1" data-src="{% url 'marketplace:trailer' product.slug %}"></video><span class="mv-play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 4.5v15l13-7.5z"/></svg></span><span class="mv-rec" aria-hidden="true"><i></i>Trailer</span><span class="mv-progress" aria-hidden="true"><b></b></span>{% endif %}
+      <span class="mv-badges">{% if rank %}<span class="mv-badge">#{{ rank }}</span>{% else %}<span class="mv-badge">Movie</span>{% endif %}{% if product.movie_quality_label %}<span class="mv-badge q">{{ product.movie_quality }}</span>{% endif %}</span>
+      <span class="mv-facts">{% if product.movie_year %}<span>{{ product.movie_year }}</span>{% endif %}{% if product.movie_duration %}<span>{{ product.movie_duration }}</span>{% endif %}{% if product.movie_genre_list %}<span>{{ product.movie_genre_list.0 }}</span>{% endif %}</span>
+    </a>
+    {% if product.has_trailer %}<button class="mv-sound" type="button" aria-label="Turn trailer sound on" aria-pressed="false"><svg class="off" viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="m16 9 5 6M21 9l-5 6"/></svg><svg class="on" viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg></button>{% endif %}
+  </div>
+  <a class="sp-card-title" href="{% url 'marketplace:detail' product.slug %}"><span class="sp-card-price"><b>TSh {{ product.price|floatformat:0|intcomma }}</b>{% if product.discount_percent %} <s>{{ product.compare_at_price|floatformat:0|intcomma }}</s> <em>-{{ product.discount_percent }}%</em>{% endif %}</span><span class="sp-card-name">{{ product.name }}</span></a>
+  {% if product.rating_count %}<div class="sp-card-rate"><b>{{ product.rating_avg|floatformat:1 }}</b>{% stars product.rating_avg %}<span>({{ product.rating_count }})</span></div>{% endif %}
+  {% if not compact %}
+  <div class="sp-card-seller">
+    {% if product.seller_store and product.seller_store.is_published %}<a href="{% url 'marketplace:seller_store_public' product.seller_store.slug %}">{{ product.seller_store.public_name }}</a><svg class="i sp-ver" aria-label="Verified seller"><use href="#i-verified"/></svg>
+    {% elif product.seller_name %}<a href="{% url 'marketplace:catalog' %}?seller={{ product.seller_name|urlencode }}">{{ product.seller_name }}</a>
+    {% else %}<span class="n">SmartPOS Marketplace</span><svg class="i sp-ver" aria-label="Verified"><use href="#i-verified"/></svg>{% endif %}
+  </div>
+  <div class="sp-card-actions">
+    {% if product.in_stock %}
+    <form class="mp-add-form" method="post" action="{% url 'marketplace:add_cart' product.pk %}"{% if qty %} hidden{% endif %}>{% csrf_token %}<input type="hidden" name="quantity" value="1"><button class="sp-add" type="submit"><svg class="i"><use href="#i-plus"/></svg> Buy movie</button></form>
+    <div class="mp-quantity-row"{% if not qty %} hidden{% endif %}><button class="mp-qty-btn" type="button" data-operation="decrement" aria-label="Remove {{ product.name }}">−</button><output class="mp-qty-value" aria-live="polite">{{ qty|default:0 }}</output><button class="mp-qty-btn" type="button" data-operation="increment" aria-label="Add {{ product.name }}"{% if qty >= product.max_cart_qty %} disabled{% endif %}>+</button></div>
+    {% else %}<button class="sp-add is-disabled" type="button" disabled>Unavailable</button>{% endif %}
+  </div>
+  {% endif %}
+</article>{% endwith %}

@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% block title %}Branch Payment{% endblock %}
+
+{% block extra_head %}
+<style data-spa-page-style="branch-addon-payment">
+  .pay-tab[aria-selected="true"] { background: #fff; color: #0f172a; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-md mx-auto py-6" id="branch-pay-app">
+  <div class="rounded-2xl bg-white shadow-xl ring-1 ring-ink-900/10">
+
+    <!-- Header: same layout as the Packages & Services checkout -->
+    <div class="px-5 py-3.5 border-b border-ink-100 flex items-start justify-between gap-3">
+      <div class="min-w-0">
+        <p class="text-xs font-bold uppercase tracking-[.16em] text-brand-700">{% if addon.status == 'ACTIVE' %}Branch renewal{% else %}Branch activation{% endif %}</p>
+        <h1 class="mt-0.5 text-lg font-extrabold text-ink-950 truncate">{{ pharmacy.name }}</h1>
+        <p class="text-[13px] text-ink-500 mt-0.5">{{ addon.get_package_tier_display }} plan &middot; {{ addon.get_billing_plan_display }} billing</p>
+      </div>
+      {% if addon.status == 'ACTIVE' %}
+        {% if addon.is_overdue %}<span class="badge bg-red-100 text-red-700 flex-none">Overdue</span>
+        {% else %}<span class="badge bg-emerald-100 text-emerald-700 flex-none">Active</span>{% endif %}
+      {% elif addon.status == 'PENDING_PAYMENT' %}
+        <span class="badge bg-amber-100 text-amber-700 flex-none">Payment pending</span>
+      {% else %}
+        <span class="badge bg-red-100 text-red-700 flex-none">{{ addon.get_status_display }}</span>
+      {% endif %}
+    </div>
+
+    <div class="px-5 py-4 space-y-3">
+
+      <!-- Summary -->
+      <dl class="rounded-2xl bg-ink-50 border border-ink-100 divide-y divide-ink-100 text-sm">
+        <div class="flex justify-between gap-4 px-4 py-2"><dt class="text-ink-500">Package</dt><dd class="font-bold text-ink-900 text-right">{{ addon.get_package_tier_display }}</dd></div>
+        <div class="flex justify-between gap-4 px-4 py-2"><dt class="text-ink-500">Billing period</dt><dd class="font-bold text-ink-900 text-right">{{ addon.get_billing_plan_display }}</dd></div>
+        <div class="flex justify-between gap-4 px-4 py-2">
+          <dt class="text-ink-500">{% if addon.status == 'ACTIVE' %}Paid until{% else %}Access{% endif %}</dt>
+          <dd class="font-bold text-ink-900 text-right">{% if addon.status == 'ACTIVE' and addon.next_billing_date %}{{ addon.next_billing_date|date:"d M Y" }}{% elif addon.status == 'ACTIVE' %}Active{% else %}Unlocks after payment{% endif %}</dd>
+        </div>
+        <div class="flex justify-between items-center gap-4 px-4 py-2">
+          <dt class="text-ink-500">Amount to pay</dt>
+          <dd class="text-xl font-extrabold text-ink-950">TZS <span class="tabular-nums">{{ addon.billing_amount|floatformat:"0g" }}</span><span class="text-xs font-medium text-ink-400">{% if addon.billing_plan == 'YEARLY' %}/year{% else %}/month{% endif %}</span></dd>
+        </div>
+      </dl>
+
+      {% if addon.status == 'ACTIVE' and not addon.renewal_due %}
+      <div class="rounded-xl bg-emerald-50 border border-emerald-200 p-3 text-sm text-emerald-800">
+        This branch is active{% if addon.next_billing_date %} and paid until <strong>{{ addon.next_billing_date|date:"d M Y" }}</strong>{% endif %}. No payment is needed now.
+      </div>
+      {% elif addon.status == 'CANCELLED' %}
+      <div class="rounded-xl bg-red-50 border border-red-200 p-3 text-sm text-red-800">This branch was cancelled. Contact support to reactivate it.</div>
+      {% else %}
+
+      {% if addon.status == 'ACTIVE' and addon.is_overdue %}
+      <div class="rounded-xl bg-red-50 border border-red-200 p-3 text-sm text-red-800"><strong>Payment is overdue.</strong> Renew now to keep this branch running.</div>
+      {% endif %}
+
+      <!-- Payment method tabs (identical to Packages & Services) -->
+      <div class="inline-flex w-full rounded-xl bg-ink-100 p-1" role="tablist" aria-label="Payment method">
+        {% if online_payment_ready %}<button type="button" role="tab" class="pay-tab flex-1 rounded-lg px-3 py-1.5 text-sm font-semibold text-ink-600" data-pay-tab="online" aria-selected="true">{% if online_gateway_is_abliner %}SmartPOS Mobile Payment{% else %}Pay online{% endif %}</button>{% endif %}
+        <button type="button" role="tab" class="pay-tab flex-1 rounded-lg px-3 py-1.5 text-sm font-semibold text-ink-600" data-pay-tab="manual" aria-selected="{% if online_payment_ready %}false{% else %}true{% endif %}">Mobile money</button>
+      </div>
+
+      {% if online_payment_ready %}
+      <form method="post" id="pay-online-form" data-pay-panel="online"
+            action="{% if addon.status == 'ACTIVE' %}{% url 'payments:pay_branch_addon_renewal' pharmacy.pk %}{% else %}{% url 'payments:pay_branch_addon' pharmacy.pk %}{% endif %}"
+            class="rounded-2xl border-2 border-brand-600 bg-gradient-to-br from-brand-50 to-white p-3.5">
+        {% csrf_token %}
+        <p class="text-sm font-bold text-ink-900">{% if online_gateway_is_abliner %}Quick and secure checkout{% else %}Instant activation{% endif %}</p>
+        <p class="text-xs text-ink-500 mt-0.5 mb-3">{% if online_gateway_is_abliner %}Pay with mobile money. Enter your number and approve the request on your phone.{% else %}Card, M-Pesa, Mixx by Yas or Airtel Money.{% endif %} {% if addon.status == 'ACTIVE' %}Your renewal applies{% else %}The branch unlocks{% endif %} the moment payment is confirmed.</p>
+        <button type="submit" class="btn btn-primary w-full">{% if online_gateway_is_abliner %}Pay with mobile money{% else %}Continue to secure payment{% endif %}</button>
+      </form>
+      {% endif %}
+
+      <div data-pay-panel="manual" class="space-y-2.5 {% if online_payment_ready %}hidden{% endif %}">
+        <div class="rounded-xl border border-ink-100 px-4 py-2.5 text-sm flex items-center justify-between gap-3">
+          <div class="min-w-0">
+            <span class="text-ink-400 text-xs block truncate">Pay to Lipa Namba &middot; {{ payment_settings.payee_name }}</span>
+            <strong class="text-lg tracking-wide">{{ payment_settings.lipa_namba }}</strong>
+          </div>
+          <button type="button" class="copy-btn rounded-lg border border-ink-200 px-3 py-1.5 text-xs font-semibold hover:bg-ink-50 flex-none" data-copy="{{ payment_settings.lipa_namba }}">Copy</button>
+        </div>
+
+        {% if addon.status == 'PENDING_PAYMENT' %}
+          {% if addon.payment_reference %}
+          <p class="rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm text-amber-800">
+            Reference <strong>{{ addon.payment_reference }}</strong> is waiting for verification. You can correct it below{% if online_payment_ready %}, or pay online instead{% endif %}.
+          </p>
+          {% endif %}
+          <form method="post" id="pay-manual-form" class="space-y-2.5">
+            {% csrf_token %}
+            <input name="payment_reference" value="{{ addon.payment_reference }}" class="form-input" required maxlength="120" placeholder="Transaction reference (from your payment SMS)" autocomplete="off">
+            <button type="submit" class="btn btn-secondary w-full">I have paid &mdash; submit for verification</button>
+          </form>
+          <p class="text-xs text-ink-400">The branch stays locked until the payment is verified. Your other branches are unaffected.</p>
+        {% else %}
+          <p class="rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm text-amber-800">
+            To renew by mobile money, pay the Lipa Namba above and contact support{% if payment_settings.support_phone %} on <strong>{{ payment_settings.support_phone }}</strong>{% endif %} with your transaction reference.
+          </p>
+        {% endif %}
+
+        {% if payment_settings.instructions_text %}
+        <p class="text-xs text-ink-500 whitespace-pre-line">{{ payment_settings.instructions_text }}</p>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      <p class="text-center text-[11px] text-ink-400 !mt-2">Questions? Call {{ payment_settings.support_phone }}</p>
+    </div>
+  </div>
+
+  <div class="text-center mt-5">
+    <a href="{% url 'pharmacies:list' %}" class="text-sm text-brand-700 font-medium hover:text-brand-800 transition">&larr; Back to My Branches</a>
+  </div>
+</div>
+
+<script>
+(function () {
+  var root = document.getElementById('branch-pay-app'); if (!root) return;
+  function showPayTab(name) {
+    root.querySelectorAll('[data-pay-tab]').forEach(function (b) { b.setAttribute('aria-selected', b.getAttribute('data-pay-tab') === name); });
+    root.querySelectorAll('[data-pay-panel]').forEach(function (p) { p.classList.toggle('hidden', p.getAttribute('data-pay-panel') !== name); });
+  }
+  root.querySelectorAll('[data-pay-tab]').forEach(function (b) { b.addEventListener('click', function () { showPayTab(b.getAttribute('data-pay-tab')); }); });
+  root.querySelectorAll('.copy-btn').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var v = b.getAttribute('data-copy');
+      var done = function () { var t = b.textContent; b.textContent = 'Copied'; setTimeout(function () { b.textContent = t; }, 1400); };
+      if (navigator.clipboard) { navigator.clipboard.writeText(v).then(done); } else { var ta = document.createElement('textarea'); ta.value = v; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); done(); }
+    });
+  });
+  root.querySelectorAll('form').forEach(function (f) {
+    f.addEventListener('submit', function () {
+      var b = f.querySelector('button[type=submit]');
+      if (b) { var t = b.textContent; setTimeout(function () { b.disabled = true; b.textContent = 'Processing…'; }, 0); setTimeout(function () { b.disabled = false; b.textContent = t; }, 15000); }
+    });
+  });
+})();
+</script>
+{% endblock %}

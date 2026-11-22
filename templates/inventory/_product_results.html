@@ -1,0 +1,76 @@
+<div class="card overflow-x-auto">
+    <table class="w-full text-sm">
+        <thead>
+            <tr class="text-left text-ink-500 border-b border-ink-100">
+                {% if user.is_management_user %}<th class="py-2 pr-2 w-8"><input type="checkbox" id="select-all-products" class="form-checkbox"></th>{% endif %}
+                <th class="py-2 pr-4">Product</th>
+                <th class="py-2 pr-4">Category</th>
+                <th class="py-2 pr-4">Total Stock</th>
+                {% if user.is_management_user %}<th class="py-2 pr-4">Buy Price</th>{% endif %}
+                <th class="py-2 pr-4">Sell Price</th>
+                <th class="py-2 pr-4">Discount</th>
+                <th class="py-2 pr-4">Nearest Expiry</th>
+                <th class="py-2 pr-4 text-right">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for product in page_obj %}
+            <tr id="product-row-{{ product.pk }}" class="border-b border-ink-100{% if highlight_id == product.pk %} is-just-saved{% endif %}">
+                {% if user.is_management_user %}
+                <td class="py-3 pr-2"><input type="checkbox" name="product_ids" value="{{ product.pk }}" form="bulk-delete-form" class="form-checkbox product-row-checkbox"></td>
+                {% endif %}
+                <td class="py-3 pr-4 font-medium">
+                  <div class="flex items-center gap-3">
+                    <span class="shrink-0 w-10 h-10 rounded-lg border border-ink-100 bg-ink-50 overflow-hidden grid place-items-center text-ink-300">{% if product.image_url %}<img src="{{ product.image_url }}" alt="" loading="lazy" decoding="async" class="w-full h-full object-contain">{% else %}<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.8"/><path d="m21 16-5-5-8 8"/></svg>{% endif %}</span>
+                    <div class="min-w-0">
+                    <a href="{% url 'inventory:product_batches' product.pk %}" class="hover:text-brand-700">{{ product.name }}</a>{% if highlight_id == product.pk %}<span class="badge bg-brand-50 text-brand-700 ml-2">Just saved</span>{% endif %}<div class="text-[10px] text-ink-400 mt-0.5">Barcode: {{ product.effective_barcode }}</div>
+                    </div>
+                  </div>
+                </td>
+                <td class="py-3 pr-4 text-ink-500">{{ product.category|default:"-" }}</td>
+                <td class="py-3 pr-4">
+                    {{ product.total_quantity }} {{ product.get_unit_display }}
+                    {% if product.is_low_stock %}<span class="badge bg-amber-100 text-amber-700 ml-1">Low</span>{% endif %}
+                </td>
+                {% if user.is_management_user %}<td class="py-3 pr-4">{{ product.current_purchase_price|default:"-" }}</td>{% endif %}
+                <td class="py-3 pr-4">{{ product.current_selling_price|default:"-" }}</td>
+                <td class="py-3 pr-4">{% if product.discount_enabled %}<span class="badge bg-brand-50 text-brand-700">{% if product.discount_type == 'AMOUNT' %}TZS {{ product.min_discount_amount|floatformat:"0" }}–{{ product.max_discount_amount|floatformat:"0" }}{% else %}{{ product.min_discount_percent }}%–{{ product.max_discount_percent }}%{% endif %}</span>{% else %}<span class="text-ink-400">Off</span>{% endif %}</td>
+                <td class="py-3 pr-4">
+                    {% if product.nearest_expiry_date %}
+                        {{ product.nearest_expiry_date|date:"d M Y" }}
+                        {% if product.is_expired %}
+                            <span class="badge bg-red-100 text-red-700 ml-1">No sellable stock</span>
+                        {% elif product.is_expiring_soon %}
+                            <span class="badge bg-amber-100 text-amber-700 ml-1">{{ product.days_to_expiry }}d left</span>
+                        {% endif %}
+                    {% elif product.total_quantity %}
+                        <span class="text-ink-400">No expiry</span>
+                        {% if not product.requires_expiry %}
+                            <span class="badge bg-ink-100 text-ink-500 ml-1">Non-expiring</span>
+                        {% endif %}
+                    {% else %}
+                        <span class="text-ink-400">No stock</span>
+                    {% endif %}
+                </td>
+                <td class="py-3 pr-4 text-right whitespace-nowrap">
+                    <a href="{% url 'inventory:product_batches' product.pk %}" class="text-brand-700 text-xs">Batches</a><a target="_blank" rel="noopener" href="{% url 'inventory:product_barcode' product.pk %}" class="text-ink-600 text-xs ml-3">Barcode</a>
+                    {% if user.is_management_user %}
+                    <a href="{% url 'inventory:batch_add' product.pk %}" class="text-ink-600 text-xs ml-3" data-batch-modal>+ New Batch</a>
+                    <a href="{% url 'inventory:product_edit' product.pk %}" class="text-ink-600 text-xs ml-3">Edit</a>
+                    <a href="{% url 'inventory:product_merge' product.pk %}" class="text-amber-700 text-xs ml-3">Merge</a>
+                    <form method="post" action="{% url 'inventory:product_delete_review' %}" class="inline">
+                        {% csrf_token %}
+                        <input type="hidden" name="product_ids" value="{{ product.pk }}">
+                        <button type="submit" class="text-red-600 text-xs ml-3">Delete</button>
+                    </form>
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="9" class="py-8 text-center text-ink-400">No products found.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% include "partials/pagination.html" with page_obj=page_obj %}

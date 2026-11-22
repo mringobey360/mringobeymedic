@@ -1,0 +1,78 @@
+{# Optional product photo. Usage: {% include 'inventory/_product_image_field.html' with f=form %} #}
+{% with current=f.instance.image_url %}
+<div class="pimg" data-pimg data-current="{{ current }}">
+  <div class="flex items-center justify-between gap-2 mb-1">
+    <label for="{{ f.image.id_for_label }}" class="block text-sm font-medium">{{ f.image.label }}</label>
+    <span class="text-[11px] font-semibold text-ink-400 uppercase tracking-wider">Optional</span>
+  </div>
+  <div class="pimg-box">
+    <div class="pimg-preview" data-pimg-preview>
+      <img alt="" data-pimg-img {% if current %}src="{{ current }}"{% else %}hidden{% endif %} decoding="async">
+      <svg data-pimg-ph viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" {% if current %}hidden{% endif %}><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.8"/><path d="m21 16-5-5-8 8"/></svg>
+    </div>
+    <div class="min-w-0 flex-1">
+      <p class="text-sm text-ink-600" data-pimg-status>{% if current %}Current photo{% else %}No photo yet. Add one so staff recognise this product quickly.{% endif %}</p>
+      <div class="flex flex-wrap gap-2 mt-2">
+        <button type="button" class="btn btn-secondary !py-1.5 !px-3 text-sm" data-pimg-choose>{% if current %}Change photo{% else %}Add photo{% endif %}</button>
+        <button type="button" class="btn !py-1.5 !px-3 text-sm text-red-700 border border-red-200 bg-red-50 hover:bg-red-100" data-pimg-remove {% if not current %}hidden{% endif %}>Remove</button>
+      </div>
+      <p class="text-xs text-ink-400 mt-2">{{ f.image.help_text }}</p>
+    </div>
+  </div>
+  {{ f.image }}{{ f.remove_image }}
+  {% if f.image.errors %}<p class="text-xs text-red-600 mt-1" role="alert">{{ f.image.errors.0 }}</p>{% endif %}
+</div>
+{% endwith %}
+<style>
+.pimg-box{display:flex;gap:1rem;align-items:center;padding:.875rem;border:1.5px dashed var(--sp-border,#cbd5e1);border-radius:1rem;background:var(--sp-surface-2,#f8fafc)}
+.pimg-preview{flex:none;width:5.5rem;height:5.5rem;border-radius:.875rem;background:var(--sp-surface,#fff);border:1px solid var(--sp-border,#e2e8f0);display:grid;place-items:center;overflow:hidden;color:#94a3b8}
+.pimg-preview img{width:100%;height:100%;object-fit:contain}
+.pimg-preview svg{width:2rem;height:2rem}
+.pimg-preview [hidden],.pimg [hidden]{display:none!important}
+</style>
+<script>
+(function(){
+  var root=document.querySelector('[data-pimg]'); if(!root||root.dataset.ready) return; root.dataset.ready='1';
+  var input=root.parentNode.querySelector('[data-product-image-input]')||root.querySelector('[data-product-image-input]');
+  var flag=root.parentNode.querySelector('[data-product-image-remove]')||root.querySelector('[data-product-image-remove]');
+  var img=root.querySelector('[data-pimg-img]'), ph=root.querySelector('[data-pimg-ph]'), st=root.querySelector('[data-pimg-status]');
+  var choose=root.querySelector('[data-pimg-choose]'), remove=root.querySelector('[data-pimg-remove]');
+  var current=root.dataset.current||'', MAX=5*1024*1024, SIDE=1280, objectUrl=null;
+  if(!input) return;
+  function show(src){ if(src){img.src=src;img.removeAttribute('hidden');ph.setAttribute('hidden','');}else{img.removeAttribute('src');img.setAttribute('hidden','');ph.removeAttribute('hidden');} }  /* SVG has no .hidden property: use attributes */
+  function setStatus(t,err){ st.textContent=t; st.style.color=err?'#b91c1c':''; }
+  function reset(){ input.value=''; if(objectUrl){URL.revokeObjectURL(objectUrl);objectUrl=null;} }
+  choose.addEventListener('click',function(){ input.click(); });
+  remove.addEventListener('click',function(){
+    reset(); flag.value = current ? '1' : '';
+    show(''); remove.hidden=true; choose.textContent='Add photo';
+    setStatus(current?'Photo will be removed when you save.':'No photo yet. Add one so staff recognise this product quickly.');
+  });
+  // Shrink big phone photos in the browser first: far less data on a weak connection. Falls back to the original file.
+  function shrink(file){
+    return new Promise(function(resolve){
+      if(!/^image\/(jpeg|png|webp)$/.test(file.type)||!window.createImageBitmap||!window.DataTransfer||file.size<350*1024) return resolve(file);
+      createImageBitmap(file).then(function(bmp){
+        var r=Math.min(1,SIDE/Math.max(bmp.width,bmp.height)); if(r===1&&file.size<1.5*1024*1024){return resolve(file);}
+        var c=document.createElement('canvas'); c.width=Math.round(bmp.width*r); c.height=Math.round(bmp.height*r);
+        var ctx=c.getContext('2d'); ctx.fillStyle='#fff'; ctx.fillRect(0,0,c.width,c.height); ctx.drawImage(bmp,0,0,c.width,c.height);
+        c.toBlob(function(b){ if(!b||b.size>=file.size) return resolve(file);
+          resolve(new File([b],(file.name||'photo').replace(/\.\w+$/,'')+'.jpg',{type:'image/jpeg'})); },'image/jpeg',0.85);
+      }).catch(function(){ resolve(file); });
+    });
+  }
+  input.addEventListener('change',function(){
+    var f=input.files&&input.files[0]; if(!f) return;
+    if(!/^image\/(jpeg|png|webp)$/.test(f.type)){ reset(); setStatus('Use a JPG, PNG or WebP photo.',true); return; }
+    shrink(f).then(function(out){
+      if(out!==f){ try{ var dt=new DataTransfer(); dt.items.add(out); input.files=dt.files; }catch(e){ out=f; } }
+      if(out.size>MAX){ reset(); setStatus('This photo is larger than 5 MB. Choose a smaller photo.',true); return; }
+      flag.value='';
+      if(objectUrl) URL.revokeObjectURL(objectUrl);
+      objectUrl=URL.createObjectURL(out); show(objectUrl);
+      remove.hidden=false; choose.textContent='Change photo';
+      setStatus('New photo ready (' + Math.max(1,Math.round(out.size/1024)) + ' KB). It is saved with the product.');
+    });
+  });
+})();
+</script>

@@ -1,0 +1,1584 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Packages & Services{% endblock %}
+
+{% block extra_head %}
+<style data-spa-page-style="pkg-tabs">
+/* Package filter tabs: colours are driven by aria-selected so hover/focus can never clash
+   with the active state (white text must never land on a white hover background). */
+.pkg-tab{cursor:pointer;-webkit-tap-highlight-color:transparent}
+.pkg-tab[aria-selected="true"],.pkg-tab[aria-selected="true"]:hover,.pkg-tab[aria-selected="true"]:focus-visible{background-color:#0f766e!important;border-color:#0f766e!important;color:#fff!important;box-shadow:0 6px 14px -8px rgba(15,118,110,.9)}
+.pkg-tab[aria-selected="true"] .pkg-tab-count{background-color:rgba(255,255,255,.22)!important;color:#fff!important}
+.pkg-tab[aria-selected="false"]:hover{background-color:#f1f5f9!important;border-color:#cbd5e1!important;color:#0f172a!important}
+.pkg-tab:focus-visible{outline:2px solid #0f766e;outline-offset:2px}
+</style>
+<style data-spa-page-style="pkg-design">
+/* ============================================================ Packages page — design system */
+#packages-app{--b:#0f766e;--b2:#0d9488;--bl:#ecfdf5;--line:#e2e8f0;--ink:#0f172a;--ink2:#475569;--ink3:#94a3b8;width:100%;max-width:none;min-width:0}
+#app-content:has(#packages-app){max-width:none}
+@media(min-width:1024px){#app-content:has(#packages-app){width:100%;max-width:none;padding-left:clamp(1rem,2vw,2rem);padding-right:clamp(1rem,2vw,2rem)}#packages-app{width:100%;max-width:none}}
+#packages-app h1,#packages-app h2,#packages-app h3{letter-spacing:-.02em}
+
+/* ---- hero */
+.pc-hero{position:relative;overflow:hidden;display:grid;gap:28px;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);align-items:center;padding:34px 36px;border-radius:24px;color:#fff;
+  background:radial-gradient(900px 340px at 105% -30%,rgba(45,212,191,.35),transparent 60%),radial-gradient(600px 300px at -10% 120%,rgba(20,184,166,.22),transparent 60%),linear-gradient(135deg,#06322e 0%,#0b4f49 50%,#0f172a 140%)}
+.pc-kicker{display:inline-flex;align-items:center;gap:8px;font-size:11.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#99f6e4;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);padding:5px 12px;border-radius:999px}
+.pc-kicker i{width:7px;height:7px;border-radius:50%;background:#5eead4;box-shadow:0 0 0 4px rgba(94,234,212,.2)}
+.pc-hero h1,#packages-app .pc-hero h1{color:#fff;margin:16px 0 0;font-size:clamp(26px,3.4vw,40px);line-height:1.12;font-weight:800}
+.pc-hero h1 em{font-style:normal;background:linear-gradient(90deg,#5eead4,#a7f3d0);-webkit-background-clip:text;background-clip:text;color:transparent}
+.pc-hero p{margin:12px 0 0;max-width:560px;font-size:14.5px;line-height:1.65;color:rgba(255,255,255,.74)}
+.pc-hero-cta{margin-top:22px;display:flex;flex-wrap:wrap;align-items:center;gap:10px 12px}
+.pc-btn{display:inline-flex;align-items:center;justify-content:center;height:42px;padding:0 18px;border-radius:12px;font-size:14px;font-weight:700;text-decoration:none;cursor:pointer;transition:transform .15s,background .15s,box-shadow .15s;border:1px solid transparent}
+.pc-btn:active{transform:translateY(1px)}
+.pc-btn-light{background:#fff;color:#0b4f49;box-shadow:0 6px 18px -8px rgba(0,0,0,.5)}.pc-btn-light:hover{background:#f0fdfa}
+.pc-btn-ghost{background:rgba(255,255,255,.08);color:#fff;border-color:rgba(255,255,255,.22)}.pc-btn-ghost:hover{background:rgba(255,255,255,.16)}
+.pc-link{color:#99f6e4;font-size:13.5px;font-weight:600;text-decoration:none}.pc-link:hover{text-decoration:underline}
+.pc-stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0}
+.pc-stats>div{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.13);border-radius:16px;padding:14px 16px;backdrop-filter:blur(6px)}
+.pc-stats dt{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.6)}
+.pc-stats dd{margin:6px 0 0;font-size:28px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
+.pc-stats dd.ok{color:#6ee7b7}.pc-stats dd.sm{font-size:19px;padding-top:6px}
+@media(max-width:1100px){.pc-hero{grid-template-columns:1fr;padding:28px 24px}.pc-hero p{max-width:none}.pc-stats{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(max-width:700px){.pc-stats{grid-template-columns:1fr 1fr}}
+@media(max-width:480px){.pc-hero{padding:22px 16px;border-radius:18px;gap:20px}.pc-hero-cta{flex-direction:column;align-items:stretch}.pc-hero-cta .pc-btn{width:100%}.pc-stats dd{font-size:24px}.pc-kicker{font-size:10.5px;letter-spacing:.1em}.pc-price .amt{font-size:30px}.pc-help .tel{font-size:20px}.pc-how-steps,.pc-help{padding:18px}.pc-controls{grid-template-columns:1fr}.pc-seg{width:100%}.pc-seg button{flex:1;justify-content:center}}
+
+/* ---- section heads */
+.pc-sec-head{display:flex;align-items:baseline;justify-content:space-between;margin:0 2px 12px}
+.pc-sec-head h2{margin:0;font-size:13px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ink3)}
+.pc-sec-head span{font-size:12.5px;font-weight:600;color:var(--ink2)}
+.pc-eyebrow{margin:0;font-size:11.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3)}
+
+/* ---- your services */
+.pc-svcs{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+.pc-svc{position:relative;display:flex;flex-direction:column;background:#fff;border:1px solid var(--line);border-radius:18px;padding:16px 16px 14px;transition:box-shadow .2s,border-color .2s,transform .2s}
+.pc-svc:hover{box-shadow:0 14px 28px -18px rgba(15,23,42,.35);border-color:#cbd5e1;transform:translateY(-2px)}
+.pc-svc-core{background:linear-gradient(160deg,#f0fdfa,#fff 70%);border-color:#99f6e4}
+.pc-svc.is-low{border-color:#fcd34d;background:linear-gradient(160deg,#fffbeb,#fff 70%)}
+.pc-svc-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.pc-svc-label{font-size:11.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink2)}
+.pc-pill{font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap}
+.pc-pill.ok{background:#d1fae5;color:#047857}.pc-pill.warn{background:#fef3c7;color:#b45309}
+.pc-svc-big{margin:10px 0 0;font-size:24px;font-weight:800;color:var(--ink);line-height:1.1}
+.pc-svc-big small{font-size:13px;font-weight:600;color:var(--ink2)}
+.pc-bar{height:6px;border-radius:99px;background:#e2e8f0;overflow:hidden;margin-top:10px}
+.pc-bar>i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#14b8a6,#0f766e)}
+.pc-svc.is-low .pc-bar>i{background:linear-gradient(90deg,#fbbf24,#f59e0b)}
+.pc-svc-meta{margin:10px 0 0;font-size:12px;color:var(--ink2)}.pc-svc-meta strong{color:var(--ink);font-weight:700}
+.pc-svc-act{margin-top:12px;align-self:flex-start;font-size:12.5px;font-weight:700;color:var(--b);background:transparent;border:0;padding:0;cursor:pointer}
+.pc-svc-act:after{content:" →";transition:margin .15s}.pc-svc-act:hover:after{margin-left:3px}
+.pc-svc.is-low .pc-svc-act{color:#b45309}
+
+/* ---- sticky filter bar */
+.pc-bar-wrap{background:rgba(255,255,255,.92);backdrop-filter:blur(10px);border:1px solid var(--line);border-radius:18px;padding:12px 14px 10px;transition:box-shadow .2s}
+.pc-bar-wrap.is-stuck{box-shadow:0 12px 30px -16px rgba(15,23,42,.35)}
+/* Sticky only where there is room (wide AND tall screens); on phones/tablets/short windows it scrolls normally
+   so it never covers the packages below it. Sits under the 4rem app header. */
+.pc-bar-wrap{position:relative;z-index:10}
+@media (min-width:1100px) and (min-height:760px){.pc-bar-wrap{position:sticky;top:calc(4rem + .5rem)}}
+.pc-tabs{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding:2px 2px 8px;margin:0 -2px;mask-image:linear-gradient(90deg,#000 94%,transparent)}
+.pc-tabs::-webkit-scrollbar{display:none}
+.pkg-tab{flex:none;display:inline-flex;align-items:center;gap:8px;white-space:nowrap;border:1px solid var(--line);border-radius:999px;padding:7px 14px;font-size:13.5px;font-weight:600;cursor:pointer;transition:background .15s,border-color .15s,color .15s,box-shadow .15s}
+.pkg-tab-count{border-radius:99px;padding:1px 8px;font-size:11px;font-weight:700}
+.pc-controls{display:grid;gap:10px;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr) minmax(0,1fr) auto auto;align-items:end}
+.pc-field{display:block;min-width:0}
+.pc-field>span{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);margin-bottom:4px}
+.pc-field kbd{font:600 10px ui-monospace,monospace;border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;padding:0 5px;color:var(--ink2);background:#f8fafc;text-transform:none;letter-spacing:0}
+#packages-app .pc-field .form-input{height:40px;padding-top:0;padding-bottom:0;border-radius:11px;font-size:13.5px}
+.pc-seg{display:inline-flex;gap:2px;background:#f1f5f9;border:1px solid var(--line);border-radius:11px;padding:3px}
+.pc-seg button{border:0;background:transparent;border-radius:8px;padding:0 12px;height:32px;display:inline-flex;align-items:center;gap:4px;font-size:13px;font-weight:600;color:var(--ink2);cursor:pointer;transition:background .15s,color .15s,box-shadow .15s}
+.pc-seg button.bg-white{background:#fff;color:var(--ink);box-shadow:0 1px 3px rgba(15,23,42,.14)}
+.pc-seg button b{font-size:10.5px;color:#059669;font-weight:700}
+.pc-reset{height:40px;padding:0 14px;border-radius:11px;border:1px solid var(--line);background:#fff;font-size:13px;font-weight:600;color:var(--ink2);cursor:pointer}.pc-reset:hover{background:#f8fafc;color:var(--ink)}
+.pc-bar-foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 16px;margin-top:10px;padding-top:10px;border-top:1px solid #f1f5f9}
+.pc-billing{display:flex;align-items:center;gap:10px}.pc-billing>span{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3)}
+#pkg-result-count{margin:0;font-size:12px;color:var(--ink3)}
+@media(max-width:1100px){.pc-controls{grid-template-columns:1fr 1fr}.pc-search{grid-column:1/-1}.pc-view{display:none}.pc-reset{align-self:end}}
+
+/* ---- package cards */
+#packages-app .pkg-grid{gap:18px}
+#packages-app .pkg-card{position:relative;display:flex;flex-direction:column;background:#fff;border:1px solid var(--line);border-radius:20px;padding:22px 22px 18px;box-shadow:0 1px 2px rgba(15,23,42,.04)}
+#packages-app .pkg-card.is-popular{border-color:#5eead4;box-shadow:0 0 0 1px #5eead4,0 18px 34px -22px rgba(13,148,136,.55)}
+#packages-app .pkg-card.is-current{border-color:var(--b);box-shadow:0 0 0 1px var(--b),0 18px 34px -22px rgba(15,118,110,.55);background:linear-gradient(180deg,#f0fdfa,#fff 45%)}
+.pc-ribbon{position:absolute;top:-11px;left:20px;background:var(--b);color:#fff;font-size:10.5px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;padding:4px 11px;border-radius:99px;box-shadow:0 4px 10px -4px rgba(15,118,110,.6)}
+.pc-ribbon.green{background:#059669}.pc-ribbon.amber{background:#f59e0b}
+.pc-fit{position:absolute;top:-11px;right:20px;align-items:center;background:#059669;color:#fff;font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:4px 11px;border-radius:99px}
+.pc-kick{margin:0;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--b)}
+.pc-name{margin:4px 0 0;font-size:18px;font-weight:800;color:var(--ink)}.pc-name.big{font-size:21px;margin-top:0}
+.pc-blurb{margin:6px 0 0;font-size:13px;line-height:1.5;color:var(--ink2);min-height:2.6em}
+.pc-price{margin:14px 0 0;display:flex;align-items:baseline;gap:6px;color:var(--ink)}
+.pc-price .cur{font-size:13px;font-weight:700;color:var(--ink2)}.pc-price .amt{font-size:34px;font-weight:800;letter-spacing:-.03em;line-height:1}
+.pc-per{margin:6px 0 0;font-size:12.5px;color:var(--ink3)}
+.pc-saving{margin:6px 0 0;font-size:12px;font-weight:700;color:#059669}
+.pc-credits{margin-top:16px;border-radius:14px;background:#f8fafc;border:1px solid #eef2f6;padding:14px}
+.pc-credits-row{display:flex;align-items:flex-end;justify-content:space-between;gap:10px}
+.pc-credits .n{margin:0;font-size:26px;font-weight:800;color:var(--ink);line-height:1}
+.pc-credits .u{margin:4px 0 0;font-size:12.5px;font-weight:500;color:var(--ink2)}
+.pc-credits .d{margin:0;text-align:right;font-size:11.5px;line-height:1.45;color:var(--ink3)}
+.pc-save{margin-top:12px}.pc-save>div:first-child{display:flex;justify-content:space-between;gap:8px;font-size:11.5px}
+.pc-save span{font-weight:700;color:#047857}.pc-save em{font-style:normal;color:var(--ink3)}
+.pc-save .pc-bar{height:5px;margin-top:6px;background:#d1fae5}.pc-save .pc-bar>i{background:#10b981}
+.pc-feat{list-style:none;margin:16px 0 0;padding:0;flex:1;display:grid;gap:9px;align-content:start}
+.pc-feat li{position:relative;padding-left:24px;font-size:13px;line-height:1.45;color:var(--ink2)}
+.pc-feat li:before{content:"";position:absolute;left:0;top:2px;width:16px;height:16px;border-radius:50%;background:#ccfbf1 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230f766e' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12.5 4.5 4.5L19 7.5'/%3E%3C/svg%3E") center/10px no-repeat}
+.pc-compare{margin-top:14px}.pc-compare label{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--ink3);cursor:pointer;user-select:none}
+.pc-compare input{width:16px;height:16px;border-radius:5px;accent-color:var(--b)}
+.pc-cta{margin-top:14px;width:100%;height:46px;border-radius:13px;border:1px solid var(--b);background:linear-gradient(180deg,#0f8a80,#0f766e);color:#fff;font-size:14.5px;font-weight:700;cursor:pointer;box-shadow:0 8px 18px -10px rgba(15,118,110,.8);transition:transform .15s,box-shadow .15s,filter .15s}
+.pc-cta:hover{filter:brightness(1.06);box-shadow:0 12px 22px -10px rgba(15,118,110,.9)}.pc-cta:active{transform:translateY(1px)}
+.pc-cta.secondary{background:#fff;color:var(--b);box-shadow:none}.pc-cta.secondary:hover{background:#f0fdfa}
+.pc-cta:focus-visible,.pc-btn:focus-visible,.pc-seg button:focus-visible,.pkg-tab:focus-visible{outline:2px solid #0f766e;outline-offset:2px}
+/* list view with the new card structure */
+
+/* ---- scroll reveal (progressive: cards are never hidden without JS) */
+@keyframes pcIn{from{opacity:0;transform:translateY(14px)}}
+.pc-anim .pkg-card:not(.in){opacity:0}
+.pc-anim .pkg-card.in{animation:pcIn .5s cubic-bezier(.2,.8,.2,1) backwards;animation-delay:var(--d,0ms)}
+@media(prefers-reduced-motion:reduce){.pc-anim .pkg-card:not(.in){opacity:1}.pc-anim .pkg-card.in{animation:none}}
+
+/* ---- how it works + help */
+.pc-how{display:grid;gap:18px;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr)}
+.pc-how-steps,.pc-help{border-radius:20px;padding:24px}
+.pc-how-steps{background:#fff;border:1px solid var(--line)}
+.pc-how-steps ol{list-style:none;margin:18px 0 0;padding:0;display:grid;gap:18px;grid-template-columns:repeat(3,minmax(0,1fr));position:relative}
+.pc-how-steps li{position:relative;display:flex;flex-direction:column;gap:10px}
+.pc-how-steps li b{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;background:linear-gradient(135deg,#14b8a6,#0f766e);box-shadow:0 6px 14px -6px rgba(15,118,110,.7);position:relative;z-index:1}
+.pc-how-steps li:not(:last-child):before{content:"";position:absolute;top:17px;left:42px;right:-14px;height:2px;background:repeating-linear-gradient(90deg,#99f6e4 0 6px,transparent 6px 12px)}
+.pc-how-steps h4{margin:0;font-size:15px;font-weight:800;color:var(--ink)}.pc-how-steps p{margin:4px 0 0;font-size:13px;line-height:1.55;color:var(--ink2)}
+.pc-help{color:#fff;background:radial-gradient(400px 200px at 100% 0,rgba(45,212,191,.28),transparent 60%),linear-gradient(145deg,#0b4f49,#0f172a)}
+.pc-help .pc-eyebrow{color:#99f6e4}.pc-help .t{margin:12px 0 0;font-size:13.5px;line-height:1.6;color:rgba(255,255,255,.78)}
+.pc-help .tel{display:inline-block;margin-top:14px;font-size:24px;font-weight:800;color:#fff;text-decoration:none;letter-spacing:-.01em}.pc-help .tel:hover{color:#99f6e4}
+.pc-help .ins{margin:14px 0 0;font-size:12px;line-height:1.6;color:rgba(255,255,255,.62)}
+@media(max-width:1100px){.pc-how{grid-template-columns:1fr}.pc-how-steps ol{grid-template-columns:1fr}.pc-how-steps li{flex-direction:row;align-items:flex-start}.pc-how-steps li:not(:last-child):before{display:none}}
+
+/* ---- FAQ polish */
+details.faq>summary{padding:2px 0}details.faq summary:hover{color:var(--b)}
+details.faq[open]>summary{color:var(--b)}
+
+/* ---- payment history: table on desktop, cards on phones */
+@media(max-width:640px){
+  .pc-table thead{display:none}
+  .pc-table,.pc-table tbody,.pc-table tr,.pc-table td{display:block;width:100%}
+  .pc-table tr{padding:12px 16px;border-top:1px solid #eef2f6!important}
+  .pc-table td{display:flex;justify-content:space-between;gap:14px;padding:5px 0!important;text-align:right!important;white-space:normal!important}
+  .pc-table td:before{content:attr(data-label);font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);text-align:left;flex:none;padding-top:2px}
+}
+</style>
+<style data-spa-page-style="pkg-base">
+  .pkg-card.hidden, .pkg-section.hidden { display: none !important; }
+  .pkg-card { transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+  .pkg-card:hover { transform: translateY(-3px); box-shadow: 0 14px 30px -14px rgba(15, 23, 42, .28); }
+  .pkg-card.is-fit { border-color: #059669 !important; box-shadow: 0 0 0 3px rgba(5, 150, 105, .14); }
+  .pkg-card.is-compared { border-color: #0f766e !important; background: #f0fdfa; }
+  .fit-badge { display: none; }
+  .pkg-card.is-fit .fit-badge { display: inline-flex; }
+  .meter-fill { transition: width .6s cubic-bezier(.2, .8, .2, 1); }
+  /* list view (SMS packages only) */
+  .reveal { opacity: 0; transform: translateY(10px); animation: reveal .45s ease forwards; }
+  @keyframes reveal { to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) {
+    .pkg-card, .meter-fill { transition: none; }
+    .reveal { animation: none; opacity: 1; transform: none; }
+    .pkg-card:hover { transform: none; }
+  }
+  details.faq > summary { list-style: none; cursor: pointer; }
+  details.faq > summary::-webkit-details-marker { display: none; }
+  details.faq[open] .faq-chevron { transform: rotate(180deg); }
+  .faq-chevron { transition: transform .2s ease; }
+  .pay-tab[aria-selected="true"] { background: #fff; color: #0f172a; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+/* ---- V40.2 modals: header stays visible while the body scrolls, soft backdrop */
+#pay-modal > [data-close-modal], #compare-modal > [data-close-compare]{backdrop-filter:blur(3px)}
+#pay-modal .sp-modal-panel > div:first-child,
+#compare-modal .sp-modal-panel > div:first-child{position:sticky;top:0;z-index:5;background:#fff;border-radius:inherit;border-bottom-left-radius:0;border-bottom-right-radius:0}
+#compare-modal .sp-modal-panel{max-width:min(56rem,100%)}
+#pay-modal .sp-modal-panel{max-width:28rem}
+@media(max-width:639px){
+  #pay-modal > .absolute .min-h-full{align-items:flex-end;padding:0}
+  #pay-modal .sp-modal-panel{max-width:none;border-radius:20px 20px 0 0}
+}
+
+/* V40.4 consistency pass: use the same page-header/card language as the rest of the application. */
+#packages-app{--pc-radius:1rem}
+#packages-app .pc-page-header{margin-bottom:0}
+#packages-app .pc-header-actions .btn{min-height:40px}
+#packages-app .pc-overview{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+#packages-app .pc-overview-card{display:flex;align-items:center;gap:12px;padding:15px 16px;box-shadow:none}
+#packages-app .pc-overview-icon{width:38px;height:38px;flex:none;border-radius:10px;display:flex;align-items:center;justify-content:center;background:#f0fdfa;color:#0f766e;border:1px solid #ccfbf1}
+#packages-app .pc-overview-icon.success{background:#ecfdf5;color:#059669;border-color:#d1fae5}
+#packages-app .pc-overview-icon .icon{width:18px;height:18px}
+#packages-app .pc-overview-label{margin:0;font-size:11px;font-weight:600;letter-spacing:.04em;color:#64748b}
+#packages-app .pc-overview-value{margin:2px 0 0;font-size:22px;font-weight:800;line-height:1.15;color:#0f172a;font-variant-numeric:tabular-nums}
+#packages-app .pc-overview-value.success{color:#059669}
+#packages-app .pc-overview-value.price{font-size:17px}
+#packages-app .pc-alert{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:12px;padding:14px 16px;border-radius:1rem;border:1px solid;box-shadow:0 1px 2px rgba(15,23,42,.03)}
+#packages-app .pc-alert-warning{background:#fffbeb;border-color:#fcd34d}
+#packages-app .pc-alert-icon{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:#fff7ed;color:#b45309;border:1px solid #fed7aa}
+#packages-app .pc-alert-icon .icon{width:19px;height:19px}
+#packages-app .pc-alert-title{margin:0;font-size:13.5px;font-weight:800;color:#78350f}
+#packages-app .pc-alert-text{margin:2px 0 0;font-size:12.5px;line-height:1.5;color:#92400e}
+#packages-app .pc-alert-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px}
+#packages-app .pc-alert-actions .btn{white-space:nowrap}
+#packages-app .pc-svc,#packages-app .pkg-card,#packages-app .pc-how-steps,#packages-app .pc-help,#packages-app .pc-bar-wrap{border-radius:1rem}
+#packages-app .pkg-card{padding:20px 20px 17px;box-shadow:0 1px 2px rgba(15,23,42,.03)}
+#packages-app .pkg-card:hover{transform:translateY(-2px);box-shadow:0 12px 24px -16px rgba(15,23,42,.28)}
+#packages-app .pc-cta{border-radius:10px;box-shadow:none}
+#packages-app .pc-cta:hover{box-shadow:0 6px 14px -9px rgba(15,118,110,.7)}
+#packages-app .pc-bar-wrap{box-shadow:0 1px 2px rgba(15,23,42,.03)}
+@media(max-width:900px){#packages-app .pc-overview{grid-template-columns:repeat(2,minmax(0,1fr))}#packages-app .pc-alert{grid-template-columns:auto minmax(0,1fr)}#packages-app .pc-alert-actions{grid-column:1/-1;justify-content:flex-start}}
+@media(max-width:640px){#packages-app{gap:1rem!important}#packages-app .pc-header-actions{width:100%}#packages-app .pc-header-actions .btn{flex:1 1 100%}#packages-app .pc-overview{grid-template-columns:1fr 1fr;gap:8px}#packages-app .pc-overview-card{padding:12px}#packages-app .pc-overview-icon{width:34px;height:34px}#packages-app .pc-overview-value{font-size:19px}#packages-app .pc-overview-value.price{font-size:14px}#packages-app .pc-alert{padding:12px;gap:10px}#packages-app .pc-alert-icon{width:34px;height:34px}#packages-app .pc-alert-actions .btn{flex:1 1 100%}}
+@media(max-width:380px){#packages-app .pc-overview{grid-template-columns:1fr}#packages-app .pc-overview-card{min-height:58px}}
+/* ============================================================
+   V40.5 FINAL FIT PASS
+   The page must never create a horizontal layout wider than its
+   actual application content column. Grids collapse before they
+   become cramped and every child is allowed to shrink.
+   ============================================================ */
+#packages-app,
+#packages-app *,
+#packages-app *::before,
+#packages-app *::after{box-sizing:border-box}
+#packages-app{width:100%;max-width:100%;min-width:0;overflow-x:clip}
+#app-content:has(#packages-app){width:100%;max-width:none;min-width:0;overflow-x:clip}
+#packages-app > *,
+#packages-app section,
+#packages-app header,
+#packages-app article,
+#packages-app .pkg-grid,
+#packages-app .pc-svcs,
+#packages-app .pc-how,
+#packages-app .pc-overview,
+#packages-app .pc-alert,
+#packages-app .pc-controls,
+#packages-app .pc-bar-foot{min-width:0;max-width:100%}
+#packages-app img,#packages-app svg,#packages-app iframe{max-width:100%}
+#packages-app input,#packages-app select,#packages-app textarea,#packages-app button{max-width:100%}
+#packages-app .pc-hero > *,
+#packages-app .pc-stats > *,
+#packages-app .pc-controls > *,
+#packages-app .pc-alert > *,
+#packages-app .pc-overview-card > *,
+#packages-app .pc-how > *,
+#packages-app .pc-how-steps li > *{min-width:0}
+#packages-app .pc-hero,
+#packages-app .pc-how{grid-template-columns:minmax(0,1.5fr) minmax(0,1fr)}
+#packages-app .pkg-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+#packages-app .pc-svcs{grid-template-columns:repeat(3,minmax(0,1fr))}
+#packages-app .pc-overview{grid-template-columns:repeat(4,minmax(0,1fr))}
+#packages-app .pc-controls{grid-template-columns:minmax(0,1.6fr) minmax(0,1fr) minmax(0,1fr) auto auto}
+#packages-app .pc-field,
+#packages-app .pc-field > *{min-width:0}
+#packages-app .pc-field .form-input{width:100%;max-width:100%}
+#packages-app .pc-alert-text,
+#packages-app .pc-svc-meta,
+#packages-app .pc-blurb,
+#packages-app .pc-feat li,
+#packages-app .pc-how-steps p{overflow-wrap:anywhere;word-break:normal}
+#packages-app .pc-alert-actions{min-width:0}
+#packages-app .pc-alert-actions .btn{max-width:100%}
+#packages-app .pc-seg{max-width:100%;overflow:hidden}
+#packages-app .pc-seg button{min-width:0;white-space:nowrap}
+#packages-app .pc-tabs{max-width:100%;min-width:0}
+#packages-app .pkg-card{min-width:0;width:100%;overflow:hidden}
+#packages-app .pkg-card > *{min-width:0;max-width:100%}
+#packages-app .pc-price{min-width:0;max-width:100%;flex-wrap:wrap}
+#packages-app .pc-price .amt{min-width:0;overflow-wrap:anywhere}
+#packages-app .pc-cta{max-width:100%;white-space:normal}
+
+@media (max-width:1199px){
+  #packages-app .pkg-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #packages-app .pc-svcs{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #packages-app .pc-controls{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  #packages-app .pc-search{grid-column:1/-1}
+  #packages-app .pc-view{display:none}
+  #packages-app .pc-reset{align-self:end}
+}
+
+@media (max-width:900px){
+  #packages-app .pc-hero,
+  #packages-app .pc-how{grid-template-columns:minmax(0,1fr)}
+  #packages-app .pc-overview{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #packages-app .pc-alert{grid-template-columns:auto minmax(0,1fr)}
+  #packages-app .pc-alert-actions{grid-column:1/-1;justify-content:flex-start}
+}
+
+@media (max-width:700px){
+  #packages-app .pc-svcs{grid-template-columns:minmax(0,1fr)}
+  #packages-app .pc-controls{grid-template-columns:minmax(0,1fr)}
+  #packages-app .pc-search{grid-column:auto}
+  #packages-app .pc-reset{width:100%;align-self:stretch}
+  #packages-app .pc-bar-foot{align-items:stretch}
+  #packages-app .pc-billing{width:100%;align-items:stretch;flex-direction:column}
+  #packages-app .pc-billing .pc-seg{width:100%}
+  #packages-app .pc-billing .pc-seg button{flex:1 1 0}
+  #packages-app .pc-result-count{max-width:100%}
+  #packages-app .pc-how-steps ol{grid-template-columns:minmax(0,1fr)}
+}
+
+@media (max-width:640px){
+  #packages-app{width:100%;max-width:100%;overflow-x:clip}
+  #packages-app .pc-hero{padding:20px 16px;border-radius:16px}
+  #packages-app .pc-hero-cta{width:100%;flex-direction:column;align-items:stretch}
+  #packages-app .pc-hero-cta .pc-btn{width:100%;max-width:100%}
+  #packages-app .pc-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #packages-app .pc-overview{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  #packages-app .pc-overview-card{padding:12px;gap:9px}
+  #packages-app .pc-overview-value{font-size:18px;overflow-wrap:anywhere}
+  #packages-app .pc-alert{grid-template-columns:auto minmax(0,1fr);padding:12px}
+  #packages-app .pc-alert-actions{grid-column:1/-1;width:100%;display:grid;grid-template-columns:minmax(0,1fr)}
+  #packages-app .pc-alert-actions .btn{width:100%}
+  #packages-app .pkg-card{padding:18px 16px 16px;border-radius:16px}
+  #packages-app .pc-price .amt{font-size:30px}
+  #packages-app .pc-how-steps,#packages-app .pc-help{padding:18px;border-radius:16px}
+  #packages-app .pc-table{min-width:0}
+}
+
+@media (max-width:380px){
+  #packages-app .pc-overview{grid-template-columns:minmax(0,1fr)}
+  #packages-app .pc-stats{grid-template-columns:minmax(0,1fr)}
+  #packages-app .pc-hero{padding:18px 14px}
+}
+</style>
+<style id="pc-v41" data-spa-page-style="pkg-v41">
+/* ===== V41 professional layout: calm enterprise look, same markup hooks/JS ===== */
+#packages-app{--b:#0f766e;--line:#e5e9f0;--ink:#0f172a;--ink2:#475569;--ink3:#8492a6;display:flex;flex-direction:column;gap:1.75rem}
+#packages-app.space-y-6>*{margin:0!important}
+/* Page header */
+#packages-app .pc-page-header{align-items:flex-end;padding-bottom:1.25rem;border-bottom:1px solid var(--line)}
+#packages-app .pc-page-header h1{font-size:1.75rem;letter-spacing:-.02em}
+#packages-app .pc-acct-chip{display:inline-flex;flex-wrap:wrap;align-items:center;gap:.5rem .75rem;margin-top:.75rem;padding:.35rem .75rem;border:1px solid var(--line);border-radius:999px;background:#fff;font-size:12.5px;color:var(--ink2)}
+#packages-app .pc-acct-chip b{color:var(--ink);font-weight:700}
+#packages-app .pc-acct-chip i{width:8px;height:8px;border-radius:50%;background:#10b981;box-shadow:0 0 0 3px #d1fae5}
+#packages-app .pc-acct-chip i.off{background:#f59e0b;box-shadow:0 0 0 3px #fef3c7}
+/* KPI strip: one card, four cells */
+#packages-app .pc-overview{gap:0;background:#fff;border:1px solid var(--line);border-radius:16px;overflow:hidden}
+#packages-app .pc-overview-card{border:0;border-radius:0;background:transparent;box-shadow:none;padding:18px 20px;border-left:1px solid var(--line)}
+#packages-app .pc-overview-card:first-child{border-left:0}
+#packages-app .pc-overview-value{font-size:24px}
+/* Section headings */
+#packages-app .pc-sec-head{margin:0 0 .875rem;padding:0}
+#packages-app .pc-sec-head h2{font-size:12px;letter-spacing:.14em;color:var(--ink2)}
+/* Your services */
+#packages-app .pc-svc{border-radius:14px;border:1px solid var(--line);border-top:3px solid #14b8a6;box-shadow:none;padding:18px}
+#packages-app .pc-svc.is-low{border-top-color:#f59e0b}
+#packages-app .pc-svc-core{background:#fff;border-top-color:#0f766e}
+#packages-app .pc-svc:hover{transform:none;box-shadow:0 8px 24px -16px rgba(15,23,42,.3)}
+#packages-app .pc-svc-big{font-size:26px;margin-top:12px}
+#packages-app .pc-svc-act{padding:.4rem .75rem;margin-top:14px;border:1px solid var(--line);border-radius:9px;background:#fff;font-size:12.5px}
+#packages-app .pc-svc-act:hover{background:#f0fdfa;border-color:#99f6e4}
+#packages-app .pc-svc-act:after{content:""}
+/* Filter toolbar */
+#packages-app .pc-bar-wrap{border-radius:14px;padding:14px 16px;background:#fff;backdrop-filter:none;box-shadow:0 1px 2px rgba(15,23,42,.04)}
+#packages-app .pc-tabs{mask-image:none;padding-bottom:12px;margin-bottom:12px;border-bottom:1px solid #eef2f6}
+#packages-app .pkg-tab{border-radius:9px!important;font-size:13px;font-weight:600}
+#packages-app .pc-bar-foot{border-top:0;margin-top:12px;padding-top:0}
+/* Package cards */
+#packages-app .pkg-card{border:1px solid var(--line);border-radius:16px;box-shadow:none;padding:24px 22px 20px;background:#fff}
+#packages-app .pkg-card:has(.pc-ribbon){border-top:3px solid var(--b)}
+#packages-app .pkg-card:hover{transform:translateY(-2px);box-shadow:0 16px 32px -20px rgba(15,23,42,.4)}
+#packages-app .pc-ribbon{top:-1px;left:22px;border-radius:0 0 9px 9px;box-shadow:none;padding:4px 10px}
+#packages-app .pc-price .amt{font-size:32px}
+#packages-app .pc-credits{background:#f8fafc;border-radius:12px}
+#packages-app .pc-feat{padding-top:16px;margin-top:16px;border-top:1px dashed var(--line)}
+#packages-app .pc-cta{height:44px;border-radius:11px;box-shadow:none;margin-top:auto}
+#packages-app .pc-cta:hover{box-shadow:0 8px 18px -10px rgba(15,118,110,.7)}
+/* How it works + help */
+#packages-app .pc-how-steps{border-radius:16px}
+#packages-app .pc-help{border-radius:16px}
+/* Payment history */
+#history,#packages-app section[id=history]{border-radius:16px}
+#packages-app table thead th{background:#f8fafc;font-size:11px;letter-spacing:.08em;color:var(--ink3)}
+#packages-app table tbody tr:hover{background:#fafcfd}
+/* Responsive */
+@media(max-width:900px){
+  #packages-app .pc-overview-card:nth-child(odd){border-left:0}
+  #packages-app .pc-overview-card:nth-child(n+3){border-top:1px solid var(--line)}
+}
+@media(max-width:640px){
+  #packages-app{gap:1.25rem!important}
+  #packages-app .pc-page-header{padding-bottom:1rem}
+  #packages-app .pc-page-header h1{font-size:1.4rem}
+  #packages-app .pc-acct-chip{border-radius:12px;width:100%}
+  #packages-app .pc-overview-card{padding:14px}
+  #packages-app .pkg-card{padding:20px 16px 16px}
+}
+@media(max-width:380px){#packages-app .pc-overview-card{border-left:0!important}#packages-app .pc-overview-card+.pc-overview-card{border-top:1px solid var(--line)}}
+</style>
+<style id="pc-v42" data-spa-page-style="pkg-v42">
+/* ===== V42 layout: usage-table style "Your services", refined pricing cards ===== */
+#packages-app .pc-svcs{grid-template-columns:minmax(0,1fr);gap:0;background:#fff;border:1px solid var(--line);border-radius:16px;overflow:hidden}
+#packages-app .pc-svc{display:grid;grid-template-columns:minmax(150px,1.1fr) minmax(130px,1fr) minmax(140px,1.3fr) minmax(150px,1.1fr) auto;
+  grid-template-areas:"a b c d e" "g g g g g";align-items:center;column-gap:20px;row-gap:0;
+  border:0;border-top:0;border-bottom:1px solid var(--line);border-radius:0;padding:14px 20px;box-shadow:none;position:relative}
+#packages-app .pc-svc:last-child{border-bottom:0}
+#packages-app .pc-svc:before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:#14b8a6}
+#packages-app .pc-svc.is-low:before{background:#f59e0b}
+#packages-app .pc-svc-core:before{background:#0f766e}
+#packages-app .pc-svc:hover{box-shadow:none;background:#fafcfd}
+#packages-app .pc-svc-top{grid-area:a;justify-content:flex-start;gap:10px}
+#packages-app .pc-svc-big{grid-area:b;margin:0;font-size:18px}
+#packages-app .pc-bar{grid-area:c;margin:0}
+#packages-app .pc-svc-meta{grid-area:d;margin:0}
+#packages-app .pc-svc a.pc-svc-meta{grid-area:g;margin:6px 0 0!important}
+#packages-app .pc-svc-act{grid-area:e;margin:0;justify-self:end;white-space:nowrap}
+@media(max-width:1099px){
+  #packages-app .pc-svc{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"a e" "b b" "c c" "d d" "g g";row-gap:8px;padding:14px 16px 14px 18px}
+}
+/* Pricing cards: header tint on featured, equal-height, CTA pinned */
+#packages-app .pkg-card{background:#fff}
+#packages-app .pkg-card:has(.pc-ribbon){background:linear-gradient(180deg,#f0fdfa,#fff 160px)}
+#packages-app .pc-name{font-size:17px;letter-spacing:-.01em}
+#packages-app .pc-price{padding-bottom:14px;border-bottom:1px solid #eef2f6}
+#packages-app .pc-price .amt{font-size:30px}
+#packages-app .pc-feat{border-top:0;padding-top:0;margin-top:14px}
+#packages-app .pkg-grid{align-items:stretch;gap:18px}
+</style>
+
+<style id="smartpos-packages-professional-layout-v1" data-spa-page-style="pkg-final">
+/* SmartPOS Packages & Services — final responsive design layer */
+#packages-app{width:100%;max-width:1600px;margin-inline:auto;padding:clamp(12px,2vw,28px);box-sizing:border-box;color:#0f172a}
+#packages-app *{box-sizing:border-box}
+#packages-app .pc-hero{min-height:250px;grid-template-columns:minmax(0,1.35fr) minmax(280px,.8fr);gap:clamp(20px,3vw,42px);padding:clamp(24px,3vw,42px);border-radius:24px;box-shadow:0 20px 50px -34px rgba(15,23,42,.65)}
+#packages-app .pc-hero h1{max-width:720px;font-size:clamp(28px,3vw,42px);line-height:1.12}
+#packages-app .pc-hero p{font-size:14px;max-width:620px}
+#packages-app .pc-stats{gap:12px}
+#packages-app .pc-stats>div{min-width:0;padding:16px;border-radius:16px}
+#packages-app .pc-stats dd{font-size:clamp(22px,2.3vw,30px)}
+#packages-app .pc-bar-wrap{position:sticky;top:8px;z-index:20;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin:24px 0 22px;padding:14px;background:rgba(255,255,255,.96);border:1px solid #e2e8f0;border-radius:18px;box-shadow:0 8px 24px -20px rgba(15,23,42,.5);backdrop-filter:blur(12px)}
+#packages-app .pc-tabs{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0}
+#packages-app .pkg-tab{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:9px 14px;border-radius:12px;border:1px solid #e2e8f0;font-size:12px;font-weight:750;white-space:nowrap;transition:background .15s,border-color .15s,transform .15s}
+#packages-app .pkg-tab-count{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;padding:0 6px;border-radius:7px;font-size:11px}
+#packages-app .pc-controls{display:grid;grid-template-columns:minmax(170px,1.4fr) minmax(145px,1fr) minmax(130px,.8fr) auto;align-items:end;gap:10px;flex:1;min-width:min(100%,520px)}
+#packages-app .pc-field{display:flex;flex-direction:column;gap:6px;min-width:0;margin:0;font-size:11px;font-weight:750;color:#64748b}
+#packages-app .pc-field input,#packages-app .pc-field select{width:100%;min-width:0;height:42px;border:1px solid #cbd5e1;border-radius:11px;background:#fff;padding:0 12px;color:#0f172a;font-size:13px;outline:none;box-shadow:none}
+#packages-app .pc-field input:focus,#packages-app .pc-field select:focus{border-color:#0d9488;box-shadow:0 0 0 3px rgba(13,148,136,.13)}
+#packages-app .pkg-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;align-items:stretch}
+#packages-app .pkg-card{min-width:0;height:100%;padding:24px;border-radius:20px;border:1px solid #e2e8f0;background:linear-gradient(180deg,#fff 0%,#fcfdfd 100%);box-shadow:0 4px 14px -12px rgba(15,23,42,.25);transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease}
+#packages-app .pkg-card:hover{transform:translateY(-3px);box-shadow:0 18px 35px -24px rgba(15,23,42,.38);border-color:#99f6e4}
+#packages-app .pkg-card.is-current{background:linear-gradient(155deg,#f0fdfa 0%,#fff 65%);border-color:#0d9488;box-shadow:0 0 0 1px rgba(13,148,136,.12),0 16px 30px -25px rgba(13,148,136,.6)}
+#packages-app .pkg-card.is-popular{border-color:#5eead4;box-shadow:0 0 0 1px rgba(94,234,212,.28),0 14px 28px -24px rgba(13,148,136,.55)}
+#packages-app .pc-name{line-height:1.25;overflow-wrap:anywhere}
+#packages-app .pc-price .amt{font-size:clamp(30px,2.5vw,38px);font-variant-numeric:tabular-nums}
+#packages-app .pc-credits{border-radius:14px;padding:15px;background:#f8fafc;border-color:#e8edf3}
+#packages-app .pc-cta .pc-btn,#packages-app .pkg-select{min-height:44px;border-radius:12px;font-weight:750}
+#packages-app button:focus-visible,#packages-app a:focus-visible,#packages-app input:focus-visible,#packages-app select:focus-visible{outline:3px solid rgba(13,148,136,.28);outline-offset:2px}
+#packages-app .pc-how-steps,#packages-app .pc-help{border:1px solid #e2e8f0;border-radius:18px;box-shadow:0 6px 20px -18px rgba(15,23,42,.3)}
+#packages-app .pc-sec-head{gap:12px;flex-wrap:wrap;margin:28px 2px 14px}
+#packages-app .pc-sec-head h2{font-size:12px;color:#64748b;letter-spacing:.12em}
+#packages-app .pc-empty,#packages-app .empty-state{padding:38px 20px;text-align:center;border:1px dashed #cbd5e1;border-radius:18px;background:#f8fafc;color:#64748b}
+@media(max-width:1180px){#packages-app .pc-hero{grid-template-columns:1fr}#packages-app .pc-stats{grid-template-columns:repeat(4,minmax(0,1fr))}#packages-app .pc-controls{grid-template-columns:repeat(2,minmax(0,1fr));min-width:0}}
+@media(max-width:900px){#packages-app .pkg-grid{grid-template-columns:repeat(2,minmax(0,1fr))}#packages-app .pc-bar-wrap{position:relative;top:auto}#packages-app .pc-tabs{width:100%;overflow-x:auto;flex-wrap:nowrap;padding-bottom:3px}#packages-app .pkg-tab{flex:none}}
+@media(max-width:600px){#packages-app{padding:10px}#packages-app .pc-hero{padding:22px 18px;border-radius:18px;gap:20px}#packages-app .pc-stats{grid-template-columns:repeat(2,minmax(0,1fr))}#packages-app .pc-stats>div{padding:13px}#packages-app .pc-bar-wrap{padding:11px;gap:12px;margin:18px 0}#packages-app .pc-controls{grid-template-columns:1fr 1fr;width:100%}#packages-app .pc-search{grid-column:1/-1}#packages-app .pkg-grid{grid-template-columns:minmax(0,1fr);gap:16px}#packages-app .pkg-card{padding:21px 18px}#packages-app .pc-price .amt{font-size:34px}#packages-app .pc-hero-cta{align-items:stretch}#packages-app .pc-hero-cta .pc-btn{width:100%}}
+@media(prefers-reduced-motion:reduce){#packages-app *,#packages-app *:before,#packages-app *:after{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
+</style>
+
+
+<style data-spa-page-style="pkg-list-view">
+/* ============================================================
+   V54 LIST VIEW — one clean horizontal row per package
+   (class "list-view" lives on #packages-app itself, so every selector is #packages-app.list-view …)
+   ============================================================ */
+#packages-app.list-view .pkg-grid{display:flex;flex-direction:column;gap:12px}
+#packages-app.list-view .pkg-card{
+  display:grid;align-items:center;column-gap:28px;row-gap:10px;
+  width:100%;height:auto;min-height:0;padding:18px 24px 18px 28px;border-radius:14px;
+  background:#fff;border:1px solid var(--line);box-shadow:0 1px 2px rgba(15,23,42,.04);overflow:hidden;position:relative}
+#packages-app.list-view .pkg-card:hover{transform:none;box-shadow:0 10px 24px -18px rgba(15,23,42,.35);border-color:#99f6e4}
+/* accent rail on the left instead of a floating ribbon */
+#packages-app.list-view .pkg-card:before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:#e2e8f0}
+#packages-app.list-view .pkg-card.is-popular:before{background:#14b8a6}
+#packages-app.list-view .pkg-card.is-current:before{background:#0f766e}
+#packages-app.list-view .pkg-card:has(.pc-ribbon){border-top:1px solid var(--line);background:#fff;padding-top:18px}
+#packages-app.list-view .pkg-card.is-current{background:linear-gradient(90deg,#f0fdfa,#fff 55%);border-color:#99f6e4}
+#packages-app.list-view .pc-ribbon{position:absolute;top:0;left:28px;margin:0;border-radius:0 0 8px 8px;padding:3px 10px;box-shadow:none}
+#packages-app.list-view .pkg-card:has(.pc-ribbon){padding-top:30px}
+#packages-app.list-view .pc-fit{top:10px;right:14px}
+
+/* --- SMS / service packages: [ name + price ] [ credits ] [ compare ] [ button ] */
+#packages-app.list-view .pkg-card[data-kind="sms"]{
+  grid-template-columns:minmax(0,1.5fr) minmax(0,1.2fr) auto 200px;
+  grid-template-areas:"top credits compare cta"}
+#packages-app.list-view .pkg-card[data-kind="sms"] .pc-top{grid-area:top;min-width:0}
+#packages-app.list-view .pkg-card[data-kind="sms"] .pc-credits{grid-area:credits;margin:0;padding:10px 14px;border-radius:12px}
+#packages-app.list-view .pkg-card[data-kind="sms"] .pc-compare{grid-area:compare;margin:0;justify-self:end}
+#packages-app.list-view .pkg-card[data-kind="sms"] .pc-cta,
+#packages-app.list-view .pkg-card[data-kind="sms"] .pkg-select{grid-area:cta;margin:0;width:100%;min-width:0;height:44px}
+#packages-app.list-view .pkg-card[data-kind="sms"] .pkg-extra{display:none}
+#packages-app.list-view .pc-credits-row{align-items:center}
+#packages-app.list-view .pc-credits .n{font-size:22px}
+#packages-app.list-view .pc-credits .d{font-size:11.5px}
+#packages-app.list-view .pc-save{margin-top:8px}
+
+/* --- Core plans: [ name + price ] [ what is included ] [ button ] */
+#packages-app.list-view .pkg-card[data-kind="core"]{
+  grid-template-columns:minmax(0,1.2fr) minmax(0,1.6fr) 200px;
+  grid-template-areas:"top feat cta"}
+#packages-app.list-view .pkg-card[data-kind="core"] .pc-top{grid-area:top;min-width:0}
+#packages-app.list-view .pkg-card[data-kind="core"] .pc-feat{grid-area:feat;margin:0;padding:0;border:0;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 18px}
+#packages-app.list-view .pkg-card[data-kind="core"] .pc-cta,
+#packages-app.list-view .pkg-card[data-kind="core"] .pkg-select{grid-area:cta;margin:0;width:100%;height:44px}
+#packages-app.list-view .pkg-card[data-kind="core"] .pc-blurb{min-height:0}
+
+/* --- shared tidy-ups inside a row */
+#packages-app.list-view .pc-name,#packages-app.list-view .pc-name.big{margin:2px 0 0;font-size:17px}
+#packages-app.list-view .pc-kick{margin:0}
+#packages-app.list-view .pc-price{margin:8px 0 0;padding:0;border:0;gap:6px}
+#packages-app.list-view .pc-price .amt{font-size:26px}
+#packages-app.list-view .pc-per,#packages-app.list-view .pc-saving{margin-top:4px}
+
+/* --- tablets: two rows per package */
+@media(max-width:1180px){
+  #packages-app.list-view .pkg-card[data-kind="sms"]{
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr) 190px;
+    grid-template-areas:"top credits cta" "top credits compare"}
+  #packages-app.list-view .pkg-card[data-kind="sms"] .pc-compare{justify-self:center}
+  #packages-app.list-view .pkg-card[data-kind="core"]{
+    grid-template-columns:minmax(0,1fr) 190px;grid-template-areas:"top cta" "feat feat"}
+}
+/* --- phones: a single tidy column */
+@media(max-width:700px){
+  #packages-app.list-view .pkg-card{padding:16px 16px 16px 20px;column-gap:0}
+  #packages-app.list-view .pkg-card[data-kind="sms"]{grid-template-columns:minmax(0,1fr);grid-template-areas:"top" "credits" "compare" "cta"}
+  #packages-app.list-view .pkg-card[data-kind="sms"] .pc-compare{justify-self:start}
+  #packages-app.list-view .pkg-card[data-kind="core"]{grid-template-columns:minmax(0,1fr);grid-template-areas:"top" "feat" "cta"}
+  #packages-app.list-view .pkg-card[data-kind="core"] .pc-feat{grid-template-columns:minmax(0,1fr)}
+}
+/* --- V54.11 mobile filter toolbar: final overrides (must stay last) */
+@media(max-width:900px){
+  #packages-app .pc-bar-wrap{position:relative;top:auto;display:block;padding:12px;margin:16px 0;max-width:100%;overflow:hidden}
+  #packages-app .pc-tabs{width:100%;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:6px;margin-bottom:10px;scrollbar-width:thin}
+  #packages-app .pkg-tab{flex:none}
+  #packages-app .pc-controls{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;width:100%;min-width:0;flex:none}
+  #packages-app .pc-search{grid-column:1/-1}
+  #packages-app .pc-view{display:none!important}
+  #packages-app .pc-field{display:flex;flex-direction:column;gap:6px;min-width:0}
+  #packages-app .pc-field>span{white-space:normal;font-size:11px;line-height:1.2}
+  #packages-app .pc-field input,#packages-app .pc-field select,#packages-app .pc-field .form-input{width:100%;min-width:0;max-width:100%;height:42px;font-size:14px;text-overflow:ellipsis}
+  #packages-app .pc-reset{grid-column:1/-1;width:100%;height:42px;padding:0 14px;white-space:nowrap;writing-mode:horizontal-tb;align-self:stretch}
+  #packages-app .pc-bar-foot{display:flex;flex-direction:column;align-items:stretch;gap:10px;margin-top:12px}
+  #packages-app .pc-billing{display:flex;flex-direction:column;align-items:stretch;gap:6px;width:100%}
+  #packages-app .pc-billing .pc-seg{width:100%;display:flex}
+  #packages-app .pc-billing .pc-seg button{flex:1 1 0;min-width:0;height:auto;min-height:34px;justify-content:center;flex-wrap:wrap;gap:4px;white-space:normal;text-align:center;line-height:1.2;padding:8px 6px}
+  #packages-app #pkg-result-count{max-width:100%;overflow-wrap:anywhere}
+}
+@media(max-width:380px){
+  #packages-app .pc-controls{grid-template-columns:minmax(0,1fr)}
+}
+</style>
+
+{% endblock %}
+
+{% block content %}
+<div class="w-full mx-auto space-y-6" id="packages-app" data-addon-price="{{ branch_addon_price|floatformat:0 }}">
+
+  <!-- ============================================================ Page header -->
+  <header class="page-header pc-page-header reveal">
+    <div class="min-w-0">
+      <div class="flex items-center gap-2 text-xs font-semibold text-ink-400 mb-1">
+        <span>Account</span><span aria-hidden="true">/</span><span class="text-brand-700">Packages &amp; Services</span>
+      </div>
+      <h1 class="text-2xl font-bold text-ink-900 tracking-tight">Packages &amp; Services</h1>
+      <p class="section-subtitle">Manage your subscription, Premium SMS services and package payments from one place.</p>
+      {% if core %}<div class="pc-acct-chip"><i class="{% if core.subscription.status != 'ACTIVE' %}off{% endif %}"></i><span><b>{{ core.subscription.get_tier_display }}</b> plan &middot; {{ core.subscription.get_status_display }}</span><span>Valid until <b>{{ core.subscription.end_date|date:'d M Y' }}</b></span></div>{% endif %}
+    </div>
+    <div class="flex flex-wrap gap-2 pc-header-actions">
+      <button type="button" id="open-finder" class="btn btn-primary">Find my best package</button>
+      {% if core %}<button type="button" class="btn btn-secondary" data-renew-core>Renew subscription</button>{% endif %}
+      {% if history_page.paginator.count %}<a href="#history" class="btn btn-secondary">Payment history</a>{% endif %}
+    </div>
+  </header>
+
+  <!-- Optional Marketplace service: available to existing SmartPOS business customers. -->
+  <section class="pro-promo reveal" aria-label="Online Selling service">
+    <div class="pro-promo-ic" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10l2-6h14l2 6"/><path d="M4 10v10h16V10"/><path d="M9 20v-6h6v6"/><path d="M3 10a3 3 0 006 0 3 3 0 006 0 3 3 0 006 0"/></svg>
+    </div>
+    <div>
+      <p class="pro-promo-k">Optional business service</p>
+      <h2>Sell online with SmartPOS</h2>
+      <p class="pro-promo-d">Create a shareable online shop, publish your products and receive customer orders. Connect an eligible ABLiner or Pesapal merchant account to get paid.</p>
+      <span class="pro-promo-price">TSh 10,000 / month</span>
+      <ul class="pro-promo-list">
+        <li>Seller order-alert SMS is optional and billed separately</li>
+        <li>Buyer payment confirmations and order feedback are free to the buyer</li>
+      </ul>
+    </div>
+    <div class="pro-promo-cta">
+      <a href="{% url 'marketplace:seller_dashboard' %}" class="btn btn-primary">Explore Online Selling <span aria-hidden="true">→</span></a>
+    </div>
+  </section>
+
+  {% if core %}
+  <!-- Current subscription summary: always visible before the package catalogue. -->
+  <section class="reveal" aria-label="Current subscription" style="display:grid;grid-template-columns:minmax(0,1.65fr) minmax(260px,1fr);gap:14px;margin-top:4px">
+    <article style="background:linear-gradient(125deg,#0f766e,#115e59);color:#fff;border-radius:20px;padding:clamp(18px,2.4vw,26px);box-shadow:0 14px 30px -22px rgba(15,118,110,.65);min-width:0">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+        <span style="font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;opacity:.82">Current subscription</span>
+        <span style="font-size:11px;font-weight:800;border-radius:999px;padding:6px 10px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.22)">{{ core.subscription.get_status_display }}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;gap:20px;align-items:flex-end;flex-wrap:wrap;margin-top:14px">
+        <div><h2 style="font-size:clamp(25px,3vw,34px);font-weight:850;line-height:1.1;margin:0">{{ core.subscription.get_tier_display }}</h2>
+          <p style="font-size:13px;opacity:.86;margin:8px 0 0">{{ core.subscription.get_plan_display }} billing · valid until {{ core.subscription.end_date|date:'d M Y' }}</p>
+          <p style="font-size:12px;opacity:.76;margin:5px 0 0">{{ core.subscription.end_date|timeuntil }} remaining</p>
+        </div>
+        <button type="button" data-renew-core style="background:#fff;color:#0f766e;border:0;border-radius:11px;padding:11px 16px;font-size:13px;font-weight:800;cursor:pointer">Renew / Upgrade →</button>
+      </div>
+    </article>
+    <article style="border:1px solid #ccfbf1;background:#f0fdfa;border-radius:20px;padding:clamp(18px,2.4vw,24px);display:flex;flex-direction:column;justify-content:space-between;gap:12px;min-width:0">
+      <div><div style="font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#0f766e">Plan management</div>
+        <h3 style="font-size:18px;font-weight:800;color:#134e4a;margin:9px 0 5px">Need more capacity?</h3>
+        <p style="font-size:13px;line-height:1.6;color:#475569;margin:0">Compare plans, review included branches and users, then upgrade securely when you're ready.</p>
+      </div>
+      <button type="button" data-renew-core style="align-self:flex-start;border:1px solid #99f6e4;background:#fff;color:#0f766e;border-radius:10px;padding:9px 13px;font-size:12px;font-weight:800;cursor:pointer">Compare upgrade options</button>
+    </article>
+  </section>
+  <style>@media(max-width:720px){#packages-app section[aria-label="Current subscription"]{grid-template-columns:minmax(0,1fr)!important}}</style>
+  {% endif %}
+
+  <!-- ============================================================ Overview -->
+  <section class="pc-overview reveal" aria-label="Package overview">
+    <div class="card pc-overview-card">
+      <div class="pc-overview-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M7 3h10a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"/><path d="M8 7h8M8 11h8M8 15h5"/></svg></div>
+      <div><p class="pc-overview-label">Packages</p><p class="pc-overview-value" data-count-to="{{ hero_stats.packages }}">{{ hero_stats.packages }}</p></div>
+    </div>
+    <div class="card pc-overview-card">
+      <div class="pc-overview-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M4 7h16M4 12h16M4 17h10"/><circle cx="18" cy="17" r="2"/></svg></div>
+      <div><p class="pc-overview-label">Services</p><p class="pc-overview-value" data-count-to="{{ hero_stats.services }}">{{ hero_stats.services }}</p></div>
+    </div>
+    <div class="card pc-overview-card">
+      <div class="pc-overview-icon success" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="m5 12.5 4.2 4.2L19 7"/><circle cx="12" cy="12" r="9"/></svg></div>
+      <div><p class="pc-overview-label">Active for you</p><p class="pc-overview-value success" data-count-to="{{ hero_stats.active }}">{{ hero_stats.active }}</p></div>
+    </div>
+    <div class="card pc-overview-card">
+      <div class="pc-overview-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M6 4h12M6 20h12M8 4c0 4 8 4 8 8s-8 4-8 8"/></svg></div>
+      <div><p class="pc-overview-label">SMS from</p><p class="pc-overview-value price">{% if hero_stats.from_price %}TZS {{ hero_stats.from_price|floatformat:0|intcomma }}{% else %}&mdash;{% endif %}</p></div>
+    </div>
+  </section>
+
+  <!-- ============================================================ Attention alert -->
+  {% if low_services %}
+  <section class="pc-alert pc-alert-warning reveal" role="alert" aria-live="polite">
+    <div class="pc-alert-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 8v5M12 16.5v.01"/><path d="m10.3 4.2-7.7 13.1A1.9 1.9 0 0 0 4.2 20h15.6a1.9 1.9 0 0 0 1.6-2.7L13.7 4.2a2 2 0 0 0-3.4 0Z"/></svg></div>
+    <div class="pc-alert-body">
+      <p class="pc-alert-title">Action required: SMS balance is running low</p>
+      <p class="pc-alert-text">{% for a in low_services %}<strong>{{ a.label }}</strong>{% if not forloop.last %}, {% endif %}{% endfor %} {{ low_services|length|pluralize:"service is,services are" }} running low. Top up before the balance is exhausted.</p>
+    </div>
+    <div class="pc-alert-actions">{% for a in low_services %}<button type="button" class="btn btn-primary" data-jump-tab="{{ a.key }}">Top up {{ a.label }}</button>{% endfor %}</div>
+  </section>
+  {% endif %}
+
+  <!-- ============================================================ Your services -->
+  {% if core or active_services %}
+  <section aria-label="Your active services" class="reveal" style="animation-delay:.05s">
+    <div class="pc-sec-head"><h2>Your services</h2><span>{{ hero_stats.active }} active</span></div>
+    <div class="pc-svcs">
+      {% if core %}
+      <div class="pc-svc pc-svc-core">
+        <div class="pc-svc-top"><span class="pc-svc-label">Core plan</span><span class="pc-pill {% if core.subscription.status == 'ACTIVE' %}ok{% else %}warn{% endif %}">{{ core.subscription.get_status_display }}</span></div>
+        <p class="pc-svc-big">{{ core.subscription.get_tier_display }}</p>
+        <p class="pc-svc-meta">{{ core.subscription.get_plan_display }} &middot; until <strong>{{ core.subscription.end_date|date:'d M Y' }}</strong></p>
+        <button type="button" class="pc-svc-act" data-renew-core>Renew or upgrade</button>
+        {% if core_receipt %}<a class="pc-svc-meta" style="display:inline-block;margin-top:6px;text-decoration:underline" href="{% url 'hq:public_subscription_receipt' core_receipt.access_token %}" target="_blank" rel="noopener">View receipt {{ core_receipt.receipt_number }}</a>{% endif %}
+      </div>
+      {% endif %}
+      {% for svc in active_services %}
+      <div class="pc-svc {% if svc.low %}is-low{% endif %}">
+        <div class="pc-svc-top"><span class="pc-svc-label">{{ svc.label }}</span>{% if svc.low %}<span class="pc-pill warn">Running low</span>{% elif svc.days_left is not None and svc.days_left <= 7 %}<span class="pc-pill warn">Expires soon</span>{% else %}<span class="pc-pill ok">Active</span>{% endif %}</div>
+        <p class="pc-svc-big tabular-nums">{{ svc.remaining|intcomma }} <small>{{ svc.unit }} left</small></p>
+        <div class="pc-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ svc.percent }}"><i class="meter-fill" style="width:{{ svc.percent }}%"></i></div>
+        <p class="pc-svc-meta">{% if svc.no_expiry %}<strong>Never expires</strong> &middot; use until finished{% else %}{% if svc.days_left is not None %}{% if svc.days_left <= 0 %}Expires today{% else %}{{ svc.days_left }} day{{ svc.days_left|pluralize }} left{% endif %} &middot; {% endif %}until <strong>{{ svc.end_date|date:'d M Y' }}</strong>{% endif %}</p>
+        <button type="button" class="pc-svc-act" data-jump-tab="{{ svc.key }}">Top up</button>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  <!-- ============================================================ Package finder -->
+  <section id="finder" class="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50/70 to-white overflow-hidden hidden">
+    <div class="p-5 md:p-6 flex flex-col md:flex-row md:items-start justify-between gap-4">
+      <div>
+        <p class="text-xs font-bold uppercase tracking-[.16em] text-emerald-700">Package finder</p>
+        <h2 class="mt-1 text-xl font-extrabold text-ink-950">How many SMS do you need each month?</h2>
+        <p class="text-sm text-ink-500 mt-1">Enter your expected volume and we highlight the most economical package that covers it. Leave a service empty to skip it.</p>
+      </div>
+      <button type="button" id="close-finder" class="btn btn-secondary shrink-0">Close</button>
+    </div>
+    <div class="px-5 md:px-6 pb-6 grid sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      {% for s in sections %}{% if s.items %}
+      <div class="rounded-2xl bg-white ring-1 ring-ink-100 p-4">
+        <label class="block text-xs font-bold uppercase tracking-wider text-ink-500" for="fit-{{ s.key }}">{{ s.label }}</label>
+        <input id="fit-{{ s.key }}" type="number" min="0" step="10" inputmode="numeric" data-fit-input="{{ s.key }}" class="form-input mt-2" placeholder="e.g. 200">
+        <div class="mt-2 flex flex-wrap gap-1.5">
+          <button type="button" class="rounded-full border border-ink-200 px-2.5 py-1 text-xs font-semibold text-ink-600 hover:bg-ink-50" data-fit-preset="50" data-for="{{ s.key }}">50</button>
+          <button type="button" class="rounded-full border border-ink-200 px-2.5 py-1 text-xs font-semibold text-ink-600 hover:bg-ink-50" data-fit-preset="100" data-for="{{ s.key }}">100</button>
+          <button type="button" class="rounded-full border border-ink-200 px-2.5 py-1 text-xs font-semibold text-ink-600 hover:bg-ink-50" data-fit-preset="300" data-for="{{ s.key }}">300</button>
+          <button type="button" class="rounded-full border border-ink-200 px-2.5 py-1 text-xs font-semibold text-ink-600 hover:bg-ink-50" data-fit-preset="1000" data-for="{{ s.key }}">1,000</button>
+        </div>
+        <p class="mt-3 text-sm text-ink-500 min-h-[2.75rem]" data-fit-result="{{ s.key }}">No volume entered.</p>
+      </div>
+      {% endif %}{% endfor %}
+    </div>
+  </section>
+
+  <!-- ============================================================ Toolbar -->
+  <section class="pc-bar-wrap" aria-label="Filter packages">
+    <div class="pc-tabs" id="pkg-tabs" role="tablist">
+      {% for tab in filter_tabs %}
+      <button type="button" role="tab" data-tab="{{ tab.key }}" aria-selected="{% if forloop.first %}true{% else %}false{% endif %}"
+              class="pkg-tab {% if forloop.first %}bg-brand-700 text-white border-brand-700{% else %}bg-white text-ink-700 border-ink-200{% endif %}">
+        {{ tab.label }}<span class="pkg-tab-count {% if forloop.first %}bg-white/20{% else %}bg-ink-100 text-ink-600{% endif %}">{{ tab.count }}</span>
+      </button>
+      {% endfor %}
+    </div>
+    <div class="pc-controls">
+      <label class="pc-field pc-search">
+        <span>Search <kbd>/</kbd></span>
+        <input id="pkg-search" type="search" class="form-input" placeholder="Name, code or service…" autocomplete="off">
+      </label>
+      <label class="pc-field">
+        <span>Sort by</span>
+        <select id="pkg-sort" class="form-input">
+          <option value="default">Recommended order</option>
+          <option value="price-asc">Price: low to high</option>
+          <option value="price-desc">Price: high to low</option>
+          <option value="credits-desc">Most SMS included</option>
+          <option value="value">Best value per SMS</option>
+        </select>
+      </label>
+      <label class="pc-field">
+        <span>Budget</span>
+        <select id="pkg-budget" class="form-input">
+          <option value="0">Any price</option>
+          <option value="10000">Up to TZS 10,000</option>
+          <option value="30000">Up to TZS 30,000</option>
+          <option value="50000">Up to TZS 50,000</option>
+          <option value="100000">Up to TZS 100,000</option>
+          <option value="300000">Up to TZS 300,000</option>
+        </select>
+      </label>
+      <div class="pc-field pc-view">
+        <span>View</span>
+        <div class="pc-seg" role="group" aria-label="Layout">
+          <button type="button" data-view="grid" class="view-btn" aria-label="Grid view" title="Grid view"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></button>
+          <button type="button" data-view="list" class="view-btn" aria-label="List view" title="List view"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+        </div>
+      </div>
+      <button type="button" id="pkg-reset" class="pc-reset">Reset</button>
+    </div>
+    <div class="pc-bar-foot">
+      {% if core %}
+      <div class="pc-billing" id="billing-toggle-wrap">
+        <span>Core plan billing</span>
+        <div class="pc-seg" role="group" aria-label="Billing period">
+          <button type="button" data-billing="MONTHLY" class="billing-btn">Monthly</button>
+          <button type="button" data-billing="YEARLY" class="billing-btn">Yearly <b>Save more</b></button>
+        </div>
+      </div>
+      {% else %}<span></span>{% endif %}
+      <p id="pkg-result-count" aria-live="polite"></p>
+    </div>
+  </section>
+
+  <!-- ============================================================ Core plans -->
+  {% if core %}
+  <section data-section="core" class="pkg-section space-y-4">
+    <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
+      <div class="max-w-3xl">
+        <p class="text-xs font-bold uppercase tracking-[.16em] text-brand-700">Core subscription</p>
+        <h2 class="mt-1 text-2xl font-extrabold text-ink-950">SmartPOS plans</h2>
+        <p class="text-sm text-ink-500 mt-1">The system itself &mdash; choose the branches and users your business needs. You can upgrade or renew at any time.</p>
+      </div>
+      <button type="button" id="toggle-matrix" class="btn btn-secondary self-start md:self-auto" aria-expanded="false" aria-controls="plan-matrix">Compare plan features</button>
+    </div>
+    {% if core.referral_percent %}
+    <div class="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
+      <strong>{{ core.referral_percent }}% referral discount</strong> is applied to the prices below for your next renewal. <a href="{% url 'hq:referrals' %}" class="underline font-semibold">See my invites</a>
+    </div>
+    {% endif %}
+    <div class="grid sm:grid-cols-2 xl:grid-cols-3 min-[1500px]:grid-cols-4 gap-5 pkg-grid">
+      {% for t in core.tiers %}
+      <article class="pkg-card {% if t.is_current %}is-current{% elif t.popular %}is-popular{% endif %}"
+               data-kind="core" data-order="{{ forloop.counter }}" data-tier="{{ t.tier }}" data-name="{{ t.label }}" data-service="core"
+               data-monthly="{{ t.monthly|floatformat:0 }}" data-yearly="{{ t.yearly|floatformat:0 }}" data-price="{{ t.monthly|floatformat:0 }}" data-credits="0" data-per="0"
+               data-core-end="{{ core.subscription.end_date|date:'Y-m-d' }}"
+               data-search="{{ t.label|lower }} core plan subscription {{ t.tier|lower }}">
+        {% if t.is_current %}<div class="pc-ribbon">Current plan</div>
+        {% elif t.popular %}<div class="pc-ribbon amber">Most chosen</div>{% endif %}
+        <div class="pc-top">
+          <h3 class="pc-name big">{{ t.label }}</h3>
+          <p class="pc-blurb">{{ t.blurb }}</p>
+          <p class="pc-price"><span class="cur">TZS</span><span class="amt core-price tabular-nums">{{ t.monthly|floatformat:0|intcomma }}</span></p>
+          <p class="pc-per core-period">per month</p>
+          {% if t.saving %}<p class="pc-saving core-saving hidden">Save TZS {{ t.saving|floatformat:0|intcomma }} a year vs monthly</p>{% endif %}
+        </div>
+        <ul class="pc-feat">
+          <li>{{ t.branches }}</li>
+          <li>{{ t.users }}</li>
+          <li>Sales, inventory, expenses and reports</li>
+          {% if t.reports %}<li>Intelligent Reports included</li>{% endif %}
+        </ul>
+        <button type="button" class="pc-cta {% if not t.is_current and not t.popular %}secondary{% endif %} pkg-select">{{ t.action }}</button>
+      </article>
+      {% endfor %}
+    </div>
+
+    <div id="plan-matrix" class="hidden card p-0 overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-ink-50 text-ink-600"><tr>
+            <th class="px-5 py-3 text-left font-semibold">Feature</th>
+            {% for t in core.tiers %}<th class="px-5 py-3 text-left font-semibold">{{ t.label }}{% if t.is_current %} <span class="badge bg-brand-100 text-brand-700 ml-1">Current</span>{% endif %}</th>{% endfor %}
+          </tr></thead>
+          <tbody class="divide-y divide-ink-100">
+            <tr><td class="px-5 py-3 font-semibold text-ink-700">Branches</td>{% for t in core.tiers %}<td class="px-5 py-3">{{ t.branches }}</td>{% endfor %}</tr>
+            <tr><td class="px-5 py-3 font-semibold text-ink-700">Users</td>{% for t in core.tiers %}<td class="px-5 py-3">{{ t.users }}</td>{% endfor %}</tr>
+            <tr><td class="px-5 py-3 font-semibold text-ink-700">Monthly price</td>{% for t in core.tiers %}<td class="px-5 py-3 tabular-nums">TZS {{ t.monthly|floatformat:0|intcomma }}</td>{% endfor %}</tr>
+            <tr><td class="px-5 py-3 font-semibold text-ink-700">Yearly price</td>{% for t in core.tiers %}<td class="px-5 py-3 tabular-nums">TZS {{ t.yearly|floatformat:0|intcomma }}{% if t.saving %} <span class="text-emerald-600 text-xs font-semibold">(save {{ t.saving|floatformat:0|intcomma }})</span>{% endif %}</td>{% endfor %}</tr>
+            <tr><td class="px-5 py-3 font-semibold text-ink-700">Intelligent Reports included</td>{% for t in core.tiers %}<td class="px-5 py-3">{% if t.reports %}<span class="text-emerald-600 font-bold">&#10003; Included</span>{% else %}<span class="text-ink-400">Buy separately</span>{% endif %}</td>{% endfor %}</tr>
+            <tr><td class="px-5 py-3 font-semibold text-ink-700">Need another branch?</td>{% for t in core.tiers %}<td class="px-5 py-3 text-ink-600">Add-on TZS {{ branch_addon_price|floatformat:0|intcomma }}/month each</td>{% endfor %}</tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+  {% endif %}
+
+  <!-- ============================================================ Premium services -->
+  {% for s in sections %}
+  <section data-section="{{ s.key }}" class="pkg-section space-y-4" id="svc-{{ s.key }}">
+    <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
+      <div class="max-w-3xl">
+        <p class="text-xs font-bold uppercase tracking-[.16em] text-brand-700">Premium service</p>
+        <h2 class="mt-1 text-2xl font-extrabold text-ink-950">{{ s.label }}</h2>
+        <p class="text-sm text-ink-500 mt-1">{{ s.tagline }}</p>
+        {% if s.starting_price %}<p class="text-xs font-semibold text-ink-400 mt-2">Packages from TZS {{ s.starting_price|floatformat:0|intcomma }}</p>{% endif %}
+      </div>
+      {% if s.current %}
+      <span class="badge {% if s.low %}bg-amber-100 text-amber-700{% else %}bg-emerald-100 text-emerald-700{% endif %} self-start md:self-auto">Active &middot; {{ s.current.credits_remaining|intcomma }} {{ s.unit }} left</span>
+      {% elif s.pending %}
+      <span class="badge bg-amber-100 text-amber-700 self-start md:self-auto">Payment awaiting verification</span>
+      {% else %}
+      <span class="badge bg-ink-100 text-ink-600 self-start md:self-auto">Not active</span>
+      {% endif %}
+    </div>
+    <div class="rounded-2xl border border-brand-200 bg-brand-50/50 p-4 md:p-5 space-y-4 csq" data-csq data-service="{{ s.key }}" data-unit="{{ s.unit }}" data-remaining="{% if s.current %}{{ s.current.credits_remaining }}{% else %}0{% endif %}" data-quote-url="{% url 'hq:custom_sms_quote' %}">
+      {% with tid="tiers-"|add:s.key %}{{ s.rate_tiers|json_script:tid }}{% endwith %}
+      <div><h3 class="font-bold text-ink-900">Need a different amount? Build your own package</h3><p class="text-sm text-ink-600 mt-1">Type how many SMS you want and the price updates instantly. The more you buy, the lower the price per SMS. Happy with the total? Pay, and your SMS are added to your account.</p></div>
+      <form method="post" class="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:items-end" data-csq-form>
+        {% csrf_token %}<input type="hidden" name="custom_sms_service" value="{{ s.key }}">
+        <div>
+          <label class="block text-xs font-bold text-ink-600 mb-1" for="custom-sms-{{ s.key }}">How many SMS do you want? (20 &ndash; 1,000,000)</label>
+          <input id="custom-sms-{{ s.key }}" name="custom_sms_quantity" type="number" inputmode="numeric" min="20" max="1000000" step="1" required class="form-input w-full text-lg font-bold" placeholder="e.g. 750" data-csq-input autocomplete="off">
+          <div class="flex flex-wrap gap-2 mt-2" role="group" aria-label="Quick amounts">
+            <button type="button" class="rounded-full border border-brand-200 bg-white px-3 py-1 text-xs font-semibold text-brand-700 hover:bg-brand-50" data-csq-chip="100">100</button>
+            <button type="button" class="rounded-full border border-brand-200 bg-white px-3 py-1 text-xs font-semibold text-brand-700 hover:bg-brand-50" data-csq-chip="250">250</button>
+            <button type="button" class="rounded-full border border-brand-200 bg-white px-3 py-1 text-xs font-semibold text-brand-700 hover:bg-brand-50" data-csq-chip="500">500</button>
+            <button type="button" class="rounded-full border border-brand-200 bg-white px-3 py-1 text-xs font-semibold text-brand-700 hover:bg-brand-50" data-csq-chip="1000">1,000</button>
+            <button type="button" class="rounded-full border border-brand-200 bg-white px-3 py-1 text-xs font-semibold text-brand-700 hover:bg-brand-50" data-csq-chip="2500">2,500</button>
+            <button type="button" class="rounded-full border border-brand-200 bg-white px-3 py-1 text-xs font-semibold text-brand-700 hover:bg-brand-50" data-csq-chip="5000">5,000</button>
+          </div>
+        </div>
+        <div class="rounded-xl bg-white border border-brand-100 p-3.5" aria-live="polite">
+          <div class="flex items-baseline justify-between gap-3"><span class="text-xs font-bold uppercase tracking-wider text-ink-500">Your total</span><span class="text-2xl font-extrabold text-ink-950 tabular-nums">TZS <span data-csq-total>0</span></span></div>
+          <p class="text-xs text-ink-500 mt-1" data-csq-rate>Enter a quantity to see your price.</p>
+          <p class="text-xs text-ink-500" data-csq-after></p>
+          <button type="submit" class="btn btn-primary w-full mt-3" data-csq-pay disabled>Pay for my SMS</button>
+        </div>
+      </form>
+      <p class="text-xs text-ink-500">Total is rounded up to the nearest TZS 1. The amount is fixed at checkout and your SMS never expire.</p>
+    </div>
+    <div class="grid sm:grid-cols-2 xl:grid-cols-3 gap-5 pkg-grid">
+      {% for p in s.items %}
+      <article class="pkg-card {% if p.popular %}is-popular{% endif %}"
+               data-kind="sms" data-service="{{ s.key }}" data-order="{{ forloop.counter }}" data-package-id="{{ p.id }}" data-name="{{ p.name }}"
+               data-price="{{ p.price|floatformat:0 }}" data-credits="{{ p.credits }}" data-per="{{ p.per_sms|default:0 }}" data-days="{{ p.days }}" data-perday="{{ p.per_day }}"
+               data-pending="{% if s.pending %}1{% else %}0{% endif %}" data-pay-url="{{ s.pay_url }}" data-unit="{{ s.unit }}"
+               data-current-remaining="{% if s.current %}{{ s.current.credits_remaining }}{% else %}0{% endif %}"
+               data-current-end="{% if s.current and not s.no_expiry %}{{ s.current.end_date|date:'Y-m-d' }}{% endif %}" data-no-expiry="{% if s.no_expiry %}1{% else %}0{% endif %}"
+               data-search="{{ p.name|lower }} {{ p.code|lower }} {{ s.label|lower }}">
+        {% if p.popular %}<div class="pc-ribbon">Popular</div>
+        {% elif p.best_value %}<div class="pc-ribbon green">Best value</div>{% endif %}
+        <span class="fit-badge pc-fit">&#10003; Best fit for you</span>
+
+        <div class="pc-top">
+          <p class="pc-kick">{% if s.no_expiry %}Never expires{% else %}{{ p.days }} days validity{% endif %}</p>
+          <h3 class="pc-name">{{ p.name }}</h3>
+          <p class="pc-price"><span class="cur">TZS</span><span class="amt tabular-nums">{{ p.price|floatformat:0|intcomma }}</span></p>
+          {% if p.per_sms %}<p class="pc-per">&asymp; TZS {{ p.per_sms }} per SMS</p>{% endif %}
+        </div>
+
+        <div class="pkg-credits pc-credits">
+          <div class="pc-credits-row">
+            <div><p class="n tabular-nums">{{ p.credits|intcomma }}</p><p class="u">{{ s.unit|capfirst }} included</p></div>
+            <p class="d">{% if s.no_expiry %}Use at your<br>own pace{% else %}&asymp; {{ p.per_day|intcomma }} / day<br>over {{ p.days }} days{% endif %}</p>
+          </div>
+          {% if p.saving_pct %}
+          <div class="pc-save">
+            <div><span>Saves {{ p.saving_pct }}% per SMS</span><em>vs smallest package</em></div>
+            <div class="pc-bar"><i class="meter-fill" style="width:{{ p.saving_pct }}%"></i></div>
+          </div>
+          {% endif %}
+        </div>
+
+        <ul class="pkg-extra pc-feat">
+          {% for f in s.features %}<li>{{ f }}</li>{% endfor %}
+        </ul>
+
+        <div class="pkg-compare pc-compare">
+          <label><input type="checkbox" class="compare-check"> Compare</label>
+        </div>
+        <button type="button" class="pc-cta pkg-select">{% if s.current %}Top up this package{% else %}Select &amp; pay{% endif %}</button>
+      </article>
+      {% empty %}
+      <div class="card md:col-span-2 xl:col-span-3 text-center py-10">
+        <p class="font-bold text-ink-900">No {{ s.label }} packages are available right now.</p>
+        <p class="text-sm text-ink-500 mt-1">Please contact support: {{ payment_settings.support_phone }}</p>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endfor %}
+
+  <div id="pkg-empty" class="card text-center py-12 hidden">
+    <p class="font-bold text-ink-900">No packages match your filters.</p>
+    <p class="text-sm text-ink-500 mt-1">Try another service, a higher budget, or reset the filters.</p>
+    <button type="button" class="btn btn-secondary mt-4" id="pkg-empty-reset">Reset filters</button>
+  </div>
+
+  <!-- ============================================================ Trust + how it works -->
+  <section class="pc-how">
+    <div class="pc-how-steps">
+      <p class="pc-eyebrow">How it works</p>
+      <ol>
+        <li><b>1</b><div><h4>Choose</h4><p>Filter, compare and let the finder suggest the best fit.</p></div></li>
+        <li><b>2</b><div><h4>Pay</h4><p>{% if online_payment_ready %}{% if online_gateway_is_abliner %}Pay securely with ABLiner mobile money. Enter your phone number at checkout and approve the prompt on your phone.{% else %}Pay online by card or mobile money, or send to our Lipa Namba.{% endif %}{% else %}Send the amount to our Lipa Namba and enter the transaction reference.{% endif %}</p></div></li>
+        <li><b>3</b><div><h4>Activate</h4><p>{% if online_payment_ready %}Online payments activate automatically after the gateway confirms payment; manual ones after verification.{% else %}Your package activates once payment is verified.{% endif %}</p></div></li>
+      </ol>
+    </div>
+    <div class="pc-help">
+      <p class="pc-eyebrow">Need help choosing?</p>
+      <p class="t">Call or message our support team and we will recommend the right plan for your business.</p>
+      <a class="tel" href="tel:{{ payment_settings.support_phone }}">{{ payment_settings.support_phone }}</a>
+      {% if payment_settings.instructions_text %}<p class="ins">{{ payment_settings.instructions_text|linebreaksbr }}</p>{% endif %}
+    </div>
+  </section>
+
+  <!-- ============================================================ FAQ -->
+  <section class="card">
+    <p class="text-xs font-bold uppercase tracking-[.16em] text-ink-400">Frequently asked questions</p>
+    <div class="mt-4 divide-y divide-ink-100">
+      <details class="faq py-3"><summary class="flex items-center justify-between gap-4 font-semibold text-ink-900">What happens if I buy a package I already have?<svg class="faq-chevron h-4 w-4 text-ink-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></summary><p class="mt-2 text-sm text-ink-500 leading-6">It is a top-up. The new SMS credits are added to your remaining balance. SMS credits never expire, so you never lose unused credits.</p></details>
+      <details class="faq py-3"><summary class="flex items-center justify-between gap-4 font-semibold text-ink-900">How long does activation take?<svg class="faq-chevron h-4 w-4 text-ink-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></summary><p class="mt-2 text-sm text-ink-500 leading-6">{% if online_payment_ready %}Online payments activate automatically as soon as they are confirmed. {% endif %}Manual mobile-money payments activate after the platform owner verifies your transaction reference.</p></details>
+      <details class="faq py-3"><summary class="flex items-center justify-between gap-4 font-semibold text-ink-900">Do the SMS services share credits?<svg class="faq-chevron h-4 w-4 text-ink-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></summary><p class="mt-2 text-sm text-ink-500 leading-6">No. Debt, Receipt, Marketing and Intelligent Report SMS each have their own credits, so heavy use of one never drains another. None of them expire.</p></details>
+      <details class="faq py-3"><summary class="flex items-center justify-between gap-4 font-semibold text-ink-900">I paid but my package is not active yet.<svg class="faq-chevron h-4 w-4 text-ink-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></summary><p class="mt-2 text-sm text-ink-500 leading-6">Check the status in Payment history below. Manual payments show &ldquo;Pending&rdquo; until verified. If it stays pending, contact support on {{ payment_settings.support_phone }} with your transaction reference.</p></details>
+    </div>
+  </section>
+
+  <!-- ============================================================ History -->
+  {% if history_page.paginator.count %}
+  <section id="history" class="card p-0 overflow-hidden">
+    <div class="p-5 border-b border-ink-100"><p class="text-xs uppercase tracking-wider text-ink-400">Account activity</p><h2 class="font-extrabold text-lg mt-1">Payment history</h2></div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm pc-table">
+        <thead class="bg-ink-50 text-ink-500"><tr>
+          <th class="px-5 py-3 text-left font-semibold">Date</th><th class="px-5 py-3 text-left font-semibold">Service</th><th class="px-5 py-3 text-left font-semibold">Package</th>
+          <th class="px-5 py-3 text-right font-semibold">Amount</th><th class="px-5 py-3 text-left font-semibold">Reference</th><th class="px-5 py-3 text-left font-semibold">Status</th>
+        </tr></thead>
+        <tbody>
+          {% for r in history_page %}
+          <tr class="border-t border-ink-100">
+            <td data-label="Date" class="px-5 py-4 whitespace-nowrap">{{ r.date|date:'d M Y H:i' }}</td>
+            <td data-label="Service" class="px-5 py-4">{{ r.service }}</td>
+            <td data-label="Package" class="px-5 py-4 font-semibold">{{ r.package }}</td>
+            <td data-label="Amount" class="px-5 py-4 text-right whitespace-nowrap tabular-nums">TZS {{ r.amount|floatformat:0|intcomma }}</td>
+            <td data-label="Reference" class="px-5 py-4 font-mono text-xs">{{ r.reference|default:"—" }}</td>
+            <td data-label="Status" class="px-5 py-4"><span class="badge {% if r.status == 'APPROVED' %}bg-emerald-100 text-emerald-700{% elif r.status == 'REJECTED' %}bg-red-100 text-red-700{% else %}bg-amber-100 text-amber-700{% endif %}">{{ r.status_display }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="px-5 pb-5">{% include "partials/pagination.html" with page_obj=history_page page_param="history_page" page_anchor="history" %}</div>
+  </section>
+  {% endif %}
+</div>
+
+<!-- ================================================================ Compare bar -->
+<div id="compare-bar" class="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 hidden w-[calc(100%-2rem)] max-w-xl">
+  <div class="rounded-2xl bg-ink-950 text-white shadow-2xl px-4 py-3 flex items-center justify-between gap-3">
+    <p class="text-sm"><strong id="compare-count">0</strong> selected <span class="text-ink-300">&middot; <span id="compare-service"></span> (max 3)</span></p>
+    <div class="flex gap-2">
+      <button type="button" id="compare-clear" class="rounded-lg px-3 py-2 text-sm font-semibold text-ink-200 hover:bg-white/10">Clear</button>
+      <button type="button" id="compare-open" class="rounded-lg bg-white px-4 py-2 text-sm font-bold text-ink-950 hover:bg-ink-100 disabled:opacity-40" disabled>Compare</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================================================================ Compare modal -->
+<div id="compare-modal" class="sp-modal-fit fixed inset-0 z-50 hidden" role="dialog" aria-modal="true" aria-labelledby="compare-title">
+  <div class="absolute inset-0 bg-ink-950/50" data-close-compare></div>
+  <div class="absolute inset-0 flex items-center justify-center p-4">
+    <div class="relative w-full max-w-3xl rounded-3xl bg-white shadow-2xl ring-1 ring-ink-900/10">
+      <div class="p-6 border-b border-ink-100 flex items-start justify-between gap-4">
+        <div><p class="text-xs font-bold uppercase tracking-[.16em] text-brand-700">Side by side</p><h3 id="compare-title" class="mt-1 text-xl font-extrabold text-ink-950">Compare packages</h3></div>
+        <button type="button" class="rounded-full p-2 text-ink-400 hover:bg-ink-100" data-close-compare aria-label="Close"><svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      </div>
+      <div class="overflow-x-auto"><table class="w-full text-sm" id="compare-table"></table></div>
+    </div>
+  </div>
+</div>
+
+<!-- ================================================================ Checkout modal -->
+<div id="pay-modal" class="sp-modal-fit fixed inset-0 z-50 hidden" role="dialog" aria-modal="true" aria-labelledby="pay-modal-title">
+  <div class="absolute inset-0 bg-ink-950/50" data-close-modal></div>
+  <div class="absolute inset-0 overflow-y-auto">
+    <div class="min-h-full flex items-center justify-center p-3 sm:p-4">
+      <div class="relative w-full max-w-md rounded-2xl bg-white shadow-2xl ring-1 ring-ink-900/10">
+        <div class="px-5 py-3.5 border-b border-ink-100 flex items-start justify-between gap-3">
+          <div>
+            <p class="text-xs font-bold uppercase tracking-[.16em] text-brand-700" id="pay-modal-kicker">Checkout</p>
+            <h3 class="mt-0.5 text-lg font-extrabold text-ink-950" id="pay-modal-title">Package</h3>
+            <p class="text-[13px] text-ink-500 mt-0.5" id="pay-modal-sub"></p>
+          </div>
+          <button type="button" class="rounded-full p-1.5 -mr-1 text-ink-400 hover:bg-ink-100" data-close-modal aria-label="Close">
+            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+          </button>
+        </div>
+        <div class="px-5 py-4 space-y-3">
+          <div id="pay-core-opts" class="hidden space-y-2.5">
+            <div>
+              <label for="pay-core-tier" class="block text-xs font-bold uppercase tracking-wider text-ink-500 mb-1.5">Package</label>
+              <select id="pay-core-tier" class="form-input">
+                {% if core %}{% for t in core.tiers %}<option value="{{ t.tier }}">{{ t.label }} &middot; {{ t.branches }} &middot; {{ t.users }}</option>{% endfor %}{% endif %}
+              </select>
+            </div>
+            <div>
+              <p class="text-xs font-bold uppercase tracking-wider text-ink-500 mb-1.5">Billing period</p>
+              <div class="inline-flex w-full rounded-xl bg-ink-100 p-1" role="group" aria-label="Billing period">
+                <button type="button" class="pay-tab flex-1 rounded-lg px-3 py-1.5 text-sm font-semibold text-ink-600" data-core-period="MONTHLY" aria-selected="true">Monthly</button>
+                <button type="button" class="pay-tab flex-1 rounded-lg px-3 py-1.5 text-sm font-semibold text-ink-600" data-core-period="YEARLY" aria-selected="false">Yearly</button>
+              </div>
+            </div>
+          </div>
+
+          <dl class="rounded-2xl bg-ink-50 border border-ink-100 divide-y divide-ink-100 text-sm">
+            <div class="flex justify-between gap-4 px-4 py-2" id="sum-balance-row"><dt class="text-ink-500">You will have</dt><dd class="font-bold text-ink-900 text-right" id="sum-balance">&mdash;</dd></div>
+            <div class="flex justify-between gap-4 px-4 py-2"><dt class="text-ink-500">Active until</dt><dd class="font-bold text-ink-900 text-right" id="sum-until">&mdash;</dd></div>
+            <div class="flex justify-between items-center gap-4 px-4 py-2"><dt class="text-ink-500">Amount to pay</dt><dd class="text-xl font-extrabold text-ink-950">TZS <span id="pay-modal-amount" class="tabular-nums">0</span></dd></div>
+          </dl>
+
+          <div class="inline-flex w-full rounded-xl bg-ink-100 p-1" role="tablist" aria-label="Payment method">
+            {% if online_payment_ready %}<button type="button" role="tab" class="pay-tab flex-1 rounded-lg px-3 py-1.5 text-sm font-semibold text-ink-600" data-pay-tab="online" aria-selected="true">{{ PAYMENT_BRAND_NAME }}</button>{% endif %}
+            <button type="button" role="tab" class="pay-tab flex-1 rounded-lg px-3 py-1.5 text-sm font-semibold text-ink-600" data-pay-tab="manual" aria-selected="{% if online_payment_ready %}false{% else %}true{% endif %}">Manual Lipa Namba</button>
+          </div>
+
+          {% if online_payment_ready %}
+          <form method="post" id="pay-online-form" data-pay-panel="online" class="rounded-2xl border-2 border-brand-600 bg-gradient-to-br from-brand-50 to-white p-3.5">
+            {% csrf_token %}
+            <input type="hidden" name="package_id" class="f-package">
+            <input type="hidden" name="tier" class="f-tier">
+            <input type="hidden" name="plan" class="f-plan">
+            <p class="text-sm font-bold text-ink-900">Quick and secure checkout</p>
+            <p class="text-xs text-ink-500 mt-0.5 mb-3">{% if online_gateway_is_abliner %}Pay with mobile money. Enter your number and approve the request on your phone.{% else %}Card, M-Pesa, Mixx by Yas or Airtel Money. Activates when payment is confirmed.{% endif %}</p>
+            <button type="submit" class="btn btn-primary w-full">Continue to secure checkout</button>
+          </form>
+          {% endif %}
+
+          <form method="post" id="pay-manual-form" data-pay-panel="manual" class="space-y-2.5 {% if online_payment_ready %}hidden{% endif %}">
+            {% csrf_token %}
+            <input type="hidden" name="service" class="f-service">
+            <input type="hidden" name="package_id" class="f-package">
+            <input type="hidden" name="tier" class="f-tier">
+            <input type="hidden" name="plan" class="f-plan">
+            <div class="rounded-xl border border-ink-100 px-4 py-2.5 text-sm flex items-center justify-between gap-3">
+              <div class="min-w-0"><span class="text-ink-400 text-xs block truncate">Pay to Lipa Namba &middot; {{ payment_settings.payee_name }}</span><strong class="text-lg tracking-wide">{{ payment_settings.lipa_namba }}</strong></div>
+              <button type="button" class="copy-btn rounded-lg border border-ink-200 px-3 py-1.5 text-xs font-semibold hover:bg-ink-50 flex-none" data-copy="{{ payment_settings.lipa_namba }}">Copy</button>
+            </div>
+            <p id="pay-pending-note" class="hidden rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm text-amber-800">You already have a payment for this service waiting for verification. Wait for it to be confirmed{% if online_payment_ready %}, or pay online instead{% endif %}.</p>
+            <input name="payment_reference" id="pay-reference" class="form-input" required placeholder="Transaction reference (from your payment SMS)" autocomplete="off">
+            <input name="customer_note" class="form-input" placeholder="Note (optional)" autocomplete="off">
+            <button type="submit" id="pay-manual-btn" class="btn btn-secondary w-full">I have paid &mdash; submit for verification</button>
+          </form>
+          <p class="text-center text-[11px] text-ink-400 !mt-2">Questions? Call {{ payment_settings.support_phone }}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+  var root = document.getElementById('packages-app');
+  if (!root) return;
+
+  var DEFAULTS = { tab: 'all', q: '', sort: 'default', budget: 0, billing: 'MONTHLY', view: 'grid' };
+  var state = Object.assign({}, DEFAULTS);
+  var cards = Array.prototype.slice.call(root.querySelectorAll('.pkg-card'));
+  var sections = Array.prototype.slice.call(root.querySelectorAll('.pkg-section'));
+  var tabs = Array.prototype.slice.call(root.querySelectorAll('.pkg-tab'));
+  var emptyBox = document.getElementById('pkg-empty');
+  var resultCount = document.getElementById('pkg-result-count');
+  var addonPrice = parseFloat(root.getAttribute('data-addon-price')) || 0;
+
+  function fmt(n) { return Number(n).toLocaleString('en-US', { maximumFractionDigits: 0 }); }
+  function num(el, key) { return parseFloat(el.getAttribute(key)) || 0; }
+  function iso(d) { return d.toISOString().slice(0, 10); }
+  function fmtDate(d) { return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }); }
+  function addDays(d, n) { var x = new Date(d.getTime()); x.setDate(x.getDate() + n); return x; }
+  function startOfToday() { var t = new Date(); t.setHours(0, 0, 0, 0); return t; }
+  function parseISO(s) { if (!s) return null; var p = s.split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
+
+  /* ------------------------------------------------ URL state (shareable filters) */
+  function pushUrl() {
+    var u = new URLSearchParams(window.location.search);
+    ['tab', 'q', 'sort', 'budget', 'bill', 'view'].forEach(function (k) { u.delete(k); });
+    if (state.tab !== DEFAULTS.tab) u.set('tab', state.tab);
+    if (state.q) u.set('q', state.q);
+    if (state.sort !== DEFAULTS.sort) u.set('sort', state.sort);
+    if (state.budget) u.set('budget', state.budget);
+    if (state.billing !== DEFAULTS.billing) u.set('bill', state.billing);
+    if (state.view !== DEFAULTS.view) u.set('view', state.view);
+    var qs = u.toString();
+    history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : '') + window.location.hash);
+  }
+  function readUrl() {
+    var u = new URLSearchParams(window.location.search);
+    var tab = u.get('tab') || u.get('service');
+    if (tab && root.querySelector('.pkg-tab[data-tab="' + tab + '"]')) state.tab = tab;
+    if (u.get('q')) state.q = u.get('q').toLowerCase();
+    if (u.get('sort')) state.sort = u.get('sort');
+    if (u.get('budget')) state.budget = parseFloat(u.get('budget')) || 0;
+    if (u.get('bill') === 'YEARLY') state.billing = 'YEARLY';
+    if (u.get('view') === 'list') state.view = 'list';
+    try { if (!u.get('view') && localStorage.getItem('pkg-view') === 'list') state.view = 'list'; } catch (e) {}
+  }
+
+  /* ------------------------------------------------ billing + view */
+  function applyBilling() {
+    root.querySelectorAll('.pkg-card[data-kind="core"]').forEach(function (c) {
+      var yearly = state.billing === 'YEARLY';
+      var price = num(c, yearly ? 'data-yearly' : 'data-monthly');
+      c.setAttribute('data-price', price);
+      c.querySelector('.core-price').textContent = fmt(price);
+      c.querySelector('.core-period').textContent = yearly ? 'per year' : 'per month';
+      var s = c.querySelector('.core-saving');
+      if (s) s.classList.toggle('hidden', !yearly);
+    });
+    root.querySelectorAll('.billing-btn').forEach(function (b) {
+      var on = b.getAttribute('data-billing') === state.billing;
+      b.classList.toggle('bg-white', on); b.classList.toggle('text-ink-900', on); b.classList.toggle('shadow-sm', on);
+      b.classList.toggle('text-ink-500', !on);
+    });
+  }
+  function applyView() {
+    root.classList.toggle('list-view', state.view === 'list');
+    root.querySelectorAll('.view-btn').forEach(function (b) {
+      var on = b.getAttribute('data-view') === state.view;
+      b.classList.toggle('bg-white', on); b.classList.toggle('shadow-sm', on); b.classList.toggle('text-ink-900', on);
+    });
+  }
+
+  /* ------------------------------------------------ filter + sort */
+  function sortGrid(grid) {
+    var items = Array.prototype.slice.call(grid.querySelectorAll('.pkg-card'));
+    items.sort(function (a, b) {
+      var s = state.sort;
+      if (s === 'price-asc') return num(a, 'data-price') - num(b, 'data-price');
+      if (s === 'price-desc') return num(b, 'data-price') - num(a, 'data-price');
+      if (s === 'credits-desc') return num(b, 'data-credits') - num(a, 'data-credits');
+      if (s === 'value') return (num(a, 'data-per') || 1e9) - (num(b, 'data-per') || 1e9);
+      return num(a, 'data-order') - num(b, 'data-order');
+    });
+    items.forEach(function (el) { grid.appendChild(el); });
+  }
+  function render(skipUrl) {
+    var shown = 0;
+    cards.forEach(function (c) {
+      var section = c.closest('.pkg-section').getAttribute('data-section');
+      var okTab = state.tab === 'all' || state.tab === section;
+      var okQ = !state.q || (c.getAttribute('data-search') || '').indexOf(state.q) !== -1;
+      var okBudget = !state.budget || num(c, 'data-price') <= state.budget;
+      var visible = okTab && okQ && okBudget;
+      c.classList.toggle('hidden', !visible);
+      if (visible) shown++;
+    });
+    sections.forEach(function (s) {
+      var hasCards = s.querySelector('.pkg-card');
+      var any = s.querySelector('.pkg-card:not(.hidden)');
+      var tabMatch = state.tab === s.getAttribute('data-section');
+      s.classList.toggle('hidden', hasCards ? !any : !tabMatch);
+      sortGrid(s.querySelector('.pkg-grid'));
+    });
+    tabs.forEach(function (x) {
+      var on = x.getAttribute('data-tab') === state.tab;
+      x.setAttribute('aria-selected', on);
+      x.classList.toggle('bg-brand-700', on); x.classList.toggle('text-white', on); x.classList.toggle('border-brand-700', on);
+      x.classList.toggle('bg-white', !on); x.classList.toggle('text-ink-700', !on); x.classList.toggle('border-ink-200', !on);
+      var cnt = x.querySelector('.pkg-tab-count');
+      cnt.classList.toggle('bg-white/20', on); cnt.classList.toggle('bg-ink-100', !on); cnt.classList.toggle('text-ink-600', !on);
+    });
+    emptyBox.classList.toggle('hidden', shown > 0);
+    resultCount.textContent = shown + ' package' + (shown === 1 ? '' : 's') + ' shown';
+    if (!skipUrl) pushUrl();
+  }
+  function setTab(key) { state.tab = key; render(); }
+  function resetAll() {
+    state = Object.assign({}, DEFAULTS, { billing: state.billing, view: state.view });
+    document.getElementById('pkg-search').value = '';
+    document.getElementById('pkg-sort').value = 'default';
+    document.getElementById('pkg-budget').value = '0';
+    clearCompare(); render();
+  }
+
+  tabs.forEach(function (t) { t.addEventListener('click', function () { setTab(t.getAttribute('data-tab')); clearCompare(); }); });
+  root.querySelectorAll('[data-jump-tab]').forEach(function (b) {
+    b.addEventListener('click', function () { setTab(b.getAttribute('data-jump-tab')); document.getElementById('pkg-tabs').scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+  });
+  var searchTimer;
+  document.getElementById('pkg-search').addEventListener('input', function (e) {
+    clearTimeout(searchTimer); var v = e.target.value.trim().toLowerCase();
+    searchTimer = setTimeout(function () { state.q = v; render(); }, 120);
+  });
+  document.getElementById('pkg-sort').addEventListener('change', function (e) { state.sort = e.target.value; render(); });
+  document.getElementById('pkg-budget').addEventListener('change', function (e) { state.budget = parseFloat(e.target.value) || 0; render(); });
+  document.getElementById('pkg-reset').addEventListener('click', resetAll);
+  document.getElementById('pkg-empty-reset').addEventListener('click', resetAll);
+  root.querySelectorAll('.billing-btn').forEach(function (b) {
+    b.addEventListener('click', function () { state.billing = b.getAttribute('data-billing'); applyBilling(); render(); });
+  });
+  root.querySelectorAll('.view-btn').forEach(function (b) {
+    b.addEventListener('click', function () {
+      state.view = b.getAttribute('data-view'); applyView();
+      try { localStorage.setItem('pkg-view', state.view); } catch (e) {}
+      pushUrl();
+    });
+  });
+
+  var matrixBtn = document.getElementById('toggle-matrix');
+  if (matrixBtn) matrixBtn.addEventListener('click', function () {
+    var box = document.getElementById('plan-matrix');
+    var open = box.classList.toggle('hidden') === false;
+    matrixBtn.setAttribute('aria-expanded', open);
+    matrixBtn.textContent = open ? 'Hide plan comparison' : 'Compare plan features';
+  });
+
+  /* ------------------------------------------------ package finder */
+  var finder = document.getElementById('finder');
+  function openFinder() { finder.classList.remove('hidden'); finder.scrollIntoView({ behavior: 'smooth', block: 'center' }); var f = finder.querySelector('input'); if (f) f.focus({ preventScroll: true }); }
+  function closeFinder() { finder.classList.add('hidden'); }
+  document.getElementById('open-finder').addEventListener('click', openFinder);
+  document.getElementById('close-finder').addEventListener('click', closeFinder);
+
+  function runFinder(service) {
+    var input = finder.querySelector('[data-fit-input="' + service + '"]');
+    var out = finder.querySelector('[data-fit-result="' + service + '"]');
+    var need = parseFloat(input.value) || 0;
+    var list = cards.filter(function (c) { return c.getAttribute('data-service') === service && c.getAttribute('data-kind') === 'sms'; });
+    list.forEach(function (c) { c.classList.remove('is-fit'); });
+    if (!need) { out.textContent = 'No volume entered.'; return; }
+    // monthly capacity = credits spread over the validity period, normalised to 30 days
+    function capacity(c) { return num(c, 'data-credits') * 30 / (num(c, 'data-days') || 30); }
+    var enough = list.filter(function (c) { return capacity(c) >= need; });
+    var pick;
+    if (enough.length) { enough.sort(function (a, b) { return num(a, 'data-price') - num(b, 'data-price'); }); pick = enough[0]; }
+    else { list.sort(function (a, b) { return capacity(b) - capacity(a); }); pick = list[0]; }
+    if (!pick) { out.textContent = 'No packages available.'; return; }
+    pick.classList.add('is-fit');
+    var covers = capacity(pick) >= need;
+    out.innerHTML = '<strong class="text-ink-900">' + pick.getAttribute('data-name') + '</strong> &middot; TZS ' + fmt(num(pick, 'data-price')) +
+      '<br><span class="text-xs ' + (covers ? 'text-emerald-700' : 'text-amber-700') + '">' +
+      (covers ? 'Covers ' + fmt(need) + ' SMS/month with room to spare.' : 'Largest available — buy more than one to reach ' + fmt(need) + ' SMS/month.') + '</span>';
+  }
+  finder.querySelectorAll('[data-fit-input]').forEach(function (i) { i.addEventListener('input', function () { runFinder(i.getAttribute('data-fit-input')); }); });
+  finder.querySelectorAll('[data-fit-preset]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var svc = b.getAttribute('data-for');
+      finder.querySelector('[data-fit-input="' + svc + '"]').value = b.getAttribute('data-fit-preset'); runFinder(svc);
+    });
+  });
+
+  /* ------------------------------------------------ compare */
+  var compared = [];
+  var bar = document.getElementById('compare-bar');
+  function updateCompareBar() {
+    cards.forEach(function (c) { c.classList.toggle('is-compared', compared.indexOf(c) !== -1); });
+    document.getElementById('compare-count').textContent = compared.length;
+    document.getElementById('compare-service').textContent = compared.length ? compared[0].closest('.pkg-section').querySelector('h2').textContent : '';
+    document.getElementById('compare-open').disabled = compared.length < 2;
+    bar.classList.toggle('hidden', compared.length === 0);
+  }
+  function clearCompare() {
+    compared = []; root.querySelectorAll('.compare-check').forEach(function (c) { c.checked = false; }); updateCompareBar();
+  }
+  root.querySelectorAll('.compare-check').forEach(function (chk) {
+    chk.addEventListener('change', function () {
+      var card = chk.closest('.pkg-card');
+      if (chk.checked) {
+        if (compared.length && compared[0].getAttribute('data-service') !== card.getAttribute('data-service')) { clearCompare(); chk.checked = true; }
+        if (compared.length >= 3) { chk.checked = false; return; }
+        compared.push(card);
+      } else { compared = compared.filter(function (c) { return c !== card; }); }
+      updateCompareBar();
+    });
+  });
+  document.getElementById('compare-clear').addEventListener('click', clearCompare);
+  function row(label, cells, hl) {
+    return '<tr class="border-t border-ink-100"><th class="px-5 py-3 text-left font-semibold text-ink-600 whitespace-nowrap">' + label + '</th>' +
+      cells.map(function (c, i) { return '<td class="px-5 py-3 tabular-nums ' + (hl === i ? 'font-extrabold text-emerald-700' : 'text-ink-900') + '">' + c + '</td>'; }).join('') + '</tr>';
+  }
+  function bestIdx(arr, low) { var best = 0; arr.forEach(function (v, i) { if (low ? v < arr[best] : v > arr[best]) best = i; }); return best; }
+  document.getElementById('compare-open').addEventListener('click', function () {
+    var price = compared.map(function (c) { return num(c, 'data-price'); });
+    var credits = compared.map(function (c) { return num(c, 'data-credits'); });
+    var per = compared.map(function (c) { return num(c, 'data-per') || 9999; });
+    var days = compared.map(function (c) { return num(c, 'data-days'); });
+    var perday = compared.map(function (c) { return num(c, 'data-perday'); });
+    var html = '<thead class="bg-ink-50"><tr><th class="px-5 py-3"></th>' + compared.map(function (c) { return '<th class="px-5 py-3 text-left text-base font-extrabold text-ink-950">' + c.getAttribute('data-name') + '</th>'; }).join('') + '</tr></thead><tbody>' +
+      row('Price', price.map(function (v) { return 'TZS ' + fmt(v); }), bestIdx(price, true)) +
+      row('SMS included', credits.map(fmt), bestIdx(credits, false)) +
+      row('Cost per SMS', per.map(function (v) { return 'TZS ' + v.toFixed(1); }), bestIdx(per, true)) +
+      row('Validity', days.map(function (v) { return v + ' days'; }), bestIdx(days, false)) +
+      row('Daily allowance', perday.map(function (v) { return '≈ ' + fmt(v) + ' / day'; }), bestIdx(perday, false)) +
+      '<tr class="border-t border-ink-100"><th></th>' + compared.map(function (c, i) { return '<td class="px-5 py-4"><button type="button" class="btn btn-primary w-full" data-compare-pick="' + i + '">Select</button></td>'; }).join('') + '</tr></tbody>';
+    var table = document.getElementById('compare-table'); table.innerHTML = html;
+    table.querySelectorAll('[data-compare-pick]').forEach(function (b) {
+      b.addEventListener('click', function () { var card = compared[+b.getAttribute('data-compare-pick')]; closeCompare(); openModal(card); });
+    });
+    document.getElementById('compare-modal').classList.remove('hidden'); document.body.style.overflow = 'hidden';
+  });
+  function closeCompare() { document.getElementById('compare-modal').classList.add('hidden'); document.body.style.overflow = ''; }
+  document.querySelectorAll('[data-close-compare]').forEach(function (el) { el.addEventListener('click', closeCompare); });
+
+  /* ------------------------------------------------ checkout */
+  var modal = document.getElementById('pay-modal');
+  var onlineForm = document.getElementById('pay-online-form');
+  var manualForm = document.getElementById('pay-manual-form');
+  var lastFocus = null;
+
+  function setAll(cls, value) { modal.querySelectorAll(cls).forEach(function (el) { el.value = value; }); }
+  function showPayTab(name) {
+    modal.querySelectorAll('[data-pay-tab]').forEach(function (b) { b.setAttribute('aria-selected', b.getAttribute('data-pay-tab') === name); });
+    modal.querySelectorAll('[data-pay-panel]').forEach(function (p) { p.classList.toggle('hidden', p.getAttribute('data-pay-panel') !== name); });
+  }
+  modal.querySelectorAll('[data-pay-tab]').forEach(function (b) { b.addEventListener('click', function () { showPayTab(b.getAttribute('data-pay-tab')); }); });
+  modal.querySelectorAll('.copy-btn').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var v = b.getAttribute('data-copy');
+      var done = function () { var t = b.textContent; b.textContent = 'Copied'; setTimeout(function () { b.textContent = t; }, 1400); };
+      if (navigator.clipboard) { navigator.clipboard.writeText(v).then(done); } else { var ta = document.createElement('textarea'); ta.value = v; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); done(); }
+    });
+  });
+
+  function openModal(card) {
+    lastFocus = document.activeElement;
+    var coreOpts = document.getElementById('pay-core-opts');
+    if (coreOpts) coreOpts.classList.add('hidden');
+    var kind = card.getAttribute('data-kind');
+    var name = card.getAttribute('data-name');
+    var price = num(card, 'data-price');
+    var pending = card.getAttribute('data-pending') === '1';
+    var today = startOfToday();
+    document.getElementById('pay-modal-amount').textContent = fmt(price);
+    setAll('.f-package', ''); setAll('.f-tier', ''); setAll('.f-plan', '');
+
+    if (kind === 'core') {
+      var yearly = state.billing === 'YEARLY';
+      document.getElementById('pay-modal-kicker').textContent = 'Core subscription';
+      document.getElementById('pay-modal-title').textContent = name + ' plan';
+      document.getElementById('pay-modal-sub').textContent = (yearly ? 'Yearly' : 'Monthly') + ' billing';
+      setAll('.f-service', 'core'); setAll('.f-tier', card.getAttribute('data-tier')); setAll('.f-plan', state.billing);
+      if (onlineForm) onlineForm.action = "{% url 'payments:pay_renewal' %}";
+      var end = parseISO(card.getAttribute('data-core-end'));
+      var base = end && end >= today ? end : addDays(today, -1);
+      document.getElementById('sum-balance').textContent = name + ' plan';
+      document.getElementById('sum-until').textContent = fmtDate(addDays(base, yearly ? 365 : 30));
+      pending = false;
+    } else {
+      var credits = num(card, 'data-credits'), days = num(card, 'data-days'), unit = card.getAttribute('data-unit');
+      var remaining = num(card, 'data-current-remaining');
+      var curEnd = parseISO(card.getAttribute('data-current-end'));
+      document.getElementById('pay-modal-kicker').textContent = 'Premium SMS service';
+      document.getElementById('pay-modal-title').textContent = name;
+      var noExp = card.getAttribute('data-no-expiry') === '1';
+      document.getElementById('pay-modal-sub').textContent = fmt(credits) + ' ' + unit + (noExp ? ' · never expires' : ' · valid ' + days + ' days');
+      setAll('.f-service', card.getAttribute('data-service')); setAll('.f-package', card.getAttribute('data-package-id'));
+      if (onlineForm) onlineForm.action = card.getAttribute('data-pay-url');
+      document.getElementById('sum-balance').innerHTML = fmt(remaining + credits) + ' ' + unit +
+        (remaining ? '<span class="block text-xs font-normal text-ink-400">' + fmt(remaining) + ' existing + ' + fmt(credits) + ' new</span>' : '');
+      var base2 = curEnd && curEnd >= today ? curEnd : today;
+      document.getElementById('sum-until').textContent = noExp ? 'Never expires' : fmtDate(addDays(base2, days));
+    }
+    document.getElementById('pay-pending-note').classList.toggle('hidden', !pending);
+    document.getElementById('pay-manual-btn').disabled = pending;
+    document.getElementById('pay-reference').required = !pending;
+    showPayTab(onlineForm ? 'online' : 'manual');
+    modal.classList.remove('hidden'); document.body.style.overflow = 'hidden';
+    var first = onlineForm ? onlineForm.querySelector('button[type=submit]') : document.getElementById('pay-reference');
+    if (first) first.focus();
+  }
+  function closeModal() { modal.classList.add('hidden'); document.body.style.overflow = ''; if (lastFocus && lastFocus.focus) lastFocus.focus(); }
+
+  /* ---- Renew / upgrade popup: package + period chosen inside the checkout dialog */
+  var coreOpts = document.getElementById('pay-core-opts');
+  var coreSelect = document.getElementById('pay-core-tier');
+  var corePeriod = 'MONTHLY';
+  function coreCard(tier) { return root.querySelector('.pkg-card[data-kind="core"][data-tier="' + tier + '"]'); }
+  function refreshCore() {
+    var card = coreCard(coreSelect.value); if (!card) return;
+    var yearly = corePeriod === 'YEARLY';
+    var price = num(card, yearly ? 'data-yearly' : 'data-monthly');
+    var name = card.getAttribute('data-name');
+    var today = startOfToday(), end = parseISO(card.getAttribute('data-core-end'));
+    var base = end && end >= today ? end : addDays(today, -1);
+    document.getElementById('pay-modal-amount').textContent = fmt(price);
+    document.getElementById('pay-modal-title').textContent = name + ' plan';
+    document.getElementById('pay-modal-sub').textContent = (yearly ? 'Yearly' : 'Monthly') + ' billing';
+    document.getElementById('sum-balance').textContent = name + ' plan';
+    document.getElementById('sum-until').textContent = fmtDate(addDays(base, yearly ? 365 : 30));
+    setAll('.f-tier', card.getAttribute('data-tier')); setAll('.f-plan', corePeriod);
+    coreOpts.querySelectorAll('[data-core-period]').forEach(function (b) { b.setAttribute('aria-selected', b.getAttribute('data-core-period') === corePeriod); });
+  }
+  function openRenew() {
+    if (!coreSelect) return;
+    var cur = root.querySelector('.pkg-card[data-kind="core"].is-current') || root.querySelector('.pkg-card[data-kind="core"]');
+    if (!cur) return;
+    openModal(cur);
+    corePeriod = (state.billing === 'YEARLY') ? 'YEARLY' : 'MONTHLY';
+    coreSelect.value = cur.getAttribute('data-tier');
+    coreOpts.classList.remove('hidden');
+    document.getElementById('pay-modal-kicker').textContent = 'Renew subscription';
+    refreshCore();
+  }
+
+  /* ---- Custom SMS quantity calculator: live price, then pay in the normal checkout dialog */
+  root.querySelectorAll('[data-csq]').forEach(function (box) {
+    var svc = box.getAttribute('data-service'), unit = box.getAttribute('data-unit'), remaining = +box.getAttribute('data-remaining') || 0;
+    var tiersEl = document.getElementById('tiers-' + svc), tiers = [];
+    try { tiers = JSON.parse(tiersEl.textContent || '[]'); } catch (e) { tiers = []; }
+    var input = box.querySelector('[data-csq-input]'), totalEl = box.querySelector('[data-csq-total]');
+    var rateEl = box.querySelector('[data-csq-rate]'), afterEl = box.querySelector('[data-csq-after]');
+    var payBtn = box.querySelector('[data-csq-pay]'), form = box.querySelector('[data-csq-form]');
+    var MIN = 20, MAX = 1000000;
+    // Same rule as the server: best rate among the published packages the quantity reaches.
+    function price(q) {
+      if (!tiers.length) return null;
+      var best = null;
+      tiers.forEach(function (t) { if (t.credits <= q) { var r = t.price / t.credits; if (best === null || r < best) best = r; } });
+      if (best === null) best = tiers[0].price / tiers[0].credits;
+      return Math.ceil(q * best - 1e-9);
+    }
+    function refresh() {
+      var q = parseInt(input.value, 10), p = (q >= MIN && q <= MAX) ? price(q) : null;
+      if (p === null) {
+        totalEl.textContent = '0'; payBtn.disabled = true; afterEl.textContent = '';
+        rateEl.textContent = (input.value && !(q >= MIN && q <= MAX)) ? 'Choose between 20 and 1,000,000 SMS.' : 'Enter a quantity to see your price.';
+        return;
+      }
+      totalEl.textContent = fmt(p);
+      rateEl.textContent = fmt(q) + ' ' + unit + ' at about TZS ' + (p / q).toFixed(1) + ' each';
+      afterEl.textContent = 'You will have ' + fmt(remaining + q) + ' ' + unit + (remaining ? ' (' + fmt(remaining) + ' now + ' + fmt(q) + ' new)' : '') + '.';
+      payBtn.disabled = false; payBtn.textContent = 'Pay TZS ' + fmt(p) + ' for ' + fmt(q) + ' SMS';
+    }
+    input.addEventListener('input', refresh);
+    box.querySelectorAll('[data-csq-chip]').forEach(function (b) { b.addEventListener('click', function () { input.value = b.getAttribute('data-csq-chip'); refresh(); input.focus(); }); });
+    form.addEventListener('submit', function (e) {
+      if (!window.fetch) return;   // no-JS / old browsers: the form posts normally
+      e.preventDefault();
+      var q = parseInt(input.value, 10); if (!(q >= MIN && q <= MAX)) { refresh(); return; }
+      payBtn.disabled = true; var label = payBtn.textContent; payBtn.textContent = 'Preparing your checkout\u2026';
+      var body = new URLSearchParams({ service: svc, quantity: String(q) });
+      fetch(box.getAttribute('data-quote-url'), { method: 'POST', credentials: 'same-origin', headers: { 'X-CSRFToken': form.querySelector('[name=csrfmiddlewaretoken]').value, 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' }, body: body })
+        .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+        .then(function (res) {
+          payBtn.disabled = false; payBtn.textContent = label;
+          if (!res.ok || !res.d.ok) { rateEl.textContent = (res.d && res.d.error) || 'We could not prepare your checkout. Please try again.'; return; }
+          var d = res.d, card = document.createElement('article');
+          var pending = root.querySelector('.pkg-card[data-service="' + svc + '"][data-pending="1"]') ? '1' : '0';
+          card.setAttribute('data-kind', 'sms'); card.setAttribute('data-service', svc); card.setAttribute('data-package-id', d.package_id);
+          card.setAttribute('data-name', d.name); card.setAttribute('data-price', d.price); card.setAttribute('data-credits', d.credits);
+          card.setAttribute('data-days', 30); card.setAttribute('data-pending', pending); card.setAttribute('data-pay-url', d.pay_url);
+          card.setAttribute('data-unit', unit); card.setAttribute('data-current-remaining', remaining); card.setAttribute('data-current-end', ''); card.setAttribute('data-no-expiry', '1');
+          openModal(card);
+        })
+        .catch(function () { payBtn.disabled = false; payBtn.textContent = label; rateEl.textContent = 'Connection problem. Please try again.'; });
+    });
+  });
+  if (coreSelect) {
+    coreSelect.addEventListener('change', refreshCore);
+    coreOpts.querySelectorAll('[data-core-period]').forEach(function (b) { b.addEventListener('click', function () { corePeriod = b.getAttribute('data-core-period'); refreshCore(); }); });
+  }
+  root.querySelectorAll('[data-renew-core]').forEach(function (b) { b.addEventListener('click', openRenew); });
+  if (new URLSearchParams(location.search).get('renew') === '1') { setTimeout(openRenew, 150); }
+
+  root.querySelectorAll('.pkg-select').forEach(function (btn) { btn.addEventListener('click', function () { openModal(btn.closest('.pkg-card')); }); });
+  modal.querySelectorAll('[data-close-modal]').forEach(function (el) { el.addEventListener('click', closeModal); });
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    if (!modal.classList.contains('hidden')) closeModal();
+    else if (!document.getElementById('compare-modal').classList.contains('hidden')) closeCompare();
+  });
+
+  [onlineForm, manualForm].forEach(function (f) {
+    if (!f) return;
+    f.addEventListener('submit', function () {
+      var b = f.querySelector('button[type=submit]');
+      if (b) { var t = b.textContent; setTimeout(function () { b.disabled = true; b.textContent = 'Processing…'; }, 0); setTimeout(function () { b.disabled = false; b.textContent = t; }, 15000); }
+    });
+  });
+
+  /* ------------------------------------------------ hero counters */
+  if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    root.querySelectorAll('[data-count-to]').forEach(function (el) {
+      var target = parseInt(el.getAttribute('data-count-to'), 10) || 0, startT = null;
+      function step(ts) { if (!startT) startT = ts; var p = Math.min((ts - startT) / 700, 1); el.textContent = Math.round(target * p); if (p < 1) requestAnimationFrame(step); }
+      el.textContent = '0'; requestAnimationFrame(step);
+    });
+  }
+
+  /* ------------------------------------------------ boot */
+  readUrl();
+  document.getElementById('pkg-search').value = state.q;
+  document.getElementById('pkg-sort').value = state.sort;
+  var budgetSel = document.getElementById('pkg-budget');
+  budgetSel.value = String(state.budget);
+  if (budgetSel.value !== String(state.budget)) budgetSel.value = '0';
+  applyBilling(); applyView(); render(true);
+
+  // Deep link: ?service=report&package=12 opens that package's checkout directly.
+  var dl = new URLSearchParams(window.location.search);
+  if (dl.get('package') && dl.get('service')) {
+    var target = cards.filter(function (c) { return c.getAttribute('data-service') === dl.get('service') && c.getAttribute('data-package-id') === dl.get('package'); })[0];
+    if (target) openModal(target);
+  }
+})();
+</script>
+<script>
+/* Packages page polish: sticky-bar elevation, staggered scroll reveal, "/" to search, keep active tab in view. */
+(function () {
+  var root = document.getElementById('packages-app'); if (!root) return;
+  var bar = root.querySelector('.pc-bar-wrap');
+  if (bar && 'IntersectionObserver' in window) {
+    var sentinel = document.createElement('div'); sentinel.style.cssText = 'height:1px;margin-bottom:-1px';
+    bar.parentNode.insertBefore(sentinel, bar);
+    new IntersectionObserver(function (e) { bar.classList.toggle('is-stuck', !e[0].isIntersecting); }, { rootMargin: '-8px 0px 0px 0px' }).observe(sentinel);
+  }
+  var cards = root.querySelectorAll('.pkg-card');
+  if ('IntersectionObserver' in window && !(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) {
+    root.classList.add('pc-anim');
+    var io = new IntersectionObserver(function (es) { es.forEach(function (en) { if (en.isIntersecting) { en.target.classList.add('in'); io.unobserve(en.target); } }); }, { threshold: .06 });
+    cards.forEach(function (c, i) { c.style.setProperty('--d', (i % 6) * 45 + 'ms'); io.observe(c); });
+    setTimeout(function () { cards.forEach(function (c) { c.classList.add('in'); }); }, 2500);   // safety net
+  }
+  document.addEventListener('keydown', function (e) {
+    if (e.key === '/' && !e.ctrlKey && !e.metaKey && !/^(input|textarea|select)$/i.test((e.target.tagName || ''))) {
+      var s = document.getElementById('pkg-search'); if (s) { e.preventDefault(); s.focus(); }
+    }
+  });
+  var tabs = document.getElementById('pkg-tabs');
+  if (tabs) tabs.addEventListener('click', function () {
+    setTimeout(function () { var a = tabs.querySelector('[aria-selected="true"]'); if (a && a.scrollIntoView) a.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' }); }, 30);
+  });
+})();
+</script>
+
+{% endblock %}

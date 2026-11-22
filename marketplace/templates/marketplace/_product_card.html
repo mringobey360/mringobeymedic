@@ -1,0 +1,25 @@
+{% load humanize cart_tags %}{% if product.is_movie %}{% include 'marketplace/_movie_card.html' %}{% else %}{% with qty=cart|get_item:product.pk %}
+<article class="sp-card mp-product-card" data-product-id="{{ product.pk }}" data-name="{{ product.name }}" data-in-cart="{{ qty }}">
+  <a class="sp-card-media" href="{% url 'marketplace:detail' product.slug %}" aria-label="{{ product.name }}">
+    {% if product.image %}<img class="sp-card-bg" loading="lazy" decoding="async" src="{{ product.image.url }}" alt="" aria-hidden="true" data-no-heal><img loading="lazy" decoding="async" width="400" height="500" src="{{ product.image.url }}" alt="{{ product.name }}">{% else %}<span class="sp-card-ph"><svg class="i"><use href="#i-image"/></svg></span>{% endif %}
+    {% if rank %}<span class="sp-tag rank">#{{ rank }}</span>{% elif product.is_digital %}<span class="sp-tag">Download</span>{% elif not product.in_stock %}<span class="sp-tag">Sold out</span>{% endif %}
+    {% if product.has_preview %}<span class="pv-tag"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>Preview</span>{% endif %}
+  </a>
+  <a class="sp-card-title" href="{% url 'marketplace:detail' product.slug %}"><span class="sp-card-price"><b>TSh {{ product.price|floatformat:0|intcomma }}</b>{% if product.discount_percent %} <s>{{ product.compare_at_price|floatformat:0|intcomma }}</s> <em>-{{ product.discount_percent }}%</em>{% endif %}</span><span class="sp-card-name">{{ product.name }}</span></a>
+  {% if product.rating_count %}<div class="sp-card-rate"><b>{{ product.rating_avg|floatformat:1 }}</b>{% stars product.rating_avg %}<span>({{ product.rating_count }})</span></div>{% endif %}
+  {% if product.trend_sold %}<div class="sp-card-sold"><svg class="i"><use href="#i-flame"/></svg>{{ product.trend_sold }} ordered</div>{% endif %}
+  {% if not compact %}
+  {% if not hide_seller %}<div class="sp-card-seller">
+    {% if product.seller_store and product.seller_store.is_published %}<a href="{% url 'marketplace:seller_store_public' product.seller_store.slug %}">{{ product.seller_store.public_name }}</a><svg class="i sp-ver" aria-label="Verified seller"><use href="#i-verified"/></svg>
+    {% elif product.seller_name %}<a href="{% url 'marketplace:catalog' %}?seller={{ product.seller_name|urlencode }}">{{ product.seller_name }}</a>
+    {% else %}<span class="n">SmartPOS Marketplace</span><svg class="i sp-ver" aria-label="Verified"><use href="#i-verified"/></svg>{% endif %}
+  </div>{% endif %}
+  <div class="sp-card-actions">
+    {% if product.in_stock %}
+    <form class="mp-add-form" method="post" action="{% url 'marketplace:add_cart' product.pk %}"{% if qty %} hidden{% endif %}>{% csrf_token %}<input type="hidden" name="quantity" value="1"><button class="sp-add" type="submit"><svg class="i"><use href="#i-plus"/></svg> Add to cart</button></form>
+    <div class="mp-quantity-row"{% if not qty %} hidden{% endif %}><button class="mp-qty-btn" type="button" data-operation="decrement" aria-label="Remove one {{ product.name }}">−</button><output class="mp-qty-value" aria-live="polite">{{ qty|default:0 }}</output><button class="mp-qty-btn" type="button" data-operation="increment" aria-label="Add one {{ product.name }}"{% if qty >= product.max_cart_qty %} disabled{% endif %}>+</button></div>
+    {% else %}<button class="sp-add is-disabled" type="button" disabled><svg class="i"><use href="#i-plus"/></svg> Add to cart</button>{% endif %}
+    {% whatsapp_url product as wa %}{% if wa %}<a class="sp-wa" href="{{ wa }}" target="_blank" rel="noopener" aria-label="Chat with seller on WhatsApp"><svg class="i"><use href="#i-whatsapp"/></svg></a>{% endif %}
+  </div>
+  {% endif %}
+</article>{% endwith %}{% endif %}

@@ -1,0 +1,7 @@
+{# One labelled form field + inline message slot. Params: field, required (bool), hint (str), wrapper_class (str) #}
+<div data-field="{{ field.name }}" class="{{ wrapper_class }}">
+  <label for="{{ field.id_for_label }}" class="block text-xs font-semibold text-ink-600 mb-1.5">{{ field.label }}{% if required %} <span class="text-red-500">*</span>{% else %} <span class="font-normal text-ink-400">(optional)</span>{% endif %}</label>
+  {{ field }}
+  {% if hint %}<p class="text-[11px] text-ink-400 mt-1">{{ hint }}</p>{% endif %}
+  <p data-msg class="text-xs mt-1{% if field.errors %} text-red-600{% endif %}" aria-live="polite"{% if field.errors %} data-server-error{% endif %}>{% if field.errors %}{{ field.errors.0 }}{% endif %}</p>
+</div>

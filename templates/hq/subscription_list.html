@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}Subscriptions - HQ{% endblock %}
+
+{% block extra_head %}
+<style id="smartpos-hq-subscriptions-professional-layout-v1">
+#hq-subscriptions{width:100%;max-width:1500px;margin:0 auto;padding:clamp(12px,2vw,28px)}
+#hq-subscriptions .hq-sub-head{display:flex;justify-content:space-between;align-items:flex-end;gap:14px;flex-wrap:wrap;margin-bottom:20px}
+#hq-subscriptions h1{font-size:clamp(23px,2.4vw,32px);line-height:1.2;letter-spacing:-.035em;margin:0;color:#0f172a}
+#hq-subscriptions .hq-sub-subtitle{margin:7px 0 0;color:#64748b;font-size:14px}
+#hq-subscriptions .hq-sub-table{overflow:auto;background:#fff;border:1px solid #e2e8f0;border-radius:18px;box-shadow:0 8px 25px -23px rgba(15,23,42,.4)}
+#hq-subscriptions table{width:100%;border-collapse:separate;border-spacing:0;min-width:850px}
+#hq-subscriptions thead th{padding:14px 16px;background:#f8fafc;color:#64748b;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;white-space:nowrap;border-bottom:1px solid #e2e8f0}
+#hq-subscriptions tbody td{padding:15px 16px;border-bottom:1px solid #f1f5f9;vertical-align:middle}
+#hq-subscriptions tbody tr:last-child td{border-bottom:0}
+#hq-subscriptions tbody tr:hover{background:#f8fafc}
+#hq-subscriptions .hq-sub-actions{display:flex;gap:8px;flex-wrap:wrap}
+@media(max-width:640px){#hq-subscriptions{padding:10px}#hq-subscriptions .hq-sub-head{align-items:flex-start}#hq-subscriptions .hq-sub-table{border-radius:14px}}
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="hq-subscriptions">
+    <div class="hq-sub-head"><div><h1>Subscriptions</h1><p class="hq-sub-subtitle">Manage customer plans, billing periods, expiry dates and renewals.</p></div></div>
+    <div class="hq-sub-table">
+    
+    <div class="card overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead>
+                <tr class="text-left border-b border-ink-200">
+                    <th class="py-2 pr-4">Owner</th>
+                    <th class="py-2 pr-4">Plan</th>
+                    <th class="py-2 pr-4">Mwanzo</th>
+                    <th class="py-2 pr-4">Mwisho</th>
+                    <th class="py-2 pr-4">Hali</th>
+                    <th class="py-2 pr-4">Renewal</th>
+                    <th class="py-2">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for sub in page_obj %}
+                <tr class="border-b border-ink-100">
+                    <td class="py-2 pr-4 font-medium">{% firstof sub.owner.get_full_name sub.owner.username %}</td>
+                    <td class="py-2 pr-4"><strong>{{ sub.get_tier_display }}</strong>{% if sub.is_trial %} <span class="badge bg-emerald-100 text-emerald-700 ml-1">Trial</span>{% endif %}<br><span class="text-xs text-ink-500">{{ sub.get_plan_display }}</span></td>
+                    <td class="py-2 pr-4 text-ink-500">{{ sub.start_date|date:"d M Y" }}</td>
+                    <td class="py-2 pr-4 text-ink-500">{{ sub.end_date|date:"d M Y" }}</td>
+                    <td class="py-2 pr-4">
+                        {% if sub.is_expired %}
+                        <span class="badge bg-red-100 text-red-700">Imeisha</span>
+                        {% elif sub.days_remaining <= 7 %}
+                        <span class="badge bg-amber-100 text-amber-700">{{ sub.days_remaining }} siku zimebaki</span>
+                        {% else %}
+                        <span class="badge bg-emerald-100 text-emerald-700">Active</span>
+                        {% endif %}
+                    </td>
+                    <td class="py-2 pr-4">
+                        {% if sub.signup_request and "[RENEWAL REQUEST]" in sub.signup_request.notes %}
+                        <span class="badge bg-amber-100 text-amber-700">Request submitted</span>
+                        {% else %}<span class="text-ink-400 text-xs">—</span>{% endif %}
+                    </td>
+                    <td class="py-2">
+                        <div class="hq-sub-actions">
+                            <form method="post" action="{% url 'hq:renew_subscription' sub.pk %}" class="inline">
+                                {% csrf_token %}
+                                <input type="hidden" name="plan" value="MONTHLY"><input type="hidden" name="tier" value="{{ sub.tier }}">
+                                <button type="submit" class="btn btn-secondary !px-3 !py-1.5 !text-xs" onclick="return confirm('Renew this customer for one month?');">+ 1 Month</button>
+                            </form>
+                            <form method="post" action="{% url 'hq:renew_subscription' sub.pk %}" class="inline">
+                                {% csrf_token %}
+                                <input type="hidden" name="plan" value="YEARLY"><input type="hidden" name="tier" value="{{ sub.tier }}">
+                                <button type="submit" class="btn btn-primary !px-3 !py-1.5 !text-xs" onclick="return confirm('Renew this customer for one year?');">+ 1 Year</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="7" class="py-8 text-center text-ink-400">No subscriptions yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    </div>
+
+    {% include "partials/pagination.html" with page_obj=page_obj %}
+</div>
+{% endblock %}

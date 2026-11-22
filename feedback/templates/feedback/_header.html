@@ -1,0 +1,12 @@
+<div class="fbp-head">
+  <div>
+    <div class="fbp-eyebrow">{{ eyebrow }}</div>
+    <h1 class="fbp-h1">{{ heading }}</h1>
+    <p class="fbp-lead">{{ lead }}</p>
+  </div>
+  <nav class="fbp-tabs" aria-label="Feedback and support sections">
+    <a href="{% url 'feedback:center' %}" class="fbp-tab {% if active_tab == 'send' %}is-active{% endif %}">Feedback</a>
+    <a href="{% url 'feedback:support' %}" class="fbp-tab {% if active_tab == 'support' %}is-active{% endif %}">Technical support</a>
+    {% if can_review %}<a href="{% url 'feedback:inbox' %}" class="fbp-tab {% if active_tab == 'inbox' %}is-active{% endif %}">Feedback inbox</a><a href="{% url 'feedback:support_inbox' %}" class="fbp-tab {% if active_tab == 'support_inbox' %}is-active{% endif %}">Support desk</a>{% endif %}
+  </nav>
+</div>

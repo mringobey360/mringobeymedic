@@ -1,0 +1,41 @@
+{% load humanize %}{% with items=product.preview_items kind=product.preview_kind %}
+<section class="pv-panel" aria-labelledby="pv-h" data-pv-panel>
+  <div class="pv-head">
+    <span class="pv-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></span>
+    <div><h2 id="pv-h">Preview before you buy</h2><p>See what you get first. Your download unlocks right after payment.</p></div>
+  </div>
+
+  {% if product.has_preview %}
+    {% if kind == 'pdf' %}
+    <button class="pv-open" type="button" data-pv-open data-src="{% url 'marketplace:preview' product.slug %}" aria-haspopup="dialog">
+      <span class="pv-sheet" aria-hidden="true"><i></i><i></i><i></i><i class="s"></i></span>
+      <span class="pv-open-t"><b>Read the free sample</b><small>PDF · opens in a viewer</small></span>
+      <svg class="pv-go" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+    </button>
+    {% elif kind == 'audio' %}
+    <div class="pv-media"><span class="pv-media-l">Listen to the free sample</span>
+      <audio controls preload="none" controlslist="nodownload" src="{% url 'marketplace:preview' product.slug %}" aria-label="Free audio sample of {{ product.name }}"></audio></div>
+    {% elif kind == 'video' %}
+    <div class="pv-media"><span class="pv-media-l">Watch the free sample</span>
+      <div class="pv-vwrap"><video controls playsinline preload="metadata" controlslist="nodownload" disablepictureinpicture oncontextmenu="return false" {% if product.image %}poster="{{ product.image.url }}"{% endif %} src="{% url 'marketplace:preview' product.slug %}" aria-label="Free video sample of {{ product.name }}"></video></div></div>
+    {% endif %}
+  {% endif %}
+
+  <dl class="pv-facts">
+    {% if product.digital_format %}<div><dt>Format</dt><dd>{{ product.digital_format }}</dd></div>{% endif %}
+    {% if product.digital_file_size %}<div><dt>File size</dt><dd>{{ product.digital_file_size|filesizeformat }}</dd></div>{% endif %}
+    {% if product.content_summary %}<div><dt>Content</dt><dd>{{ product.content_summary }}</dd></div>{% endif %}
+    {% if product.content_language %}<div><dt>Language</dt><dd>{{ product.content_language }}</dd></div>{% endif %}
+    <div><dt>Delivery</dt><dd>Instant download</dd></div>
+  </dl>
+
+  {% if items %}
+  <div class="pv-inside">
+    <h3>What's inside</h3>
+    <ul>{% for it in items %}<li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg><span>{{ it }}</span></li>{% endfor %}</ul>
+  </div>
+  {% endif %}
+
+  <p class="pv-note"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg><span>{% if product.has_preview %}The sample is a short extract. {% endif %}The full file stays locked until your payment is confirmed.</span></p>
+</section>
+{% endwith %}

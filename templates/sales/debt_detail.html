@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% load tz %}
+{% block title %}Debt trace · {{ debt.customer_name }}{% endblock %}
+{% block content %}
+<div class="max-w-4xl space-y-5">
+  <div class="flex flex-wrap items-start justify-between gap-3">
+    <div>
+      <a href="{% url 'sales:debt_list' %}" class="text-xs text-ink-500 hover:text-ink-800">&larr; Customer debts</a>
+      <h1 class="text-2xl font-bold text-ink-900 mt-1">{{ debt.customer_name }}</h1>
+      <p class="text-sm text-ink-500">{% if debt.customer_phone %}{{ debt.customer_phone }} · {% endif %}Sale #{{ sale.sale_number|default:sale.pk }} · {% if sale.is_late_entry %}{{ sale.business_date|date:"d M Y" }} (late entry){% else %}{{ sale.created_at|localtime|date:"d M Y H:i" }}{% endif %}{% if sale.served_by %} · served by {{ sale.served_by.get_full_name|default:sale.served_by.get_username }}{% endif %}</p>
+    </div>
+    <div class="flex gap-2">
+      <a href="{% url 'sales:receipt_pdf' sale.pk %}" target="_blank" rel="noopener" class="btn btn-secondary">Receipt (PDF)</a>
+      <a href="{% url 'sales:debt_edit' debt.pk %}" class="btn btn-secondary">Edit contact</a>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+    <div class="card"><p class="text-xs text-ink-500">Sale value</p><p class="text-lg font-extrabold">TZS {{ sale_value|floatformat:0|intcomma }}</p>{% if returned_value %}<p class="text-[11px] text-red-600">− {{ returned_value|floatformat:0|intcomma }} returned</p>{% endif %}</div>
+    <div class="card"><p class="text-xs text-ink-500">Paid at the till</p><p class="text-lg font-extrabold text-green-700">TZS {{ deposit|floatformat:0|intcomma }}</p><p class="text-[11px] text-ink-400">received on the sale day</p></div>
+    <div class="card"><p class="text-xs text-ink-500">Really lent (credit)</p><p class="text-lg font-extrabold text-amber-700">TZS {{ credit_given|floatformat:0|intcomma }}</p><p class="text-[11px] text-ink-400">repaid later: TZS {{ repaid|floatformat:0|intcomma }}</p></div>
+    <div class="card {% if debt.is_settled %}bg-green-50{% else %}bg-amber-50{% endif %}"><p class="text-xs text-ink-500">Balance now</p><p class="text-lg font-extrabold">TZS {{ balance|floatformat:0|intcomma }}</p><p class="text-[11px] {% if debt.is_settled %}text-green-700{% else %}text-amber-700{% endif %}">{% if debt.is_settled %}Settled{% else %}Still owed{% endif %}</p></div>
+  </div>
+
+  {% if untraced %}
+  <div class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+    <p class="font-semibold">Untraced amount: TZS {{ untraced|floatformat:0|intcomma }}</p>
+    <p class="mt-1">The "paid" figure on this debt differs from the payments recorded below. It was probably edited by hand in an older version, so no cash or mobile money entry exists for that part. Record the real payment (or ask the owner to review) so the cash ledger agrees.</p>
+  </div>
+  {% endif %}
+
+  <div class="card">
+    <h2 class="font-semibold text-ink-900 mb-3">Timeline</h2>
+    <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead><tr class="text-left text-xs text-ink-500 border-b border-ink-100">
+        <th class="py-2 pr-3">When</th><th class="py-2 pr-3">What happened</th><th class="py-2 pr-3">How</th><th class="py-2 pr-3">By</th>
+        <th class="py-2 pr-3 text-right">Added to debt</th><th class="py-2 pr-3 text-right">Reduced debt</th><th class="py-2 text-right">Balance after</th>
+      </tr></thead>
+      <tbody>
+      {% for e in events %}
+        <tr class="border-b border-ink-50 align-top">
+          <td class="py-2 pr-3 whitespace-nowrap">{{ e.at|localtime|date:"d M Y H:i" }}</td>
+          <td class="py-2 pr-3"><span class="font-medium">{{ e.label }}</span>{% if e.note %}<span class="block text-[11px] text-ink-400">{{ e.note }}</span>{% endif %}</td>
+          <td class="py-2 pr-3">{{ e.method|default:"—" }}</td>
+          <td class="py-2 pr-3">{{ e.who }}</td>
+          <td class="py-2 pr-3 text-right">{% if e.debit %}{{ e.debit|floatformat:0|intcomma }}{% else %}—{% endif %}</td>
+          <td class="py-2 pr-3 text-right text-green-700">{% if e.credit %}{{ e.credit|floatformat:0|intcomma }}{% else %}—{% endif %}</td>
+          <td class="py-2 text-right font-semibold">{{ e.running|floatformat:0|intcomma }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    <p class="text-[11px] text-ink-400 mt-3">Cash payments enter the drawer on the day recorded; mobile money / bank payments enter the mobile money account. Both are counted in Cash Control.</p>
+  </div>
+
+  <div class="card">
+    <h2 class="font-semibold text-ink-900 mb-3">Items on this sale</h2>
+    <table class="w-full text-sm">
+      <thead><tr class="text-left text-xs text-ink-500 border-b border-ink-100"><th class="py-2">Product</th><th class="py-2 text-right">Qty</th><th class="py-2 text-right">Price</th><th class="py-2 text-right">Line total</th></tr></thead>
+      <tbody>
+      {% for it in items %}
+        <tr class="border-b border-ink-50"><td class="py-2">{{ it.product.name }}{% if it.returned_quantity %} <span class="text-red-600 text-xs">({{ it.returned_quantity }} returned)</span>{% endif %}</td><td class="py-2 text-right">{{ it.original_quantity }}</td><td class="py-2 text-right">{{ it.unit_price|floatformat:0|intcomma }}</td><td class="py-2 text-right">{{ it.original_subtotal|floatformat:0|intcomma }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if not debt.is_settled %}
+  <div class="card">
+    <h2 class="font-semibold text-ink-900 mb-3">Record a payment</h2>
+    <form method="post" action="{% url 'sales:debt_pay' debt.pk %}" class="flex flex-wrap gap-2 items-end">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{% url 'sales:debt_detail' debt.pk %}">
+      <input type="number" name="amount" min="1" max="{{ balance|floatformat:0 }}" step="1" placeholder="Amount (TZS)" inputmode="decimal" class="form-input" required>
+      <select name="payment_method" class="form-input"><option value="CASH" selected>Cash (into drawer)</option><option value="MOBILE_MONEY">Mobile money / bank</option></select>
+      <button type="submit" class="btn btn-success">Record Payment</button>
+    </form>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

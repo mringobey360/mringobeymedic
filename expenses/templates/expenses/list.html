@@ -1,0 +1,180 @@
+{% extends 'base.html' %}
+{% load humanize %}
+{% block title %}Expenses & Petty Cash{% endblock %}
+{% block content %}
+{% include "expenses/_expense_styles.html" %}
+<div class="xp">
+
+  {# ───────── Page header ───────── #}
+  <header class="xp-head">
+    <div class="min-w-0">
+      <nav class="xp-crumb" aria-label="Breadcrumb">
+        {% if user.is_admin_role %}<a href="{% url 'expenses:cash' %}">Cash &amp; expense control</a>{% else %}<span>Cash &amp; expense control</span>{% endif %}
+      </nav>
+      <h1 class="xp-title">Expenses &amp; petty cash</h1>
+      <p class="xp-sub">Every business expense is recorded, approved and traceable.</p>
+    </div>
+    <div class="xp-actions">
+      {% if user.is_admin_role %}
+      <a href="{% url 'expenses:cash' %}" class="btn btn-secondary">Cash control</a>
+      <a href="{% url 'expenses:report' %}" class="btn btn-secondary">Reports</a>
+      {% endif %}
+      <a href="{% url 'expenses:create' %}" class="btn btn-primary">
+        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        Record expense
+      </a>
+    </div>
+  </header>
+
+  {# ───────── Summary ───────── #}
+  <section class="xp-card xp-summary" aria-label="Expense summary">
+    <div class="xp-cell">
+      <p class="xp-cell-label">Approved expenses{% if has_filters %} (filtered){% endif %}</p>
+      <p class="xp-cell-value"><small>TZS</small>{{ total_approved|floatformat:0|intcomma }}</p>
+    </div>
+    <div class="xp-cell">
+      <p class="xp-cell-label">{% if user.is_admin_role %}Pending approval{% else %}My pending approval{% endif %}</p>
+      <p class="xp-cell-value {% if pending_count %}is-warn{% endif %}">{{ pending_count|intcomma }}</p>
+      {% if pending_count %}<p class="xp-cell-hint"><a href="{% url 'expenses:list' %}?status=PENDING">Review pending</a></p>{% endif %}
+    </div>
+    <div class="xp-cell">
+      <p class="xp-cell-label">Control principle</p>
+      <p class="xp-rule">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 5 6v5c0 4.5 3 8 7 10 4-2 7-5.5 7-10V6z"/><path d="m9 12 2 2 4-4"/></svg>
+        Only approved expenses affect cash
+      </p>
+    </div>
+  </section>
+
+  {# ───────── Filters ───────── #}
+  <section class="xp-card xp-filters">
+    <form method="get" id="expense-filters">
+      <details {% if has_filters %}open{% endif %}>
+        <summary class="xp-filter-toggle">
+          <span>Search &amp; filters{% if has_filters %} · active{% endif %}</span>
+          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="xp-filter-grid">
+          <div class="xp-f-q">
+            <label for="f-q" class="xp-label">Search</label>
+            <input id="f-q" type="search" name="q" value="{{ f_q }}" class="form-input" placeholder="Title, reference or staff name" autocomplete="off">
+          </div>
+          <div class="xp-f-s">
+            <label for="f-status" class="xp-label">Status</label>
+            <select id="f-status" name="status" class="form-input">
+              <option value="">All statuses</option>
+              {% for value, label in status_choices %}<option value="{{ value }}" {% if f_status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="xp-f-c">
+            <label for="f-category" class="xp-label">Category</label>
+            <select id="f-category" name="category" class="form-input">
+              <option value="">All categories</option>
+              {% for c in categories %}<option value="{{ c.pk }}" {% if f_category == c.pk|stringformat:'s' %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="xp-f-d">
+            <label for="f-from" class="xp-label">From</label>
+            <input id="f-from" type="date" name="from" value="{{ f_from|date:'Y-m-d' }}" class="form-input">
+          </div>
+          <div class="xp-f-d">
+            <label for="f-to" class="xp-label">To</label>
+            <input id="f-to" type="date" name="to" value="{{ f_to|date:'Y-m-d' }}" class="form-input">
+          </div>
+          <input type="hidden" name="per_page" value="{{ f_per_page }}">
+          <div class="xp-f-btns">
+            {% if has_filters %}<a href="{% url 'expenses:list' %}" class="btn btn-secondary">Clear</a>{% endif %}
+            <button type="submit" class="btn btn-primary">Apply filters</button>
+          </div>
+        </div>
+      </details>
+    </form>
+  </section>
+
+  {# ───────── Register ───────── #}
+  <section class="xp-card">
+    <div class="xp-card-head">
+      <div>
+        <h2 class="xp-card-title">Expense register</h2>
+        <p class="xp-card-note xp-count">{{ expenses.paginator.count|intcomma }} record{{ expenses.paginator.count|pluralize }}{% if has_filters %} match your filters{% endif %}</p>
+      </div>
+      <form method="get" class="xp-rows hidden sm:flex items-center gap-2 text-xs">
+        {% if f_q %}<input type="hidden" name="q" value="{{ f_q }}">{% endif %}
+        {% if f_status %}<input type="hidden" name="status" value="{{ f_status }}">{% endif %}
+        {% if f_category %}<input type="hidden" name="category" value="{{ f_category }}">{% endif %}
+        {% if f_from %}<input type="hidden" name="from" value="{{ f_from|date:'Y-m-d' }}">{% endif %}
+        {% if f_to %}<input type="hidden" name="to" value="{{ f_to|date:'Y-m-d' }}">{% endif %}
+        <label for="per-page" class="xp-count" style="font-weight:500">Rows per page</label>
+        <select id="per-page" name="per_page" onchange="this.form.submit()">
+          <option value="10" {% if f_per_page == 10 %}selected{% endif %}>10</option>
+          <option value="20" {% if f_per_page == 20 %}selected{% endif %}>20</option>
+          <option value="50" {% if f_per_page == 50 %}selected{% endif %}>50</option>
+          <option value="100" {% if f_per_page == 100 %}selected{% endif %}>100</option>
+        </select>
+      </form>
+    </div>
+
+    {# Desktop / tablet table #}
+    <div class="hidden md:block xp-table-wrap">
+      <table class="xp-table">
+        <thead>
+          <tr>
+            <th scope="col">Date</th>
+            <th scope="col">Expense</th>
+            <th scope="col">Category</th>
+            <th scope="col">Paid from</th>
+            <th scope="col">Status</th>
+            <th scope="col" class="xp-num">Amount</th>
+            <th scope="col"><span class="sr-only">Actions</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for e in expenses %}
+          <tr>
+            <td style="white-space:nowrap">{{ e.expense_date|date:"d M Y" }}</td>
+            <td style="min-width:13rem">
+              <a class="xp-link" href="{% url 'expenses:detail' e.pk %}">{{ e.title }}</a>
+              <div class="xp-meta">Recorded by {% firstof e.submitted_by.get_full_name e.submitted_by.username %}</div>
+            </td>
+            <td>{{ e.category.name }}</td>
+            <td>{{ e.get_payment_source_display }}</td>
+            <td><span class="xp-status {% if e.status == 'APPROVED' %}is-approved{% elif e.status == 'REJECTED' %}is-rejected{% elif e.status == 'PENDING' %}is-pending{% endif %}">{{ e.get_status_display }}</span></td>
+            <td class="xp-num xp-strong">TZS {{ e.amount|floatformat:0|intcomma }}</td>
+            <td class="xp-num"><a href="{% url 'expenses:detail' e.pk %}" class="row-action">View</a></td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="7">{% include "expenses/_empty_state.html" %}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {# Mobile list #}
+    <ul class="md:hidden xp-mlist">
+      {% for e in expenses %}
+      <li>
+        <a href="{% url 'expenses:detail' e.pk %}" class="xp-mitem">
+          <div class="xp-mrow">
+            <div class="min-w-0">
+              <p class="xp-strong truncate">{{ e.title }}</p>
+              <p class="xp-meta truncate">{{ e.category.name }} · {{ e.get_payment_source_display }}</p>
+            </div>
+            <p class="xp-strong xp-num" style="font-size:.875rem">TZS {{ e.amount|floatformat:0|intcomma }}</p>
+          </div>
+          <div class="xp-mrow">
+            <span class="xp-meta">{{ e.expense_date|date:"d M Y" }} · {% firstof e.submitted_by.get_full_name e.submitted_by.username %}</span>
+            <span class="xp-status {% if e.status == 'APPROVED' %}is-approved{% elif e.status == 'REJECTED' %}is-rejected{% elif e.status == 'PENDING' %}is-pending{% endif %}">{{ e.get_status_display }}</span>
+          </div>
+        </a>
+      </li>
+      {% empty %}
+      <li>{% include "expenses/_empty_state.html" %}</li>
+      {% endfor %}
+    </ul>
+
+    <div class="px-4 sm:px-5 pb-4">
+      {% include "partials/pagination.html" with page_obj=expenses %}
+    </div>
+  </section>
+</div>
+{% endblock %}

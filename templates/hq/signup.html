@@ -1,0 +1,696 @@
+{% extends "accounts/auth_base.html" %}
+{% load static %}
+{% load humanize %}
+{% block title %}Create Your Business Account - SmartPOS Tanzania{% endblock %}
+{% block meta_description %}Create your SmartPOS account in minutes and start free. Sell with barcodes, track stock and expiry, manage branches and send SMS receipts. Built for shops in Tanzania.{% endblock %}
+{% block og_title %}Create your free SmartPOS account{% endblock %}
+{% block canonical %}<link rel="canonical" href="{{ SITE_URL }}/jiunge/">{% endblock %}
+{% block auth_head %}
+<style>
+  /* Wizard is progressive enhancement: without JavaScript every step is visible and the form still submits normally. */
+  html:not(.js) .js-only { display: none; }
+  .js .wz-step { display: none; }
+  .js .wz-step.is-active { display: block; animation: wzIn .25s ease; }
+  @keyframes wzIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .js .wz-step.is-active { animation: none; } }
+  /* Without JavaScript the Pharmacy Council section stays visible; with JavaScript it shows only for Pharmacy. */
+  .js .pharmacy-only:not(.is-on) { display: none; }
+  .type-chip { display: flex; align-items: center; gap: .625rem; min-height: 3rem; border-radius: .75rem; border: 1.5px solid #e2e8f0; background: #fff; padding: .6rem .8rem; font-size: .8125rem; font-weight: 600; color: #334155; transition: border-color .15s, background .15s, box-shadow .15s; }
+  .type-chip .dot { width: 1.125rem; height: 1.125rem; flex: none; border-radius: 9999px; border: 1.5px solid #cbd5e1; background: #fff; display: flex; align-items: center; justify-content: center; transition: all .15s; }
+  .type-chip .dot svg { width: .65rem; height: .65rem; opacity: 0; color: #fff; }
+  label:hover > .type-chip { border-color: #5eead4; }
+  input:checked + .type-chip { border-color: #0f766e; background: #f0fdfa; color: #0f172a; box-shadow: 0 0 0 3px rgba(20,184,166,.12); }
+  input:checked + .type-chip .dot { border-color: #0f766e; background: #0f766e; }
+  input:checked + .type-chip .dot svg { opacity: 1; }
+  input:focus-visible + .type-chip { box-shadow: 0 0 0 3px rgba(20,184,166,.35); }
+  .wz-section-title { font-size: .6875rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #94a3b8; }
+
+
+  /* V40 registration density: each wizard screen is intentionally compact and viewport-friendly. */
+  #signup-form { padding: 1.25rem !important; }
+  #signup-form .wz-step { min-width: 0; }
+  #signup-form .form-input { min-height: 42px; padding-top: .62rem; padding-bottom: .62rem; }
+  #signup-form .type-chip { min-height: 2.7rem; padding: .5rem .65rem; }
+  #signup-form .wz-step.space-y-6 > :not([hidden]) ~ :not([hidden]) { margin-top: 1rem; }
+  #signup-form .wz-step.space-y-5 > :not([hidden]) ~ :not([hidden]) { margin-top: .9rem; }
+  @media (min-width: 640px) {
+    #signup-form { padding: 1.5rem !important; }
+  }
+  #signup-form button { white-space: nowrap; }
+  #signup-form button:disabled { opacity: .65; cursor: wait; }
+  #signup-form :focus-visible { outline: 3px solid rgba(13,148,136,.35); outline-offset: 2px; }
+  @media (max-width: 639px) {
+    #signup-form .type-chip { font-size: .75rem; }
+    #signup-form .wz-step { animation-duration: .18s; }
+    #signup-form #wz-back { flex: 0 0 auto; min-width: 4.5rem; padding-left: .85rem; padding-right: .85rem; }
+    #signup-form .btn, #signup-form #wz-submit { border-radius: 9999px; }
+    #signup-form #wz-submit { min-width: 0; flex: 1 1 auto; white-space: normal; line-height: 1.35; }
+  }
+</style>
+{% endblock %}
+{% block auth_content %}
+<script>document.documentElement.classList.add('js');</script>
+<div class="w-full max-w-[76rem]">
+    <div class="grid lg:grid-cols-[21rem_minmax(0,1fr)] gap-6 lg:gap-8 items-start">
+
+      <!-- ============ Left column (desktop): brand, what happens next, live order ============ -->
+      <aside class="hidden lg:block lg:sticky lg:top-6 space-y-4">
+        <div class="rounded-2xl bg-brand-700 text-white p-7 shadow-xl">
+          <h2 class="text-2xl font-semibold leading-snug">Run any business with confidence.</h2>
+          <p class="mt-3 text-sm text-white/75 leading-6">Stock, sales, staff, debts and reports in one secure system — for shops, restaurants, clinics and every kind of business.</p>
+
+          <p class="mt-7 text-xs font-semibold uppercase tracking-wider text-white/60">What happens next</p>
+          <ol class="mt-3 space-y-3 text-sm">
+            <li class="flex gap-3"><span class="w-6 h-6 shrink-0 rounded-full bg-white text-brand-700 text-xs font-bold flex items-center justify-center">1</span><span><strong>Register</strong> — takes about 2 minutes.</span></li>
+            <li class="flex gap-3"><span class="w-6 h-6 shrink-0 rounded-full bg-white/15 text-xs font-bold flex items-center justify-center">2</span><span><strong>Pay</strong> securely online or by mobile money on the next page — or start a <strong>free {{ trial_days }}-day trial</strong> with no payment.</span></li>
+            <li class="flex gap-3"><span class="w-6 h-6 shrink-0 rounded-full bg-white/15 text-xs font-bold flex items-center justify-center">3</span><span><strong>Payment confirmed</strong> — instantly online, or after our quick check.</span></li>
+            <li class="flex gap-3"><span class="w-6 h-6 shrink-0 rounded-full bg-white/15 text-xs font-bold flex items-center justify-center">4</span><span><strong>Login details</strong> arrive by SMS on your phone.</span></li>
+          </ol>
+        </div>
+
+        <div class="rounded-2xl bg-white border border-ink-100 shadow-sm p-5" id="signup-order-card" aria-live="polite">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <p class="text-xs font-semibold uppercase tracking-wider text-ink-400">Your order</p>
+              <h3 class="mt-1 text-base font-bold text-ink-900">Your selected SmartPOS plan</h3>
+            </div>
+            <span class="inline-flex items-center rounded-full bg-brand-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-brand-700" data-sum-status>Paid plan</span>
+          </div>
+          <div class="mt-4 rounded-xl border border-ink-100 bg-ink-50/70 p-3">
+            <p class="text-[10px] font-bold uppercase tracking-wider text-ink-400">Business type</p>
+            <p class="mt-1 text-sm font-semibold text-ink-900" data-sum-business>Choose a business type</p>
+          </div>
+          <div class="mt-3 flex items-start gap-3">
+            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700" aria-hidden="true">
+              <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6M9 9h.01M15 9h.01"/></svg>
+            </div>
+            <div class="min-w-0 flex-1">
+              <p class="text-sm font-bold text-ink-900" data-sum-plan-label>Starter · Monthly billing</p>
+              <p class="mt-1 text-xs leading-5 text-ink-500" data-sum-plan-detail>Stock, sales, staff, debts and reports in one system.</p>
+            </div>
+            <p class="shrink-0 text-sm font-bold text-ink-900 whitespace-nowrap">TZS <span data-sum-plan-price>0</span></p>
+          </div>
+          <div class="mt-4 pt-4 border-t border-ink-100 flex items-baseline justify-between gap-3">
+            <span class="text-sm font-semibold text-ink-700">Total to pay</span>
+            <span class="text-2xl font-extrabold text-brand-700 whitespace-nowrap">TZS <span data-total>0</span></span>
+          </div>
+          <p class="mt-2 text-[11px] leading-5 text-ink-400" data-pay-note>You pay after registering. No payment is taken on this page.</p>
+          <p class="mt-3 flex items-center gap-2 text-[11px] font-medium text-ink-500"><svg class="h-4 w-4 shrink-0 text-brand-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>Secure checkout · no payment is taken on this page</p>
+        </div>
+      </aside>
+
+      <!-- ============ Right column: the wizard ============ -->
+      <div class="min-w-0">
+        <div class="mb-5 text-center lg:text-left">
+          <h1 class="text-2xl sm:text-3xl font-light tracking-tight text-ink-900">Create your business account</h1>
+          <p class="text-sm text-ink-500 mt-1">Five focused steps, then payment. Any business can register.</p>
+        </div>
+
+        {% if google_identity %}
+        <div class="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900" role="status">
+          <p class="font-semibold">Signed in with Google as {{ google_identity.email }}</p>
+          <p class="text-xs mt-0.5">Just add your business name and phone number. You will go straight into SmartPOS, with no password to remember.</p>
+        </div>
+        {% elif google_enabled %}
+        <div class="mb-4 text-center">
+          <p class="text-xs font-medium text-ink-500 mb-2.5">Register faster with Google</p>
+          {% include "partials/google_button.html" %}
+          <div class="sp-or">or fill the form</div>
+        </div>
+        {% endif %}
+
+        <!-- Stepper -->
+        <div id="wz-stepper" class="js-only mb-5" aria-label="Progress">
+          <ol class="flex items-center justify-between gap-1">
+            <li class="flex-1 flex flex-col items-center gap-1.5"><button type="button" data-dot="0" class="w-8 h-8 sm:w-9 sm:h-9 rounded-full text-xs sm:text-sm font-bold transition">1</button><span class="text-[10px] sm:text-[11px] font-medium text-ink-500">Business</span></li>
+            <li class="flex-1 flex flex-col items-center gap-1.5"><button type="button" data-dot="1" class="w-8 h-8 sm:w-9 sm:h-9 rounded-full text-xs sm:text-sm font-bold transition">2</button><span class="text-[10px] sm:text-[11px] font-medium text-ink-500">Licence</span></li>
+            <li class="flex-1 flex flex-col items-center gap-1.5"><button type="button" data-dot="2" class="w-8 h-8 sm:w-9 sm:h-9 rounded-full text-xs sm:text-sm font-bold transition">3</button><span class="text-[10px] sm:text-[11px] font-medium text-ink-500">Owner</span></li>
+            <li class="flex-1 flex flex-col items-center gap-1.5"><button type="button" data-dot="3" class="w-8 h-8 sm:w-9 sm:h-9 rounded-full text-xs sm:text-sm font-bold transition">4</button><span class="text-[10px] sm:text-[11px] font-medium text-ink-500">Plan</span></li>
+            <li class="flex-1 flex flex-col items-center gap-1.5"><button type="button" data-dot="4" class="w-8 h-8 sm:w-9 sm:h-9 rounded-full text-xs sm:text-sm font-bold transition">5</button><span class="text-[10px] sm:text-[11px] font-medium text-ink-500">Review</span></li>
+          </ol>
+          <div class="mt-3 h-1.5 rounded-full bg-ink-100 overflow-hidden"><div id="wz-bar" class="h-full bg-brand-600 rounded-full transition-all duration-300" style="width:25%"></div></div>
+        </div>
+
+        <form method="post" id="signup-form" class="auth-card !max-w-none" autocomplete="on">
+          {% csrf_token %}
+          {% if form.non_field_errors %}<div class="mb-5 rounded-xl bg-red-50 border border-red-200 p-3 text-sm text-red-700">{{ form.non_field_errors }}</div>{% endif %}
+
+          <!-- ---------- Step 1: Business type ---------- -->
+          <section class="wz-step is-active space-y-5" data-step="0" aria-labelledby="wz-h0">
+            <div><h3 id="wz-h0" class="text-lg font-bold text-ink-900">Business type</h3><p class="text-xs text-ink-500 mt-0.5">Choose the type that best describes your business.</p></div>
+
+            <div data-field="business_type">
+              <label class="block text-xs font-semibold text-ink-600 mb-2">{{ form.business_type.label }} <span class="text-red-500">*</span></label>
+              <div class="grid grid-cols-1 min-[420px]:grid-cols-2 md:grid-cols-3 gap-2.5" role="radiogroup" aria-label="Business type">
+                {% for value, label in form.business_type.field.choices %}
+                <label class="block cursor-pointer">
+                  <input type="radio" name="business_type" value="{{ value }}" data-label="{{ label }}" {% if form.business_type.value == value %}checked{% endif %} class="sr-only">
+                  <span class="type-chip"><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"/></svg></span><span>{{ label }}</span></span>
+                </label>
+                {% endfor %}
+              </div>
+              <p data-msg class="text-xs mt-2{% if form.business_type.errors %} text-red-600{% endif %}" aria-live="polite"{% if form.business_type.errors %} data-server-error{% endif %}>{% if form.business_type.errors %}{{ form.business_type.errors.0 }}{% endif %}</p>
+            </div>
+
+            <div class="rounded-xl bg-ink-50/70 border border-ink-100 px-4 py-3 text-xs text-ink-600 leading-5">
+              <span class="font-semibold text-ink-800">Next:</span> add your business name, location and any licence or permit details.
+            </div>
+          </section>
+
+          <!-- ---------- Step 2: Business & Licence ---------- -->
+          <section class="wz-step space-y-5" data-step="1" aria-labelledby="wz-h1">
+            <div>
+              <div class="flex items-center justify-between gap-3">
+                <div>
+                  <h3 id="wz-h1" class="text-lg font-bold text-ink-900">Business &amp; licence <span class="font-normal text-ink-400">(licence optional)</span></h3>
+                  <p class="text-xs text-ink-500 mt-0.5">Set up your business identity, then add licence details if you have them.</p>
+                </div>
+                <span class="hidden sm:inline-flex shrink-0 items-center rounded-full bg-ink-50 border border-ink-100 px-2.5 py-1 text-[11px] font-semibold text-ink-500">Step 2</span>
+              </div>
+            </div>
+
+            <div class="grid sm:grid-cols-2 gap-x-4 gap-y-4">
+              {% include "hq/partials/signup_field.html" with field=form.business_name required=True %}
+              {% include "hq/partials/signup_field.html" with field=form.location required=False hint="Town and area, e.g. Dodoma, Area D." %}
+            </div>
+
+            <div class="rounded-2xl border border-brand-100 bg-brand-50/50 p-4 space-y-3" data-licence-section>
+              <div><p class="wz-section-title !text-brand-700">Licence &amp; permits</p><p class="text-xs text-ink-500 mt-0.5">Optional business licence information. You can skip these fields and add them later where supported.</p></div>
+              <div class="grid sm:grid-cols-2 gap-x-4 gap-y-4">
+                <div class="pharmacy-only" data-pharmacy-only>
+                  {% include "hq/partials/signup_field.html" with field=form.pharmacy_council_fin required=True hint="Exactly 7 digits, e.g. 0101726." %}
+                </div>
+                {% include "hq/partials/signup_field.html" with field=form.permit_number required=False %}
+                {% include "hq/partials/signup_field.html" with field=form.permit_expiry_date required=False %}
+              </div>
+            </div>
+          </section>
+
+          <!-- ---------- Step 3: Owner ---------- -->
+          <section class="wz-step space-y-5" data-step="2" aria-labelledby="wz-h2">
+            <div><h3 id="wz-h2" class="text-lg font-bold text-ink-900">Owner details</h3><p class="text-xs text-ink-500 mt-0.5">We use these details to contact you and to send your login.</p></div>
+            <div class="grid sm:grid-cols-2 gap-4">
+              {% include "hq/partials/signup_field.html" with field=form.owner_first_name required=True %}
+              {% include "hq/partials/signup_field.html" with field=form.owner_last_name required=True %}
+              {% include "hq/partials/signup_field.html" with field=form.phone_number required=True hint="Your login details are sent by SMS to this number. You can type 07... or +255..." %}
+              {% include "hq/partials/signup_field.html" with field=form.email required=False %}
+            </div>
+          </section>
+
+          <!-- ---------- Step 4: Plan ---------- -->
+          <section class="wz-step space-y-6" data-step="3" aria-labelledby="wz-h3">
+            <div><h3 id="wz-h3" class="text-lg font-bold text-ink-900">Choose how to start</h3><p class="text-xs text-ink-500 mt-0.5">Try free for one month, or pay now and skip the trial (the free SMS come with the trial only).</p></div>
+
+            <div>
+              <p class="text-sm font-semibold text-ink-800 mb-2">How would you like to start?</p>
+              <div class="grid sm:grid-cols-2 gap-3">
+                <label class="relative block cursor-pointer group">
+                  <input type="radio" name="account_type" value="TRIAL" data-label="Free trial · 30 days" {% if trial_selected %}checked{% endif %} class="peer sr-only">
+                  <div class="h-full rounded-2xl border-2 border-ink-100 p-4 pr-9 transition peer-checked:border-brand-600 peer-checked:bg-brand-50/60 peer-focus-visible:ring-2 peer-focus-visible:ring-brand-500 group-hover:border-brand-300">
+                    <span class="absolute -top-2 left-4 rounded-full bg-emerald-600 text-white px-2.5 py-0.5 text-[10px] font-bold">FREE · {{ trial_days }} DAYS</span>
+                    <p class="font-bold text-ink-900">Free trial · {{ trial_days }} days</p>
+                    <p class="text-xs text-ink-500 mt-1 leading-5">One full month of Starter features, no card and no payment. 10 sample products are ready on day one, plus {{ trial_sms }} free SMS in each SMS package (Debt, Receipt, Marketing).</p>
+                    <p class="mt-3 text-xl font-extrabold text-brand-700 whitespace-nowrap">TZS 0<span class="text-xs font-medium text-ink-400"> / first {{ trial_days }} days</span></p>
+                  </div>
+                  <span class="absolute top-3 right-3 hidden peer-checked:flex w-5 h-5 rounded-full bg-brand-600 text-white items-center justify-center"><svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"/></svg></span>
+                </label>
+                <label class="relative block cursor-pointer group">
+                  <input type="radio" name="account_type" value="PAID" data-label="Paid subscription" {% if not trial_selected %}checked{% endif %} class="peer sr-only">
+                  <div class="h-full rounded-2xl border-2 border-ink-100 p-4 pr-9 transition peer-checked:border-brand-600 peer-checked:bg-brand-50/60 peer-focus-visible:ring-2 peer-focus-visible:ring-brand-500 group-hover:border-brand-300">
+                    <p class="font-bold text-ink-900">Pay now · no trial</p>
+                    <p class="text-xs text-ink-500 mt-1 leading-5">Choose Starter, Business, Professional or Enterprise, then pay online or by mobile money to activate straight away.</p>
+                    <p class="mt-3 text-xs font-semibold text-ink-600">Pick your plan below</p>
+                  </div>
+                  <span class="absolute top-3 right-3 hidden peer-checked:flex w-5 h-5 rounded-full bg-brand-600 text-white items-center justify-center"><svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"/></svg></span>
+                </label>
+              </div>
+            </div>
+
+            <div id="paid-options" class="space-y-6">
+            <div class="grid sm:grid-cols-2 gap-3">
+              {% for tier in tier_cards %}
+              <label class="relative block cursor-pointer group">
+                <input type="radio" name="tier" value="{{ tier.value }}" data-monthly="{{ tier.monthly|floatformat:'0u' }}" data-yearly="{{ tier.yearly|floatformat:'0u' }}" data-label="{{ tier.label }}" {% if form.tier.value == tier.value %}checked{% elif not form.tier.value and forloop.first %}checked{% endif %} class="peer sr-only">
+                <div class="h-full rounded-2xl border-2 border-ink-100 p-4 pr-9 transition peer-checked:border-brand-600 peer-checked:bg-brand-50/60 peer-focus-visible:ring-2 peer-focus-visible:ring-brand-500 group-hover:border-brand-300">
+                  {% if tier.popular %}<span class="absolute -top-2 left-4 rounded-full bg-brand-700 text-white px-2.5 py-0.5 text-[10px] font-bold">RECOMMENDED ENTRY</span>{% endif %}
+                  <p class="font-bold text-ink-900">{{ tier.label }}</p>
+                  <p class="text-xs text-ink-500 mt-1 leading-5">{{ tier.features }}</p>
+                  <p class="mt-4 text-xl font-extrabold text-brand-700 whitespace-nowrap">TZS {{ tier.monthly|floatformat:0|intcomma }}<span class="text-xs font-medium text-ink-400"> / month</span></p>
+                  <p class="text-xs text-ink-500 mt-1.5">TZS {{ tier.yearly|floatformat:0|intcomma }} / year{% if tier.savings > 0 %} · Save TZS {{ tier.savings|floatformat:0|intcomma }}{% endif %}</p>
+                </div>
+                <span class="absolute top-3 right-3 hidden peer-checked:flex w-5 h-5 rounded-full bg-brand-600 text-white items-center justify-center"><svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"/></svg></span>
+              </label>
+              {% endfor %}
+            </div>
+            {% if form.tier.errors %}<p class="text-xs text-red-600" data-server-error>{{ form.tier.errors.0 }}</p>{% endif %}
+
+            <div>
+              <p class="text-sm font-semibold text-ink-800 mb-2">Billing period</p>
+              <div class="grid sm:grid-cols-2 gap-3">
+                <label class="relative block cursor-pointer group">
+                  <input type="radio" name="plan" value="MONTHLY" data-label="Monthly billing" {% if form.plan.value == 'MONTHLY' or not form.plan.value %}checked{% endif %} class="peer sr-only">
+                  <div class="rounded-2xl border-2 border-ink-100 p-4 peer-checked:border-brand-600 peer-checked:bg-brand-50/60"><p class="font-bold text-ink-900">Monthly</p><p class="text-xs text-ink-500 mt-1">Flexible billing — cancel or change at renewal.</p></div>
+                </label>
+                <label class="relative block cursor-pointer group">
+                  <input type="radio" name="plan" value="YEARLY" data-label="Yearly billing" {% if form.plan.value == 'YEARLY' %}checked{% endif %} class="peer sr-only">
+                  <div class="rounded-2xl border-2 border-ink-100 p-4 peer-checked:border-brand-600 peer-checked:bg-brand-50/60"><p class="font-bold text-ink-900">Yearly</p><p class="text-xs text-ink-500 mt-1">Pay once for 12 months and save on every plan.</p></div>
+                </label>
+              </div>
+            </div>
+            {% if form.plan.errors %}<p class="text-xs text-red-600" data-server-error>{{ form.plan.errors.0 }}</p>{% endif %}
+
+            <div class="rounded-2xl bg-ink-50 border border-ink-100 p-4 text-xs text-ink-600 leading-5 flex gap-3">
+              <svg class="w-5 h-5 shrink-0 text-brand-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>
+              <span>SMS packages (Debt, Receipt, Marketing) and Intelligent Reports are not needed to start. You can add them any time from <strong class="text-ink-800">Subscription &amp; Packages</strong> inside your system.</span>
+            </div>
+            </div>
+
+            <div id="trial-note" class="hidden rounded-2xl bg-emerald-50 border border-emerald-200 p-4 text-xs text-emerald-900 leading-5">
+              <p class="font-semibold">What your free month includes</p>
+              <ul class="mt-1.5 list-disc pl-4 space-y-0.5">
+                <li>All Starter features for {{ trial_days }} days: POS, stock, debts and reports. No sales limit.</li>
+                <li>10 sample products for your business type, ready to sell right away. Delete them in one click when you are ready.</li>
+                <li>{{ trial_sms }} free SMS in each SMS package: Debt, Receipt and Marketing.</li>
+                <li>After {{ trial_days }} days, pay from TSh {{ starter_price }} a month to keep going. Everything you recorded is kept.</li>
+              </ul>
+            </div>
+          </section>
+
+          <!-- ---------- Step 5: Review ---------- -->
+          <section class="wz-step space-y-5" data-step="4" aria-labelledby="wz-h4">
+            <div><h3 id="wz-h4" class="text-lg font-bold text-ink-900">Review &amp; submit</h3><p class="text-xs text-ink-500 mt-0.5">Check your details. Use Edit to change anything.</p></div>
+            <div id="wz-review" class="js-only space-y-3"></div>
+
+            <div class="rounded-2xl bg-brand-50 border border-brand-100 p-4 flex items-baseline justify-between">
+              <span class="text-sm font-semibold text-ink-700" data-total-label>Total to pay after registering</span>
+              <span class="text-xl font-extrabold text-brand-700">TZS <span data-total>0</span></span>
+            </div>
+
+            <div class="lg:hidden rounded-2xl bg-ink-50 border border-ink-100 p-4 text-xs text-ink-600 leading-5">
+              <p class="font-semibold text-ink-800 mb-1">What happens next</p>
+              After you submit, you go straight to a secure payment page. Pay online or by mobile money, and your login details are sent to your phone by SMS once payment is confirmed.
+            </div>
+
+            <div>
+              <label for="{{ form.referral_code.id_for_label }}" class="block text-sm font-medium text-ink-700 mb-1">{{ form.referral_code.label }}</label>
+              {{ form.referral_code }}
+              {% if form.referral_code.errors %}<p class="text-xs text-red-600 mt-1">{{ form.referral_code.errors.0 }}</p>{% endif %}
+              <p class="text-xs text-ink-400 mt-1">Invited by a SmartPOS customer? Enter their code &mdash; they earn a discount when you pay.</p>
+            </div>
+
+            <label class="flex items-start gap-3 text-sm text-ink-700 cursor-pointer">
+              <input type="checkbox" id="wz-confirm" required class="mt-0.5">
+              <span>I confirm the information above is correct.</span>
+            </label>
+            <p id="wz-confirm-msg" class="text-xs text-red-600 -mt-3"></p>
+            <p class="text-[11px] text-ink-400">Your information is used only to process your registration and contact you about it.</p>
+          </section>
+
+          <!-- ---------- Navigation ---------- -->
+          <div id="wz-total-mobile" class="js-only hidden lg:hidden mt-6 rounded-xl bg-brand-50 px-4 py-3">
+            <div class="flex items-baseline justify-between"><span class="text-xs font-medium text-ink-600">Total to pay</span><span class="font-extrabold text-brand-700">TZS <span data-total>0</span></span></div>
+          </div>
+          <div class="mt-6 flex items-center gap-3">
+            <button type="button" id="wz-back" class="js-only hidden btn btn-secondary"><svg class="icon btn-icon" aria-hidden="true"><use href="#i-arrow-left"/></svg>Back</button>
+            <button type="button" id="wz-next" class="js-only ml-auto btn btn-primary">Continue<svg class="icon btn-icon" aria-hidden="true"><use href="#i-arrow-right"/></svg></button>
+            <button type="submit" id="wz-submit" class="ml-auto w-full sm:w-auto btn btn-primary"><svg class="icon btn-icon" aria-hidden="true"><use href="#i-send"/></svg><span data-submit-label>Submit &amp; continue to payment</span></button>
+          </div>
+          <div class="auth-switch">
+            <span>Already have an account?</span>
+            <a href="{% url 'accounts:login' %}" class="btn btn-secondary btn-sm"><svg class="icon btn-icon" aria-hidden="true"><use href="#i-log-in"/></svg>Sign in</a>
+          </div>
+        </form>
+      </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  var form = document.getElementById('signup-form');
+  if (!form) return;
+  form.noValidate = true;   // we validate step by step ourselves; the server validates again
+
+  var steps = Array.prototype.slice.call(form.querySelectorAll('.wz-step'));
+  var LAST = steps.length - 1;
+  var dots = Array.prototype.slice.call(document.querySelectorAll('[data-dot]'));
+  var bar = document.getElementById('wz-bar');
+  var backBtn = document.getElementById('wz-back');
+  var nextBtn = document.getElementById('wz-next');
+  var submitBtn = document.getElementById('wz-submit');
+  var mobileTotal = document.getElementById('wz-total-mobile');
+  var reviewBox = document.getElementById('wz-review');
+  var confirmBox = document.getElementById('wz-confirm');
+  var confirmMsg = document.getElementById('wz-confirm-msg');
+  var PHONE_URL = '{% url "hq:signup_phone_check" %}';
+  var DRAFT_KEY = 'pm_signup_draft_v3';
+  var DRAFT_FIELDS = ['business_name', 'location', 'pharmacy_council_fin', 'permit_number', 'permit_expiry_date',
+                      'owner_first_name', 'owner_last_name', 'phone_number', 'email'];
+  var current = 0, maxReached = 0, validationInProgress = false, submissionStarted = false;
+
+  function el(name) { return form.querySelector('[name="' + name + '"]'); }
+  function val(name) {
+    var e = el(name); if (!e) return '';
+    if (e.type === 'radio') { var c = form.querySelector('input[name="' + name + '"]:checked'); return c ? c.value : ''; }
+    return (e.value || '').trim();
+  }
+  function isPharmacy() { return val('business_type') === 'PHARMACY'; }
+  function fmt(n) { return Number(n || 0).toLocaleString('en-US'); }
+  function localToday() {
+    var d = new Date(), p = function (n) { return String(n).padStart(2, '0'); };
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+  }
+
+  // ---- input helpers (mobile keyboards, formatting) ----
+  var phone = el('phone_number'), expiry = el('permit_expiry_date');
+  ['business_name', 'owner_first_name', 'owner_last_name'].forEach(function (n) {
+    var e = el(n); if (e) e.required = true;
+  });
+
+  // ---- business type: Pharmacy shows the Pharmacy Council section, everything else hides it ----
+  var NAME_HINTS = { PHARMACY: 'e.g. Neema Pharmacy', RETAIL: 'e.g. Neema General Store', WHOLESALE: 'e.g. Neema Distributors', SUPERMARKET: 'e.g. Neema Supermarket',
+                     RESTAURANT: 'e.g. Neema Restaurant', HARDWARE: 'e.g. Neema Hardware', ELECTRONICS: 'e.g. Neema Electronics', FASHION: 'e.g. Neema Boutique',
+                     BEAUTY: 'e.g. Neema Beauty Salon', AGROVET: 'e.g. Neema Agrovet', OTHER: 'e.g. Neema Enterprises' };
+  function applyType() {
+    var t = val('business_type'), pharm = t === 'PHARMACY';
+    Array.prototype.forEach.call(form.querySelectorAll('[data-pharmacy-only]'), function (n) { n.classList.toggle('is-on', pharm); });
+    var fin = el('pharmacy_council_fin');
+    if (fin) { fin.required = pharm; if (!pharm) { fin.value = ''; setMsg('pharmacy_council_fin', '', ''); } }
+    var nm = el('business_name'); if (nm && NAME_HINTS[t]) nm.placeholder = NAME_HINTS[t];
+    if (t) setMsg('business_type', '', '');
+  }
+  if (expiry) expiry.min = localToday();
+
+  // ---- messages ----
+  function setMsg(name, text, kind) {
+    var wrap = form.querySelector('[data-field="' + name + '"]');
+    if (!wrap) return;
+    var m = wrap.querySelector('[data-msg]'), input = wrap.querySelector('input, select, textarea');
+    m.removeAttribute('data-server-error');
+    m.textContent = text || '';
+    m.className = 'text-xs mt-1' + (kind === 'error' ? ' text-red-600' : (kind === 'ok' ? ' text-green-600' : ''));
+    if (input) {
+      input.classList.toggle('!border-red-400', kind === 'error');
+      input.setAttribute('aria-invalid', kind === 'error' ? 'true' : 'false');
+    }
+  }
+
+  // ---- rules (client-side convenience; the Django form is still the authority) ----
+  var rules = {
+    business_type: function (v) { return v ? '' : 'Choose the type of business you run.'; },
+    business_name: function (v) { return v ? '' : 'Enter the business name.'; },
+    pharmacy_council_fin: function (v) { return (!isPharmacy() || /^\d{7}$/.test(v || '')) ? '' : 'Pharmacies must enter the Pharmacy Council FIN as exactly 7 digits, e.g. 0101726.'; },
+    permit_expiry_date: function (v) { return (!v || v >= localToday()) ? '' : 'This licence has already expired. Enter the current expiry date, or leave it empty.'; },
+    owner_first_name: function (v) { return v ? '' : 'Enter the first name.'; },
+    owner_last_name: function (v) { return v ? '' : 'Enter the last name.'; },
+    email: function (v) { return (!v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) ? '' : 'Enter a valid email address, or leave it empty.'; }
+  };
+  function validateField(name) {
+    if (!rules[name]) return true;
+    var msg = rules[name](val(name));
+    setMsg(name, msg, msg ? 'error' : '');
+    return !msg;
+  }
+  Object.keys(rules).forEach(function (name) {
+    var e = el(name); if (!e || name === 'business_type') return;
+    e.addEventListener('blur', function () { if (e.value || e.dataset.touched) { e.dataset.touched = '1'; validateField(name); } });
+    e.addEventListener('input', function () { if (e.getAttribute('aria-invalid') === 'true') validateField(name); });
+  });
+
+  // ---- phone: normalise + availability check (same API as before) ----
+  var phoneState = { checked: '', ok: false };
+  function normalizePhone(raw) {
+    var v = (raw || '').trim().replace(/[\s\-().]/g, '');
+    if (/^0\d{9}$/.test(v)) return '+255' + v.slice(1);
+    if (/^255\d{9}$/.test(v)) return '+' + v;
+    return v;
+  }
+  function checkPhone() {
+    var normalized = normalizePhone(phone.value);
+    if (!normalized) { setMsg('phone_number', 'Enter your phone number.', 'error'); return Promise.resolve(false); }
+    if (phoneState.checked === normalized) return Promise.resolve(phoneState.ok);
+    setMsg('phone_number', 'Checking number…', '');
+    return fetch(PHONE_URL + '?phone=' + encodeURIComponent(normalized), { headers: { 'Accept': 'application/json' }, cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        var ok = !!(d.valid && !d.exists);
+        phoneState = { checked: normalized, ok: ok };
+        if (ok) { phone.value = d.normalized || normalized; phoneState.checked = normalizePhone(phone.value); setMsg('phone_number', 'Number is valid and available.', 'ok'); }
+        else setMsg('phone_number', d.message || 'Enter a valid Tanzania phone number.', 'error');
+        return ok;
+      })
+      .catch(function () { setMsg('phone_number', '', ''); return true; });   // network hiccup: the server will still validate
+  }
+  var phoneTimer = null;
+  if (phone) {
+    phone.addEventListener('input', function () {
+      clearTimeout(phoneTimer); phoneState = { checked: '', ok: false };
+      setMsg('phone_number', '', '');
+      phoneTimer = setTimeout(function () { if (normalizePhone(phone.value).length >= 10) checkPhone(); }, 500);
+    });
+    phone.addEventListener('blur', function () { if (phone.value.trim()) checkPhone(); });
+  }
+
+  // ---- step validation ----
+  function validateStep(i) {
+    var names = Array.prototype.map.call(steps[i].querySelectorAll('[data-field]'), function (w) { return w.getAttribute('data-field'); });
+    var firstBad = null, allOk = true;
+    names.forEach(function (n) {
+      if (n === 'phone_number') return;
+      if (!validateField(n)) { allOk = false; if (!firstBad) firstBad = n; }
+    });
+    if (names.indexOf('phone_number') !== -1) {
+      return checkPhone().then(function (ok) {
+        if (!ok) { allOk = false; if (!firstBad || names.indexOf('phone_number') < names.indexOf(firstBad)) firstBad = 'phone_number'; }
+        if (firstBad && el(firstBad)) el(firstBad).focus();
+        return allOk;
+      });
+    }
+    if (i === 3 && !isTrial() && (!form.querySelector('input[name="tier"]:checked') || !form.querySelector('input[name="plan"]:checked'))) allOk = false;
+    if (firstBad && el(firstBad)) el(firstBad).focus();
+    return Promise.resolve(allOk);
+  }
+
+  // ---- order summary ----
+  function checkedInput(name) { return form.querySelector('input[name="' + name + '"]:checked'); }
+  function price(inp) { return inp && inp.value !== '' ? Number(inp.getAttribute('data-price') || 0) : 0; }
+  function tierPrice(tier, billing) { if (!tier) return 0; return Number(tier.getAttribute(billing === 'YEARLY' ? 'data-yearly' : 'data-monthly') || 0); }
+  function setText(sel, t) { Array.prototype.forEach.call(document.querySelectorAll(sel), function (n) { n.textContent = t; }); }
+  function toggleRow(sel, show) { Array.prototype.forEach.call(document.querySelectorAll(sel), function (n) { n.classList.toggle('hidden', !show); }); }
+  function isTrial() { var a = checkedInput('account_type'); return !!(a && a.value === 'TRIAL'); }
+  function applyAccountType() {
+    var t = isTrial();
+    var paid = document.getElementById('paid-options'), note = document.getElementById('trial-note');
+    if (paid) paid.classList.toggle('hidden', t);
+    if (note) note.classList.toggle('hidden', !t);
+    setText('[data-total-label]', t ? 'Total to pay' : 'Total to pay after registering');
+    setText('[data-pay-note]', t ? 'No payment is needed for your first {{ trial_days }} days.' : 'You pay after registering. No payment is taken on this page.');
+    setText('[data-submit-label]', t ? 'Start free' : 'Submit & continue to payment');
+  }
+  function updateSummary() {
+    applyAccountType();
+    var plan = checkedInput('plan'), tier = checkedInput('tier');
+    var business = checkedInput('business_type');
+    var businessLabel = business ? (business.getAttribute('data-label') || business.value) : 'Choose a business type';
+    setText('[data-sum-business]', businessLabel);
+    if (isTrial()) {
+      setText('[data-sum-status]', 'Free trial');
+      setText('[data-sum-plan-label]', 'Free trial · {{ trial_days }} days');
+      setText('[data-sum-plan-detail]', 'All Starter features for {{ trial_days }} days, plus {{ trial_sms }} free SMS in each SMS package.');
+      setText('[data-sum-plan-price]', '0');
+      setText('[data-total]', '0');
+      return;
+    }
+    var billingLabel = plan ? (plan.getAttribute('data-label') || (plan.value === 'YEARLY' ? 'Yearly billing' : 'Monthly billing')) : 'Monthly billing';
+    var p = tierPrice(tier, plan ? plan.value : 'MONTHLY');
+    var tierLabel = tier ? (tier.getAttribute('data-label') || tier.value) : 'Choose a plan';
+    setText('[data-sum-status]', 'Paid plan');
+    setText('[data-sum-plan-label]', tierLabel + ' · ' + billingLabel);
+    setText('[data-sum-plan-detail]', plan && plan.value === 'YEARLY' ? '12 months of SmartPOS access, billed yearly.' : 'SmartPOS access billed monthly.');
+    setText('[data-sum-plan-price]', fmt(p));
+    setText('[data-total]', fmt(p));
+  }
+  Array.prototype.forEach.call(form.querySelectorAll('input[type="radio"]'), function (r) { r.addEventListener('change', function () { if (r.name === 'business_type') applyType(); updateSummary(); saveDraft(); }); });
+
+  // ---- review (built with textContent only) ----
+  function addRow(parent, label, value) {
+    var row = document.createElement('div');
+    row.className = 'flex justify-between gap-4 py-1.5 text-sm';
+    var a = document.createElement('span'); a.className = 'text-ink-500'; a.textContent = label;
+    var b = document.createElement('span'); b.className = 'font-medium text-ink-900 text-right break-words min-w-0'; b.textContent = value || '—';
+    row.appendChild(a); row.appendChild(b); parent.appendChild(row);
+  }
+  function addGroup(title, stepIndex, rows) {
+    var box = document.createElement('div');
+    box.className = 'rounded-2xl border border-ink-100 p-4';
+    var head = document.createElement('div'); head.className = 'flex items-center justify-between mb-1';
+    var h = document.createElement('p'); h.className = 'text-xs font-semibold uppercase tracking-wider text-ink-400'; h.textContent = title;
+    var edit = document.createElement('button'); edit.type = 'button'; edit.className = 'text-xs font-semibold text-brand-700 hover:text-brand-800 transition'; edit.textContent = 'Edit';
+    edit.addEventListener('click', function () { show(stepIndex); });
+    head.appendChild(h); head.appendChild(edit); box.appendChild(head);
+    rows.forEach(function (r) { addRow(box, r[0], r[1]); });
+    reviewBox.appendChild(box);
+  }
+  function renderReview() {
+    if (!reviewBox) return;
+    reviewBox.innerHTML = '';
+    var plan = checkedInput('plan'), tier = checkedInput('tier');
+    var typeInp = checkedInput('business_type');
+    var bizRows = [['Type', typeInp ? typeInp.getAttribute('data-label') : ''], ['Name', val('business_name')], ['Location', val('location')]];
+    if (isPharmacy()) bizRows.push(['Pharmacy Council FIN', val('pharmacy_council_fin')]);
+    if (val('permit_number')) bizRows.push(['Licence / permit', val('permit_number')]);
+    if (val('permit_expiry_date')) bizRows.push(['Licence expiry', val('permit_expiry_date')]);
+    addGroup('Business & licence', 1, bizRows);
+    addGroup('Owner', 2, [['Name', (val('owner_first_name') + ' ' + val('owner_last_name')).trim()], ['Phone', val('phone_number')], ['Email', val('email')]]);
+    if (isTrial()) {
+      addGroup('Subscription', 3, [
+        ['Account', 'Free trial · {{ trial_days }} days'],
+        ['Features', 'Starter plan'],
+        ['Free SMS', '{{ trial_sms }} in each SMS package'],
+        ['Amount', 'TZS 0']
+      ]);
+    } else addGroup('Subscription', 3, [
+      ['Plan', (tier ? tier.getAttribute('data-label') : 'Plan')],
+      ['Billing', (plan ? plan.getAttribute('data-label') : 'Monthly')],
+      ['Amount', 'TZS ' + fmt(tierPrice(tier, plan ? plan.value : 'MONTHLY'))]
+    ]);
+  }
+
+  // ---- navigation ----
+  function show(i, opts) {
+    opts = opts || {};
+    current = Math.max(0, Math.min(LAST, i));
+    if (current > maxReached) maxReached = current;
+    steps.forEach(function (s, idx) { s.classList.toggle('is-active', idx === current); });
+    dots.forEach(function (d, idx) {
+      var done = idx < current, active = idx === current;
+      d.className = 'w-9 h-9 rounded-full text-sm font-bold transition ' +
+        (active ? 'bg-brand-700 text-white ring-4 ring-brand-100' : (done || idx <= maxReached ? 'bg-brand-600 text-white' : 'bg-ink-100 text-ink-500'));
+      d.textContent = done ? '✓' : String(idx + 1);
+      if (active) d.setAttribute('aria-current', 'step'); else d.removeAttribute('aria-current');
+      d.disabled = idx > maxReached;
+    });
+    bar.style.width = ((current + 1) / (LAST + 1) * 100) + '%';
+    backBtn.classList.toggle('hidden', current === 0);
+    nextBtn.classList.toggle('hidden', current === LAST);
+    submitBtn.classList.toggle('hidden', current !== LAST);
+    if (mobileTotal) mobileTotal.classList.toggle('hidden', current < 3);
+    if (current === LAST) renderReview();
+    updateSummary();
+    saveDraft();
+    if (!opts.silent) {
+      var top = document.getElementById('wz-stepper');
+      if (top && top.getBoundingClientRect().top < 0) top.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      var first = steps[current].querySelector('input:not([type="radio"]):not([type="checkbox"]), textarea');
+      if (first && current < 4) setTimeout(function () { first.focus({ preventScroll: true }); }, 60);
+    }
+  }
+  nextBtn.addEventListener('click', function () {
+    if (validationInProgress || submissionStarted) return;
+    validationInProgress = true; nextBtn.disabled = true;
+    validateStep(current).then(function (ok) { if (ok) show(current + 1); })
+      .catch(function () { setMsg('phone_number', 'We could not validate the phone right now. Check your connection and try again.', 'error'); })
+      .finally(function () { validationInProgress = false; nextBtn.disabled = false; });
+  });
+  backBtn.addEventListener('click', function () { show(current - 1); });
+  dots.forEach(function (d, idx) { d.addEventListener('click', function () { if (idx <= maxReached) show(idx); }); });
+
+  // Enter moves forward on steps 1-3 instead of submitting a half-finished form.
+  form.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'BUTTON') return;
+    if (current < LAST) { e.preventDefault(); nextBtn.click(); }
+  });
+
+  // Submit: validate everything first (click runs before the submit event, so the global
+  // "double-submit guard" in base.html never disables the button after a failed check).
+  submitBtn.addEventListener('click', function (e) {
+    e.preventDefault();
+    if (validationInProgress || submissionStarted) return;
+    validationInProgress = true;
+    submitBtn.disabled = true;
+    submitBtn.setAttribute('aria-busy', 'true');
+    submitBtn.dataset.originalText = submitBtn.textContent.trim();
+    submitBtn.textContent = 'Checking your details…';
+    var chain = Promise.resolve(true), failedStep = -1;
+    [0, 1, 2, 3].forEach(function (i) {
+      chain = chain.then(function (ok) {
+        if (!ok) return false;
+        return validateStep(i).then(function (stepOk) { if (!stepOk) failedStep = i; return stepOk; });
+      });
+    });
+    chain.then(function (ok) {
+      if (!ok) {
+        show(failedStep < 0 ? 0 : failedStep, { silent: true });
+        var bad = steps[failedStep < 0 ? 0 : failedStep].querySelector('[aria-invalid="true"]');
+        if (bad) bad.focus();
+        return;
+      }
+      if (!confirmBox.checked) {
+        confirmMsg.textContent = 'Please confirm your details are correct before continuing.';
+        confirmBox.focus();
+        return;
+      }
+      confirmMsg.textContent = '';
+      submissionStarted = true;
+      submitBtn.textContent = 'Submitting securely…';
+      try { sessionStorage.removeItem(DRAFT_KEY); } catch (err) {}
+      if (form.requestSubmit) form.requestSubmit(submitBtn); else form.submit();
+    }).catch(function () {
+      setMsg('phone_number', 'We could not finish checking your details. Please try again.', 'error');
+    }).finally(function () {
+      validationInProgress = false;
+      if (!submissionStarted) {
+        submitBtn.disabled = false;
+        submitBtn.removeAttribute('aria-busy');
+        submitBtn.textContent = submitBtn.dataset.originalText || 'Submit & continue to payment';
+      }
+    });
+  });
+  form.addEventListener('submit', function () {
+    submissionStarted = true;
+    submitBtn.disabled = true;
+    submitBtn.setAttribute('aria-busy', 'true');
+    try { sessionStorage.removeItem(DRAFT_KEY); } catch (err) {}
+  });
+
+  // ---- draft (this tab only; cleared on submit) ----
+  function saveDraft() {
+    try {
+      var data = { step: current, fields: {}, radios: {} };
+      DRAFT_FIELDS.forEach(function (n) { data.fields[n] = el(n) ? el(n).value : ''; });
+      ['business_type', 'account_type', 'tier', 'plan'].forEach(function (n) { var c = checkedInput(n); data.radios[n] = c ? c.value : ''; });
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify(data));
+    } catch (err) {}
+  }
+  function restoreDraft() {
+    try {
+      var raw = sessionStorage.getItem(DRAFT_KEY); if (!raw) return 0;
+      var data = JSON.parse(raw);
+      DRAFT_FIELDS.forEach(function (n) { if (el(n) && data.fields && data.fields[n]) el(n).value = data.fields[n]; });
+      Object.keys(data.radios || {}).forEach(function (n) {
+        var r = form.querySelector('input[name="' + n + '"][value="' + data.radios[n] + '"]'); if (r) r.checked = true;
+      });
+      return Math.min(Number(data.step) || 0, LAST);
+    } catch (err) { return 0; }
+  }
+  DRAFT_FIELDS.forEach(function (n) { if (el(n)) el(n).addEventListener('input', saveDraft); });
+
+  // ---- start ----
+  var serverErrors = Array.prototype.slice.call(form.querySelectorAll('[data-server-error]'));
+  var startStep = 0;
+  if (serverErrors.length) {
+    // The server rejected the submission: keep the entered values and jump to the first step with a problem.
+    startStep = LAST;
+    serverErrors.forEach(function (n) {
+      var s = n.closest('.wz-step'); if (s) startStep = Math.min(startStep, steps.indexOf(s));
+    });
+    maxReached = LAST;
+  } else if (!DRAFT_FIELDS.some(function (n) { return el(n) && el(n).value; })) {
+    startStep = restoreDraft();
+    maxReached = startStep;
+  }
+  applyType();
+  updateSummary();
+  show(startStep, { silent: true });
+});
+</script>
+{% endblock %}

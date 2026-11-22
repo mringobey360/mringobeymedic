@@ -1,0 +1,12 @@
+{% load cart_tags %}
+<div class="sp-sec-head"><h2 id="reviews-h">Customer reviews</h2><button type="button" class="sp-pill-btn" data-review-open><svg class="i"><use href="#i-plus"/></svg> Rate this product</button></div>
+{% if rating_total %}
+<div class="mk-rv-summary">
+  <div class="mk-rv-score"><strong>{{ product.rating_avg|floatformat:1 }}</strong>{% stars product.rating_avg size='lg' %}<span>{{ rating_total }} review{{ rating_total|pluralize }}</span></div>
+  <div class="mk-rv-bars" aria-label="Rating breakdown">{% for d in rating_dist %}<div class="mk-rv-bar"><span>{{ d.star }}<svg class="i"><use href="#i-star"/></svg></span><i><b style="width:{{ d.pct }}%"></b></i><em>{{ d.count }}</em></div>{% endfor %}</div>
+</div>
+<div class="mk-rv-list" id="mk-rv-list" data-next="{% if has_next %}{{ next_page }}{% endif %}">{% include 'marketplace/_review_items.html' %}</div>
+<div class="mk-rv-more"{% if not has_next %} hidden{% endif %}><button type="button" class="sp-pill-btn" data-review-more>Show more reviews</button></div>
+{% else %}
+<div class="mk-rv-empty"><span class="ic">{% stars 0 size='lg' %}</span><b>No reviews yet</b><p>Bought this product? Be the first to share your experience.</p></div>
+{% endif %}

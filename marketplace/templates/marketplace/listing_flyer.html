@@ -1,0 +1,132 @@
+{% load humanize cart_tags %}<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b4f4a">
+<title>{{ listing.title }} · Property flyer</title>
+<style>
+:root{--green:#0f766e;--deep:#0b4f4a;--ink:#10201d;--muted:#5b6b66;--line:#dbe6e1;--soft:#f3f8f6;--gold:#c8a24a;--paper:#fff}
+*{box-sizing:border-box}
+html{print-color-adjust:exact;-webkit-print-color-adjust:exact;-webkit-text-size-adjust:100%}
+body{margin:0;font-family:Inter,"Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;background:#e6ecea;color:var(--ink);font-size:14px;line-height:1.45}
+
+/* ---------- Screen toolbar (never printed) ---------- */
+.bar{position:sticky;top:0;z-index:5;display:flex;gap:8px;justify-content:center;align-items:center;padding:10px 12px;flex-wrap:wrap;background:#e6ecea}
+.bar .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:42px;padding:0 16px;border-radius:10px;border:1px solid var(--green);background:var(--green);color:#fff;font:700 13px/1 inherit;text-decoration:none;cursor:pointer}
+.bar .btn.alt{background:#fff;color:var(--green)}
+.bar .btn:focus-visible{outline:3px solid #99d5cc;outline-offset:2px}
+.bar .share{display:none}
+
+/* ---------- A4 sheet ---------- */
+.sheet{width:min(210mm,calc(100% - 24px));min-height:297mm;margin:4px auto 28px;background:var(--paper);padding:10mm 11mm;display:flex;flex-direction:column;gap:4.2mm;box-shadow:0 14px 40px #152e2520;border:1px solid #e1e9e5;border-radius:4px;overflow:hidden}
+
+.brandline{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.brand{display:flex;align-items:center;gap:2.4mm;color:var(--deep);font-weight:850;letter-spacing:.08em;font-size:10pt}
+.brand i{display:inline-block;width:6.5mm;height:6.5mm;border-radius:2mm;background:linear-gradient(135deg,var(--green),var(--deep));position:relative}
+.brand i:after{content:"";position:absolute;inset:1.7mm;border:.6mm solid #fff;border-radius:50%}
+.tag{font-size:8pt;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--deep);background:#e9f5f1;border:1px solid #cfe7df;border-radius:999px;padding:1.3mm 3.2mm}
+
+.top{background:linear-gradient(125deg,var(--deep),var(--green));color:#fff;border-radius:3mm;padding:5.5mm 7mm;border-bottom:1.1mm solid var(--gold)}
+.top small{display:block;opacity:.92;letter-spacing:.14em;text-transform:uppercase;font-weight:800;font-size:8pt}
+.top h1{margin:1.6mm 0 0;font-size:21pt;line-height:1.18;font-weight:800;letter-spacing:-.01em;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+
+/* Gallery fills whatever height is left, so the page always fits exactly one A4 */
+.gallery{flex:1 1 0;min-height:62mm;display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1fr);grid-template-rows:1fr 1fr;gap:2.6mm}
+.gallery figure{position:relative;margin:0;min-width:0;min-height:0;background:var(--soft);border:1px solid var(--line);border-radius:2.4mm;overflow:hidden}
+.gallery img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center;display:block}
+.gallery figure:first-child{grid-row:1/3}
+.gallery.one{grid-template-columns:1fr;grid-template-rows:1fr}.gallery.one figure:first-child{grid-row:auto}
+.gallery.two{grid-template-rows:1fr}.gallery.two figure:first-child{grid-row:auto}
+.nophoto{flex:1 1 0;min-height:30mm;border:1px dashed var(--line);border-radius:3mm;background:var(--soft)}
+
+.price-row{display:flex;align-items:center;justify-content:space-between;gap:3mm;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:3mm}
+.price{font-size:27pt;line-height:1.05;font-weight:850;letter-spacing:-.03em;color:var(--green)}
+.price small{font-size:10.5pt;color:var(--muted);font-weight:650;letter-spacing:0}
+.nego{font-size:8.5pt;font-weight:800;color:#7a5b10;background:#fbf3dc;border:1px solid #efdca3;border-radius:999px;padding:1.4mm 3.4mm;white-space:nowrap}
+
+.location{display:flex;gap:2mm;align-items:flex-start;font-size:10pt;color:#2f3f3b;line-height:1.4}
+.location svg{flex:none;width:4.2mm;height:4.2mm;margin-top:.6mm;color:var(--green)}
+.location span{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+
+.facts{display:flex;flex-wrap:wrap;gap:1.8mm}
+.facts span{background:#f0fdfa;border:1px solid #ccebe3;color:#0f5f58;border-radius:999px;padding:1.4mm 3mm;font-size:8.3pt;font-weight:700;line-height:1.25}
+.facts .key{background:var(--green);border-color:var(--green);color:#fff}
+
+/* ---------- Contact + QR ---------- */
+.foot{display:grid;grid-template-columns:minmax(0,1fr) 44mm;gap:6mm;align-items:center;background:var(--soft);border:1px solid var(--line);border-top:1.6mm solid var(--green);border-radius:3mm;padding:4.5mm 6mm;break-inside:avoid}
+.foot h2{margin:0 0 .8mm;font-size:13.5pt;line-height:1.25;color:var(--deep)}
+.foot .hint{margin:0 0 2mm;color:var(--muted);font-size:9pt}
+.phone{display:inline-block;font-size:19pt;font-weight:850;color:var(--green);margin:0 0 .6mm;letter-spacing:.01em;text-decoration:none}
+.seller{font-size:10.5pt;font-weight:750;color:var(--ink);margin:0}
+.qrbox{text-align:center}
+.qr{width:40mm;height:40mm;margin:0 auto;background:#fff;border:1px solid var(--line);border-radius:2.4mm;padding:1.4mm;display:flex;align-items:center;justify-content:center}
+.qr-svg{display:block;width:100%;height:100%}
+.qr-fallback{display:block;width:100%;height:100%;object-fit:contain;image-rendering:pixelated}
+.qr-caption{font-size:7.6pt;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--deep);margin-top:1.6mm}
+
+.legal{display:flex;justify-content:space-between;gap:8px;color:var(--muted);font-size:7.4pt;border-top:1px solid var(--line);padding-top:2mm}
+
+/* ---------- Mobile ---------- */
+@media(max-width:640px){
+ .bar{padding:8px;gap:6px}.bar .btn{flex:1 1 calc(50% - 6px);min-height:44px;padding:0 10px}
+ .sheet{width:calc(100% - 16px);min-height:0;padding:14px;gap:14px;border-radius:12px}
+ .brand{font-size:11px}.tag{font-size:10px;padding:5px 10px}
+ .top h1,.location span{display:block;-webkit-line-clamp:unset;overflow:visible}
+ .top{padding:16px;border-radius:12px}.top small{font-size:10px}.top h1{font-size:clamp(20px,6.2vw,26px)}
+ .gallery{flex:none;min-height:0;grid-template-columns:1fr 1fr;grid-template-rows:auto auto;gap:6px}
+ .gallery figure{border-radius:10px}
+ .gallery figure:first-child{grid-column:1/3;grid-row:auto;height:min(62vw,300px)}
+ .gallery figure:not(:first-child){height:min(34vw,170px)}
+ .gallery.one figure:first-child{grid-column:auto}
+ .gallery.two figure:first-child{grid-column:1/3}
+ .price{font-size:28px}.price small{font-size:13px}.nego{font-size:11px;padding:5px 10px}
+ .location{font-size:13px}.location svg{width:16px;height:16px}
+ .facts{gap:6px}.facts span{font-size:11.5px;padding:6px 10px}
+ .foot{grid-template-columns:1fr;text-align:center;gap:14px;padding:16px;border-radius:12px}
+ .foot h2{font-size:17px}.foot .hint{font-size:12.5px}.phone{font-size:26px}.seller{font-size:14px}
+ .qr{width:180px;height:180px}.qr-caption{font-size:11px}
+ .legal{flex-direction:column;text-align:center;font-size:11px}
+}
+
+/* ---------- Print: exactly one clean A4, no browser header/footer ---------- */
+@page{size:A4 portrait;margin:0}
+@media print{
+ html,body{width:210mm;height:297mm;margin:0;padding:0;background:#fff;font-size:10pt}
+ .bar{display:none!important}
+ .sheet{width:210mm;height:296mm;min-height:0;margin:0;padding:10mm 11mm;border:0;border-radius:0;box-shadow:none;overflow:hidden;gap:4.2mm;break-inside:avoid;page-break-after:avoid;page-break-inside:avoid}
+ .gallery{display:grid!important}
+}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
+</style></head><body>
+<div class="bar">
+ <button type="button" class="btn" onclick="window.print()">🖨 Print / Save as PDF</button>
+ <button type="button" class="btn alt share" id="shareBtn">↗ Share</button>
+ <a class="btn alt" href="{{ qr_png_url }}?download=1">⬇ QR code (PNG)</a>
+ <a class="btn alt" href="{% url 'marketplace:listing_detail' listing.slug %}">← Back</a>
+</div>
+<main class="sheet">
+ <div class="brandline"><div class="brand"><i></i>SMARTPOS MARKETPLACE</div><span class="tag">{{ listing.get_purpose_display }}</span></div>
+ <header class="top"><small>{{ listing.get_purpose_display }} · {{ listing.get_property_type_display }}</small><h1>{{ listing.title }}</h1></header>
+ {% if images %}<div class="gallery{% if images|length == 1 %} one{% elif images|length == 2 %} two{% endif %}">{% for im in images %}{% if forloop.counter <= 3 %}<figure><img src="{{ im.image.url }}" alt="Photo {{ forloop.counter }} of {{ listing.title }}"></figure>{% endif %}{% endfor %}</div>{% else %}<div class="nophoto"></div>{% endif %}
+ <div class="price-row"><div class="price">TSh {{ listing.price|floatformat:0|intcomma }} <small>{{ listing.price_suffix }}</small></div>{% if listing.negotiable %}<span class="nego">Negotiable</span>{% endif %}</div>
+ <div class="location"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a7 7 0 0 0-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg><span><b>{{ listing.location_line }}</b>{% if listing.landmark %} — near {{ listing.landmark }}{% endif %}</span></div>
+ <div class="facts">{% if listing.bedrooms %}<span class="key">{{ listing.bedrooms }} bedrooms</span>{% endif %}{% if listing.bathrooms %}<span class="key">{{ listing.bathrooms }} bathrooms</span>{% endif %}{% if listing.size_value %}<span class="key">{{ listing.size_value|floatformat:"-2" }} {{ listing.get_size_unit_display }}</span>{% endif %}{% if listing.title_type %}<span>{{ listing.get_title_type_display }}</span>{% endif %}{% for a in listing.amenity_labels|slice:":8" %}<span>{{ a }}</span>{% endfor %}</div>
+ <footer class="foot">
+  <div>
+   <h2>View photos &amp; full details</h2>
+   <p class="hint">Scan the QR code with your phone camera, or call us.</p>
+   <a class="phone" href="tel:{{ listing.contact_phone }}">{{ listing.contact_phone }}</a>
+   <p class="seller">{{ store.public_name }}{% if store.verified %} · ✓ Verified seller{% endif %}</p>
+  </div>
+  <div class="qrbox">
+   <div class="qr">{% if qr_svg %}{{ qr_svg|safe }}{% else %}<img class="qr-fallback" src="{{ qr_png_url }}" alt="QR code linking to this property">{% endif %}</div>
+   <div class="qr-caption">Scan to view listing</div>
+  </div>
+ </footer>
+ <div class="legal"><span>Posted on SmartPOS Marketplace</span><span>Always inspect the property and verify documents before paying.</span></div>
+</main>
+<script>
+(function(){var b=document.getElementById('shareBtn');if(!b||!navigator.share)return;
+b.style.display='inline-flex';
+b.addEventListener('click',function(){navigator.share({title:document.title,url:'{{ url|escapejs }}'}).catch(function(){});});})();
+</script>
+</body></html>

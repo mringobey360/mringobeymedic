@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Restock History · SmartPOS{% endblock %}
+{% block content %}
+{% include "partials/_report_ui.html" %}
+<div class="rp">
+  <div class="rp-head">
+    <div>
+      <p class="rp-eyebrow">Inventory control</p>
+      <h1 class="rp-title">Restock History</h1>
+      <p class="rp-sub">Every delivery received into this branch &mdash; manual, scanned or Excel upload &mdash; with the exact date, time and person who received it.</p>
+    </div>
+    <div class="rp-actions">
+      <a class="btn btn-secondary" href="{% url 'inventory:bulk_upload' %}">Bulk upload</a>
+      <a class="btn btn-primary" href="{% url 'inventory:restock_history_export' %}{% if querystring %}?{{ querystring }}{% endif %}">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M4 21h16"/></svg>
+        Download Excel{% if filtered %} (filtered){% endif %}</a>
+    </div>
+  </div>
+
+  {% if f.import %}
+  <div class="rp-banner">
+    <span>Showing only batches from import <strong>{{ f.import.reference }}</strong> ({{ f.import.get_mode_display }})</span>
+    <span>{{ f.import.created_at|date:"d M Y" }}, {{ f.import.created_at|time:"H:i:s" }}</span>
+    {% if f.import.created_by %}<span>By {{ f.import.created_by.get_full_name|default:f.import.created_by.username }}</span>{% endif %}
+    {% if f.import.file_name %}<span>File: {{ f.import.file_name }}</span>{% endif %}
+    <a href="{% url 'inventory:restock_history' %}">Show all restocks</a>
+  </div>
+  {% endif %}
+
+  <div class="rp-stats">
+    <div class="rp-stat"><span class="rp-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5l9-4 9 4-9 4-9-4z"/><path d="M3 7.5v9l9 4 9-4v-9"/></svg></span><div><small>Restock entries{% if filtered %} &middot; filtered{% endif %}</small><b>{{ summary.events|intcomma }}</b></div></div>
+    <div class="rp-stat"><span class="rp-ico slate"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></span><div><small>Units received</small><b>{{ summary.units|intcomma }}</b></div></div>
+    <div class="rp-stat"><span class="rp-ico amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/></svg></span><div><small>Total purchase cost</small><b>TZS {{ summary.cost|floatformat:0|intcomma }}</b></div></div>
+  </div>
+
+  <div class="rp-panel">
+    <form method="get" class="rp-filters">
+      {% if f.import %}<input type="hidden" name="import" value="{{ f.import.pk }}">{% endif %}
+      <div class="rp-chips" role="group" aria-label="Quick date range">
+        {% for c in quick %}<a class="rp-chip {% if c.active %}on{% endif %}" href="?from={{ c.from }}&to={{ c.to }}{% if f.import %}&import={{ f.import.pk }}{% endif %}">{{ c.label }}</a>{% endfor %}
+      </div>
+      <div class="rp-fgrid">
+        <div class="wide"><label for="rh-q">Search</label><input id="rh-q" class="form-input" type="search" name="q" value="{{ f.q }}" placeholder="Product, SKU, batch number or reference"></div>
+        <div><label for="rh-from">From</label><input id="rh-from" class="form-input" type="date" name="from" value="{{ f.date_from|date:'Y-m-d' }}"></div>
+        <div><label for="rh-to">To</label><input id="rh-to" class="form-input" type="date" name="to" value="{{ f.date_to|date:'Y-m-d' }}"></div>
+        <div><label for="rh-src">Source</label>
+          <select id="rh-src" class="form-input" name="source">
+            <option value="">All sources</option>
+            <option value="import" {% if f.source == 'import' %}selected{% endif %}>Excel uploads</option>
+            <option value="manual" {% if f.source == 'manual' %}selected{% endif %}>Manual / scan</option>
+          </select></div>
+        <div class="rp-fbtns"><button class="btn btn-primary" type="submit">Apply</button>{% if filtered %}<a class="btn btn-ghost" href="{% url 'inventory:restock_history' %}">Reset</a>{% endif %}</div>
+      </div>
+    </form>
+  </div>
+
+  {% if imports and not f.import %}
+  <div class="rp-panel">
+    <div class="rp-panel-h"><h2>Recent Excel uploads</h2><span>Preview the batches an upload created, or download them as Excel</span></div>
+    <div class="rp-scroll"><table class="rp-table">
+      <thead><tr><th>Date &amp; time</th><th>Reference</th><th class="rp-hide-sm">Type</th><th class="rp-num">Batches</th><th class="rp-num rp-hide-sm">Added to batch</th><th class="rp-hide-sm">By</th><th></th></tr></thead>
+      <tbody>
+      {% for i in imports %}
+        <tr>
+          <td><div class="rp-date">{{ i.created_at|date:"d M Y" }}</div><div class="rp-time">{{ i.created_at|time:"H:i:s" }}</div></td>
+          <td class="rp-name rp-ref">{{ i.reference }}</td>
+          <td class="rp-hide-sm"><span class="rp-pill {% if i.mode == 'RESTOCK' %}blue{% else %}slate{% endif %}">{{ i.get_mode_display }}</span></td>
+          <td class="rp-num">{{ i.new_batches }}</td>
+          <td class="rp-num rp-hide-sm">{{ i.topped_up }}</td>
+          <td class="rp-hide-sm" style="white-space:nowrap">{{ i.created_by.get_full_name|default:i.created_by.username|default:"-" }}</td>
+          <td class="rp-num rp-actcell"><a class="rp-link" href="{% url 'inventory:restock_history' %}?import={{ i.pk }}">Preview</a><span class="rp-hide-sm"> &nbsp;&middot;&nbsp; </span><a class="rp-link" href="{% url 'inventory:restock_history_export' %}?import={{ i.pk }}">Download</a></td>
+        </tr>
+      {% endfor %}
+      </tbody></table></div>
+  </div>
+  {% endif %}
+
+  <div class="rp-panel">
+    <div class="rp-panel-h"><h2>Restock ledger</h2><span>Newest first &middot; {{ page_obj.paginator.count|intcomma }} entr{{ page_obj.paginator.count|pluralize:"y,ies" }}</span></div>
+    <div class="rp-scroll"><table class="rp-table">
+      <thead><tr>
+        <th>Date &amp; time</th><th>Product</th><th class="rp-hide-sm">Batch</th><th class="rp-hide-sm">Action</th>
+        <th class="rp-num">Qty<span class="rp-hide-sm"> received</span></th><th class="rp-num rp-hide-sm">Cost / unit</th><th class="rp-num">Cost</th>
+        <th class="rp-hide-sm">Source</th>
+      </tr></thead>
+      <tbody>
+      {% for r in page_obj %}
+        <tr>
+          <td><div class="rp-date">{{ r.when|date:"d M Y" }}</div><div class="rp-time">{{ r.when|time:"H:i:s" }}</div>{% if r.by %}<div class="rp-meta rp-hide-sm">{{ r.by }}</div>{% endif %}</td>
+          <td class="rp-prod"><div class="rp-name">{{ r.product }}</div><div class="rp-meta">{% if r.sku %}{{ r.sku }}{% endif %}{% if r.category %}{% if r.sku %} &middot; {% endif %}{{ r.category }}{% endif %}</div>{% if r.action != 'New batch' %}<div class="rp-meta rp-show-sm" style="color:#b45309;font-weight:700">Added to existing batch</div>{% endif %}</td>
+          <td class="rp-hide-sm" style="white-space:nowrap"><div>{{ r.batch_number|default:"-" }}</div>{% if r.expiry %}<div class="rp-meta">Exp {{ r.expiry|date:"d M Y" }}</div>{% endif %}</td>
+          <td class="rp-hide-sm"><span class="rp-pill {% if r.action == 'New batch' %}green{% else %}amber{% endif %}">{{ r.action }}</span></td>
+          <td class="rp-num"><b>{{ r.qty|intcomma }}</b><div class="rp-meta">{{ r.unit }}</div></td>
+          <td class="rp-num rp-hide-sm">{% if r.cost is not None %}{{ r.cost|floatformat:2|intcomma }}{% else %}-{% endif %}{% if r.price is not None %}<div class="rp-meta">Sell {{ r.price|floatformat:2|intcomma }}</div>{% endif %}</td>
+          <td class="rp-num"><b>{% if r.line_cost is not None %}{{ r.line_cost|floatformat:0|intcomma }}{% else %}-{% endif %}</b></td>
+          <td class="rp-hide-sm"><span class="rp-pill {% if r.source == 'Excel upload' %}blue{% else %}slate{% endif %}">{{ r.source }}</span>{% if r.reference %}<div class="rp-meta" style="white-space:nowrap">{{ r.reference }}</div>{% endif %}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="8" style="padding:0"><div class="rp-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>{% if filtered %}No restock entries match these filters.{% else %}No restocks recorded yet. Stock you receive from now on will appear here.{% endif %}</div></td></tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+  </div>
+  {% include "partials/pagination.html" with page_obj=page_obj %}
+  <p class="rp-foot">Times are shown in East Africa Time (Tanzania). Line cost = quantity received &times; cost per unit.</p>
+</div>
+{% endblock %}

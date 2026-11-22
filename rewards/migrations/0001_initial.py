@@ -1,0 +1,8 @@
+from django.conf import settings
+from django.db import migrations, models
+import django.db.models.deletion
+
+class Migration(migrations.Migration):
+    initial = True
+    dependencies = [('pharmacies','__first__'), migrations.swappable_dependency(settings.AUTH_USER_MODEL)]
+    operations = [migrations.CreateModel(name='RewardDecision', fields=[('id',models.BigAutoField(auto_created=True,primary_key=True,serialize=False,verbose_name='ID')),('period',models.CharField(max_length=7,help_text='YYYY-MM')),('rank',models.PositiveSmallIntegerField()),('metric',models.CharField(choices=[('SALES','Net sales'),('PROFIT','Gross profit')],default='SALES',max_length=12)),('metric_value',models.DecimalField(decimal_places=2,default=0,max_digits=14)),('proposed_amount',models.DecimalField(decimal_places=2,default=0,max_digits=12)),('approved_amount',models.DecimalField(blank=True,decimal_places=2,max_digits=12,null=True)),('approved_at',models.DateTimeField(blank=True,null=True)),('created_at',models.DateTimeField(auto_now_add=True)),('approved_by',models.ForeignKey(blank=True,null=True,on_delete=django.db.models.deletion.SET_NULL,related_name='approved_staff_rewards',to=settings.AUTH_USER_MODEL)),('pharmacy',models.ForeignKey(on_delete=django.db.models.deletion.CASCADE,related_name='staff_reward_decisions',to='pharmacies.pharmacy')),('staff',models.ForeignKey(on_delete=django.db.models.deletion.CASCADE,related_name='reward_decisions',to=settings.AUTH_USER_MODEL))],options={'ordering':['-period','rank']}),migrations.AddConstraint(model_name='rewarddecision',constraint=models.UniqueConstraint(fields=('pharmacy','staff','period'),name='uniq_staff_reward_period'))]

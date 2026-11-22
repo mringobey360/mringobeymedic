@@ -1,0 +1,2140 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Sell (POS){% endblock %}
+{% block content %}
+{% csrf_token %}
+<div class="flex flex-wrap gap-2 mb-3"><a class="btn btn-outline-primary btn-sm" href="{% url 'layaway:list' %}">Layaway Management</a><a class="btn btn-primary btn-sm" href="{% url 'layaway:create' %}">+ New Layaway</a></div>
+
+<div id="branch-changed-banner" class="hidden mb-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 flex flex-wrap items-center justify-between gap-3" role="alert">
+    <span class="flex items-start gap-2"><svg class="w-5 h-5 shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4"/><circle cx="12" cy="16.3" r=".6" fill="currentColor"/><path d="M10.3 3.9 2.6 17.5A1.5 1.5 0 0 0 4 19.8h16a1.5 1.5 0 0 0 1.4-2.3L13.7 3.9a1.5 1.5 0 0 0-2.6 0z"/></svg><span><strong>Branch changed.</strong> The active branch is now <strong id="branch-changed-name"></strong>, but this page is for <strong id="branch-page-name"></strong>. Selling is paused so items are not mixed between branches.</span></span>
+    <button type="button" id="branch-reload-btn" class="btn btn-primary btn-sm shrink-0">Reload POS</button>
+</div>
+
+<div id="offline-status-bar" class="hidden mb-4 rounded-lg px-4 py-2.5 text-sm flex items-center justify-between gap-3">
+    <span id="offline-status-text" class="flex items-center gap-2"></span>
+    <button id="sync-now-btn" type="button" class="hidden rounded-md border border-current px-2.5 py-1 text-xs font-semibold hover:bg-black/5 transition">Sync Now</button>
+</div>
+
+<div class="flex items-start justify-between gap-3 mb-4">
+    <div class="min-w-0">
+        <h1 class="page-title flex items-center gap-2"><span class="inline-flex w-9 h-9 rounded-xl bg-brand-50 text-brand-700 items-center justify-center shrink-0"><svg class="icon" aria-hidden="true"><use href="#i-cart"/></svg></span>Sell to Customer</h1>
+        <p class="page-sub">Search a product, add it to the cart, then complete the sale.</p>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_23rem] gap-4 lg:gap-5 items-start">
+    <section class="min-w-0" aria-label="Product search">
+        <div class="card" id="pos-search-card">
+            {% if can_restock %}
+            <style>
+            .pmode{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:0 0 12px}
+            .pmode-seg{display:inline-flex;padding:3px;border-radius:12px;background:#f1f5f9;border:1px solid #e2e8f0}
+            .pmode-btn{border:0;background:transparent;padding:8px 16px;border-radius:9px;font-size:13.5px;font-weight:700;color:#475569;cursor:pointer;min-height:38px}
+            .pmode-btn.is-active{background:#fff;color:#0f172a;box-shadow:0 1px 3px rgba(15,23,42,.15)}
+            .pmode-btn.is-active[data-mode="restock"]{background:#0f766e;color:#fff}
+            .pmode-hint{flex:1 1 220px;font-size:12.5px;color:#64748b}
+            #pos-search-card.is-restock{border-color:#5eead4;box-shadow:0 0 0 2px rgba(20,184,166,.18)}
+            #pos-search-card.is-restock .pmode-hint{color:#0f766e;font-weight:600}
+            </style>
+            <div class="pmode" id="pos-mode" role="group" aria-label="Scan mode">
+                <div class="pmode-seg">
+                    <button type="button" class="pmode-btn is-active" data-mode="sell" aria-pressed="true">Sell</button>
+                    <button type="button" class="pmode-btn" data-mode="restock" aria-pressed="false">Restock</button>
+                </div>
+                <span class="pmode-hint" id="pos-mode-hint">Scanning adds items to the cart.</span>
+            </div>
+            {% endif %}
+            <label for="product-search" class="sr-only">Search product</label>
+            <div class="flex gap-2 items-stretch">
+            <div class="relative flex-1 min-w-0">
+                <span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-ink-400"><svg class="icon" aria-hidden="true"><use href="#i-search"/></svg></span>
+                <input type="text" id="product-search" placeholder="Search by name, or scan barcode&hellip;" class="form-input !pl-10 !pr-10 !py-3" autofocus autocomplete="off" enterkeyhint="search">
+                <button type="button" id="product-search-clear" class="hidden absolute inset-y-0 right-2 my-auto h-7 w-7 items-center justify-center rounded-lg text-ink-400 hover:text-ink-700 hover:bg-ink-100 transition" aria-label="Clear search" title="Clear search"><svg class="icon w-4 h-4" aria-hidden="true"><use href="#i-x"/></svg></button>
+            </div>
+            <button type="button" id="pos-scan-btn" class="btn btn-primary shrink-0 inline-flex items-center gap-2 !px-4" aria-label="Scan barcode with camera" title="Scan barcode with camera">
+                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><path d="M7 8v8M10.5 8v8M14 8v8M17 8v8"/></svg>
+                <span class="hidden sm:inline">Scan</span>
+            </button>
+            </div>
+            <div id="search-results" class="mt-3 space-y-2 max-h-[55vh] lg:max-h-[32rem] overflow-y-auto pr-0.5"></div>
+            <p class="mt-3 text-xs text-ink-400 flex items-center gap-1.5"><svg class="icon w-3.5 h-3.5" aria-hidden="true"><use href="#i-package"/></svg>Tap a product to add it to the cart, or scan its barcode (camera or USB scanner).</p>
+        </div>
+    </section>
+
+    <aside id="cart-panel" class="min-w-0 lg:sticky lg:top-4" aria-label="Cart">
+        <div class="card !p-0 flex flex-col lg:max-h-[calc(100vh-2rem)]">
+            <div class="flex items-center justify-between gap-2 px-4 py-3 border-b border-ink-100 rounded-t-2xl shrink-0">
+                <h2 class="section-title"><svg class="icon" aria-hidden="true"><use href="#i-cart"/></svg>Cart <span id="cart-count-chip" class="chip chip-idle">0 items</span></h2>
+                <button type="button" id="clear-cart-btn" class="hidden inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-ink-500 hover:text-red-600 hover:bg-red-50 transition" title="Remove all items"><svg class="icon w-3.5 h-3.5" aria-hidden="true"><use href="#i-trash"/></svg>Clear all</button>
+            </div>
+
+            <!-- Scrollable item list: only this part scrolls, totals / payment / action stay in reach -->
+            <div id="cart-items" class="flex-1 min-h-[7rem] max-h-72 lg:max-h-none overflow-y-auto overscroll-contain px-3 divide-y divide-ink-100">
+                <div id="cart-empty-msg" class="flex flex-col items-center justify-center text-center py-8 text-ink-400">
+                    <span class="w-12 h-12 rounded-2xl bg-ink-50 flex items-center justify-center mb-2"><svg class="icon w-6 h-6" aria-hidden="true"><use href="#i-cart"/></svg></span>
+                    <p class="text-sm font-medium text-ink-600">Your cart is empty</p>
+                    <p class="text-xs mt-0.5">Search and add products to begin.</p>
+                </div>
+            </div>
+
+            <div class="shrink-0 border-t border-ink-100 bg-ink-50/50 rounded-b-2xl p-3.5 space-y-3">
+                <div class="flex items-baseline justify-between px-0.5">
+                    <span class="text-sm font-semibold text-ink-600">Total</span>
+                    <span id="cart-total" class="text-2xl font-extrabold text-ink-900 tabular-nums">TZS 0</span>
+                </div>
+
+                <section id="pos-customer-card" class="rounded-xl border border-ink-200 bg-white" aria-labelledby="customer-section-title">
+                    <button type="button" id="customer-toggle" class="w-full flex items-center gap-2.5 px-3 py-2.5 text-left" aria-haspopup="dialog" aria-expanded="false" aria-controls="customer-modal">
+                        <span class="w-8 h-8 rounded-lg bg-brand-50 text-brand-700 flex items-center justify-center shrink-0"><svg class="icon w-4 h-4" aria-hidden="true"><use href="#i-user"/></svg></span>
+                        <span class="min-w-0 flex-1 leading-tight">
+                            <span id="customer-section-title" class="block text-[11px] font-bold uppercase tracking-wide text-ink-500">Customer</span>
+                            <span id="customer-summary" class="block text-sm font-semibold text-ink-900 truncate">Walk-in &middot; add for debt or SMS receipt</span>
+                        </span>
+                        <span id="customer-status-chip" class="chip chip-idle shrink-0">Walk-in</span>
+                        <span id="customer-chevron" class="shrink-0 inline-flex items-center gap-1 rounded-lg bg-brand-50 px-2 py-1 text-[11px] font-bold text-brand-700"><svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span id="customer-action-label">Add</span></span>
+                    </button>
+                    <div class="px-3 pb-3 -mt-0.5 empty:hidden">
+                        <div id="debt-deposit-box" class="hidden mt-2 rounded-lg border border-ink-200 bg-ink-50 px-3 py-2">
+                            <p class="text-[11px] font-semibold text-ink-600 mb-1">Part-payment now (optional) &mdash; the rest stays as the customer&rsquo;s debt</p>
+                            <div class="grid grid-cols-2 gap-2">
+                                <input type="number" id="debt-deposit" min="0" step="1" inputmode="decimal" placeholder="Paid now (TZS)" class="form-input !py-2" autocomplete="off">
+                                <select id="debt-deposit-method" class="form-input !py-2"><option value="CASH">Cash (into drawer)</option><option value="MOBILE_MONEY">Mobile money / bank</option></select>
+                            </div>
+                            <p id="debt-split-summary" class="mt-2 text-xs font-semibold text-ink-700"></p>
+                        </div>
+                        <div id="debt-warning" class="hidden mt-2 text-xs bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-3 py-2 flex items-start gap-2"><svg class="w-4 h-4 shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M12 9v4"/><circle cx="12" cy="16.3" r="0.6" fill="currentColor"/><path d="M10.3 3.9L2.6 17.5A1.5 1.5 0 004 19.8h16a1.5 1.5 0 001.4-2.3L13.7 3.9a1.5 1.5 0 00-2.6 0z"/></svg><span id="debt-warning-text"></span></div>
+                    </div>
+                </section>
+
+                <div>
+                    <p id="pay-label" class="flex items-center gap-1.5 text-xs font-semibold text-ink-600 mb-1.5"><svg class="icon w-3.5 h-3.5 text-ink-400" aria-hidden="true"><use href="#i-wallet"/></svg>Payment method</p>
+                    <div id="pay-tiles" class="pay-tiles" role="radiogroup" aria-labelledby="pay-label">
+                        <button type="button" role="radio" aria-checked="true" data-pay="CASH" class="pay-tile"><svg class="icon" aria-hidden="true"><use href="#i-wallet"/></svg><span>Cash</span></button>
+                        <button type="button" role="radio" aria-checked="false" data-pay="MOBILE_MONEY" class="pay-tile"><svg class="icon" aria-hidden="true"><use href="#i-phone"/></svg><span>Mobile Money</span></button>
+                        <button type="button" role="radio" aria-checked="false" data-pay="DEBT" class="pay-tile"><svg class="icon" aria-hidden="true"><use href="#i-book"/></svg><span>Debt / Credit</span></button>
+                        <button type="button" role="radio" aria-checked="false" data-pay="SPLIT" class="pay-tile"><svg class="icon" aria-hidden="true"><use href="#i-wallet"/></svg><span>Cash + Mobile</span></button>
+                    </div>
+                    <div id="split-box" class="hidden mt-2 rounded-lg border border-ink-200 bg-ink-50 px-3 py-2">
+                        <p class="text-[11px] font-semibold text-ink-600 mb-1">Customer pays in two ways</p>
+                        <div class="grid grid-cols-2 gap-2 items-center">
+                            <input type="number" id="split-cash" min="1" step="1" inputmode="decimal" placeholder="Cash (TZS)" class="form-input !py-2" autocomplete="off">
+                            <p class="text-xs text-ink-600">Mobile money: <strong id="split-mobile">TZS 0</strong></p>
+                        </div>
+                        <p id="split-error" class="hidden text-xs text-red-600 mt-1"></p>
+                    </div>
+                    <div class="custom-select" id="payment-method-select" hidden style="display:none">
+                        <select id="payment-method" class="custom-select-native" aria-hidden="true" tabindex="-1">
+                            <option value="CASH">Cash</option>
+                            <option value="MOBILE_MONEY">Mobile Money</option>
+                            <option value="DEBT">Debt / Credit</option>
+                            <option value="SPLIT">Cash + Mobile Money</option>
+                        </select>
+                        <button type="button" class="custom-select-trigger" aria-haspopup="listbox" aria-expanded="false" aria-controls="payment-method-menu">
+                            <span id="payment-method-label">Cash</span>
+                            <svg class="custom-select-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                        </button>
+                        <div id="payment-method-menu" class="custom-select-menu" role="listbox" aria-label="Payment Method">
+                            <button type="button" class="custom-option selected" data-value="CASH" role="option" aria-selected="true">
+                                <span>Cash</span><svg class="custom-option-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>
+                            </button>
+                            <button type="button" class="custom-option" data-value="MOBILE_MONEY" role="option" aria-selected="false">
+                                <span>Mobile Money</span><svg class="custom-option-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>
+                            </button>
+                            <button type="button" class="custom-option" data-value="DEBT" role="option" aria-selected="false">
+                                <span>Debt / Credit</span><svg class="custom-option-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>
+                            </button>
+                            <button type="button" class="custom-option" data-value="SPLIT" role="option" aria-selected="false">
+                                <span>Cash + Mobile Money</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                {% if late_entry_dates %}
+                <details id="late-entry-panel" class="group rounded-xl border border-brand-200 bg-brand-50/70 text-sm">
+                    <summary class="flex cursor-pointer list-none items-center gap-2 px-3 py-2.5 font-semibold text-brand-900">
+                        <svg class="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
+                        <span class="min-w-0 flex-1">Record for an earlier day</span>
+                        <svg class="h-4 w-4 shrink-0 transition-transform group-open:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                    </summary>
+                    <div class="space-y-3 border-t border-brand-100 px-3 pb-3 pt-3">
+                        <p class="text-xs leading-5 text-brand-800">For a sale that was not recorded on the day. It is counted on the date you choose and marked as a late entry for the owner.</p>
+                        <label class="flex min-h-[2.75rem] cursor-pointer items-center gap-2.5 rounded-lg bg-white px-3 py-2 text-sm font-medium text-ink-900 ring-1 ring-brand-100">
+                            <input id="late-entry-enabled" type="checkbox" class="h-4 w-4 accent-brand-600">
+                            <span>Use an earlier date for this sale</span>
+                        </label>
+                        <div id="late-entry-fields" class="hidden grid-cols-1 gap-3 sm:grid-cols-2">
+                            <div class="min-w-0">
+                                <label for="late-entry-date" class="block text-xs font-semibold text-ink-900">Sale date</label>
+                                <select id="late-entry-date" class="form-input mt-1 w-full !bg-white">
+                                    {% for d in late_entry_dates %}<option value="{{ d|date:'Y-m-d' }}">{{ d|date:"D, d M Y" }}{% if forloop.first %} (yesterday){% endif %}</option>{% endfor %}
+                                </select>
+                            </div>
+                            <div class="min-w-0">
+                                <label for="late-entry-reason" class="block text-xs font-semibold text-ink-900">Reason</label>
+                                <select id="late-entry-reason" class="form-input mt-1 w-full !bg-white">
+                                    <option value="">Choose a reason…</option>
+                                    {% for value, label in late_entry_reasons %}{% if value != 'OTHER' %}<option value="{{ value }}">{{ label }}</option>{% endif %}{% endfor %}
+                                </select>
+                            </div>
+                            <p class="text-[11px] leading-snug text-brand-800 sm:col-span-2">Stock is reduced now. A cash sale goes into that day&rsquo;s drawer and is blocked if the day is already closed.</p>
+                        </div>
+                    </div>
+                </details>
+                {% endif %}
+                {% if can_override_layaway %}
+                <details id="layaway-override-panel" class="hidden rounded-xl border border-amber-200 bg-amber-50/70 p-3 text-sm">
+                    <summary class="cursor-pointer font-semibold text-amber-900">Manager: sell against an unpaid Layaway reservation</summary>
+                    <p class="mt-2 text-xs leading-relaxed text-amber-800">Use only when necessary. This releases affected unpaid Layaway reservations and flags those plans for customer resolution. Fully-paid Layaway plans cannot be overridden.</p>
+                    <label class="mt-2 flex items-start gap-2 text-xs font-medium text-amber-950"><input id="allow-layaway-reserved-sale" type="checkbox" class="mt-0.5"> I approve releasing the affected unpaid reservation(s).</label>
+                    <label for="layaway-override-reason" class="block mt-2 text-xs font-semibold text-amber-950">Reason for approval</label>
+                    <textarea id="layaway-override-reason" rows="2" maxlength="500" class="form-input mt-1 !bg-white" placeholder="e.g. Customer contacted and agreed to restock tomorrow"></textarea>
+                </details>
+                {% endif %}
+                <button id="checkout-btn" type="button" class="btn btn-primary btn-lg w-full"><svg class="icon btn-icon" aria-hidden="true"><use href="#i-check-circle"/></svg><span class="btn-label">Complete Sale</span></button>
+                <p class="text-[11px] text-ink-400 text-center flex items-center justify-center gap-1.5"><svg class="icon w-3.5 h-3.5" aria-hidden="true"><use href="#i-cloud"/></svg>Works offline &mdash; sales sync automatically when you&rsquo;re back online.</p>
+            </div>
+        </div>
+    </aside>
+</div>
+
+<style>
+#cart-panel .pay-tile{min-height:3.1rem;flex-direction:row;gap:.4rem;padding:.45rem .3rem}
+@media (max-width:420px){#cart-panel .pay-tile{flex-direction:column;min-height:3.6rem}}
+.cust-opt.is-active,.cust-opt:hover{background:#f0fdfa}
+.qty-btn{width:2rem;height:2rem;display:flex;align-items:center;justify-content:center;color:#475569;font-size:1.05rem;font-weight:700;line-height:1;transition:background-color .15s,color .15s}
+.qty-btn:hover:not(:disabled){background:#f1f5f9;color:#0f172a}
+.qty-btn:disabled{opacity:.35;cursor:not-allowed}
+.cart-qty-input::-webkit-outer-spin-button,.cart-qty-input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.cart-qty-input{-moz-appearance:textfield}
+</style>
+<style>#pos-mobile-bar{display:none}@media (max-width:1023px){#pos-mobile-bar:not([hidden]){display:flex}#pos-mobile-bar.is-away{display:none!important}#cart-panel{scroll-margin-top:calc(var(--sp-header-h,4rem) + .5rem)}}</style>
+<!-- Mobile summary bar: total always in reach, one tap to the cart -->
+<div id="pos-mobile-bar" class="fixed inset-x-0 bottom-0 z-40 border-t border-ink-200 bg-white/95 backdrop-blur px-4 py-2.5 items-center justify-between gap-3" style="padding-bottom:calc(.625rem + env(safe-area-inset-bottom,0px))" hidden>
+    <div class="min-w-0 leading-tight"><p class="text-[11px] text-ink-500"><span id="pos-bar-count">0 items</span></p><p id="pos-bar-total" class="text-base font-extrabold text-ink-900 tabular-nums truncate">TZS 0</p></div>
+    <button type="button" id="pos-bar-go" class="btn btn-primary btn-sm shrink-0" data-icon="arrow-right">Review &amp; pay</button>
+</div>
+
+<!-- Customer details pop-up: keeps the cart short. All field ids are unchanged. -->
+<style>
+#customer-modal{position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;padding:1rem;background:rgba(15,23,42,.5);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}
+#customer-modal.is-open{display:flex}
+.cm-card{width:min(100%,28rem);max-height:min(92dvh,40rem);display:flex;flex-direction:column;background:#fff;border-radius:1.25rem;box-shadow:0 30px 80px -20px rgba(15,23,42,.45);overflow:hidden;animation:cmIn .22s cubic-bezier(.2,.9,.3,1.15) both}
+@keyframes cmIn{from{opacity:0;transform:translateY(12px) scale(.97)}to{opacity:1;transform:none}}
+.cm-head{display:flex;align-items:flex-start;gap:.75rem;padding:1.1rem 1.25rem .6rem}
+.cm-ico{flex:none;width:2.5rem;height:2.5rem;border-radius:.75rem;background:#ecfdf5;color:#0f766e;display:grid;place-items:center}
+.cm-title{font-size:1.05rem;font-weight:800;color:#172033;line-height:1.25}
+.cm-sub{font-size:.75rem;color:#64748b;margin-top:.15rem}
+.cm-x{margin-left:auto;flex:none;width:2.1rem;height:2.1rem;border-radius:999px;border:0;background:transparent;color:#64748b;cursor:pointer;display:grid;place-items:center}
+.cm-x:hover{background:#f1f5f9;color:#172033}
+.cm-body{padding:.5rem 1.25rem 1rem;overflow-y:auto}
+.cm-label{display:block;font-size:.6875rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#64748b;margin-bottom:.3rem}
+.cm-or{display:flex;align-items:center;gap:.6rem;margin:.9rem 0 .7rem;font-size:.6875rem;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.08em}
+.cm-or::before,.cm-or::after{content:"";flex:1;height:1px;background:#e2e8f0}
+.cm-foot{display:flex;align-items:center;gap:.5rem;padding:.8rem 1.25rem 1rem;border-top:1px solid #e2e8f0;background:#f8fafc}
+.cm-err{font-size:.75rem;color:#b91c1c;margin-top:.5rem}
+#customer-modal .form-input:focus-visible,.cm-x:focus-visible{outline:3px solid rgba(13,148,136,.35);outline-offset:1px}
+@media (max-width:480px){.cm-card{max-height:88dvh}.cm-foot{padding-bottom:calc(1rem + env(safe-area-inset-bottom,0px))}}
+@media (prefers-reduced-motion:reduce){.cm-card{animation:none}}
+</style>
+<div id="customer-modal" role="dialog" aria-modal="true" aria-labelledby="customer-modal-title" aria-hidden="true">
+    <div class="cm-card" id="customer-modal-card" tabindex="-1">
+        <div class="cm-head">
+            <span class="cm-ico" aria-hidden="true"><svg class="icon w-5 h-5"><use href="#i-user"/></svg></span>
+            <div class="min-w-0">
+                <h2 id="customer-modal-title" class="cm-title">Customer details</h2>
+                <p class="cm-sub">Needed for Debt / Credit. Optional for an SMS receipt.</p>
+            </div>
+            <button type="button" class="cm-x" id="customer-modal-x" aria-label="Close customer details"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+        </div>
+        <div class="cm-body" id="customer-body">
+            <label for="customer-lookup" class="cm-label">Find registered customer</label>
+            <div class="relative">
+                <span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-ink-400"><svg class="icon w-4 h-4" aria-hidden="true"><use href="#i-search"/></svg></span>
+                <input type="search" id="customer-lookup" placeholder="Search by name or phone" class="form-input !pl-9" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="customer-suggestions">
+            </div>
+            <div id="customer-suggestions" role="listbox" class="hidden mt-1.5 max-h-48 overflow-y-auto rounded-xl border border-ink-200 bg-white shadow-sm"></div>
+
+            <div class="cm-or">or enter details</div>
+
+            <div class="grid grid-cols-1 gap-3">
+                <div>
+                    <label for="customer-name" class="cm-label">Customer name</label>
+                    <input type="text" id="customer-name" placeholder="e.g. Asha Juma" class="form-input" autocomplete="off">
+                </div>
+                <div>
+                    <label for="customer-phone" class="cm-label">Phone number</label>
+                    <input type="tel" id="customer-phone" placeholder="0712345678" class="form-input" inputmode="tel" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="customer-phone-suggestions">
+                    <p id="customer-phone-error" class="hidden text-xs text-red-600 mt-1"></p>
+                    <div id="customer-phone-suggestions" role="listbox" class="hidden mt-1.5 max-h-48 overflow-y-auto rounded-xl border border-ink-200 bg-white shadow-sm"></div>
+                </div>
+            </div>
+            <p id="customer-help" class="text-[11px] text-ink-400 mt-2">Type a phone number (0712&hellip;, 6&hellip;, +255&hellip;) &mdash; registered customers fill in automatically.</p>
+            <p id="customer-modal-error" class="cm-err hidden" role="alert"></p>
+        </div>
+        <div class="cm-foot">
+            <button type="button" id="clear-customer-btn" class="hidden btn btn-secondary !py-2 text-sm">Clear</button>
+            <button type="button" id="customer-modal-done" class="btn btn-primary !py-2.5 ml-auto flex-1 sm:flex-none sm:min-w-[8rem]">Done</button>
+        </div>
+    </div>
+</div>
+
+<!-- Receipt choice modal (V117.12 professional sale-complete card): the sale is already completed; closing/continuing clears the sold cart and returns to POS. -->
+<style>
+#receipt-choice-modal{background:rgba(15,23,42,.5)}
+.rcp{position:relative;width:100%;max-width:21.5rem;max-height:calc(100dvh - 1.5rem);display:flex;flex-direction:column;background:#fff;border-radius:1rem;box-shadow:0 24px 48px -16px rgba(15,23,42,.45),0 0 0 1px rgba(15,23,42,.06);overflow:hidden;contain:layout paint;animation:rcpIn .22s cubic-bezier(.2,.9,.3,1) both}
+.rcp-head{position:relative;display:flex;align-items:center;gap:.8rem;padding:.9rem 2.9rem .9rem 1rem;color:#fff;background:linear-gradient(135deg,#0f9488 0%,#0f766e 60%,#0d625c 100%)}
+.rcp-x{border:0;cursor:pointer;position:absolute;top:.55rem;right:.55rem;width:1.85rem;height:1.85rem;border-radius:.55rem;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.85);background:rgba(255,255,255,.12);transition:background .15s}
+.rcp-x:hover,.rcp-x:focus-visible{background:rgba(255,255,255,.25);color:#fff;outline:none}
+.rcp-tick{flex:none;width:2.5rem;height:2.5rem;border-radius:50%;background:#fff;color:#0f766e;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 4px rgba(255,255,255,.2);animation:rcpPop .35s cubic-bezier(.3,1.5,.5,1) both}
+.rcp-tick path{stroke-dasharray:26;stroke-dashoffset:26;animation:rcpDraw .3s ease-out .12s forwards}
+.rcp-hd{min-width:0;line-height:1.2}
+.rcp-status{margin:0;font-size:.625rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.8)}
+.rcp-amount{margin:.1rem 0 0;font-size:1.5rem;line-height:1.15;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.rcp-amount small{font-size:.75rem;font-weight:700;letter-spacing:.04em;margin-right:.3rem;opacity:.8}
+.rcp-pay{display:inline-flex;align-items:center;gap:.3rem;margin-top:.3rem;padding:.1rem .55rem;border-radius:999px;font-size:.6875rem;font-weight:700;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.26)}
+.rcp-pay i{width:.4rem;height:.4rem;border-radius:50%;background:#5eead4;display:inline-block}
+.rcp-pay.is-debt i{background:#fcd34d}
+.rcp-body{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:.35rem 1rem}
+.rcp-list{margin:0;padding:0}
+.rcp-row{display:flex;align-items:center;justify-content:space-between;gap:.75rem;padding:.45rem 0;border-bottom:1px solid #f1f5f9}
+.rcp-row:last-child{border-bottom:0}
+.rcp-row dt{font-size:.75rem;font-weight:500;color:#64748b;white-space:nowrap}
+.rcp-row dd{margin:0;min-width:0;text-align:right;font-size:.8125rem;font-weight:600;color:#0f172a;font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rcp-row.is-due dd{color:#b45309}.rcp-row.is-paid dd{color:#047857}
+.rcp-copy{border:0;cursor:pointer;display:inline-flex;align-items:center;gap:.3rem;max-width:100%;padding:.1rem .4rem;border-radius:.4rem;background:#f1f5f9;color:#0f172a;font:inherit;font-weight:600;transition:background .15s,color .15s}
+.rcp-copy:hover,.rcp-copy:focus-visible{background:#ccfbf1;color:#0f766e;outline:none}
+.rcp-copy svg{width:.75rem;height:.75rem;flex:none}
+.rcp-copy.is-done{background:#d1fae5;color:#047857}
+.rcp-foot{flex:none;display:grid;grid-template-columns:1fr auto;gap:.5rem;padding:.65rem 1rem .9rem;border-top:1px solid #f1f5f9}
+.rcp-b{border:0;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:.4rem;min-height:2.5rem;padding:0 .9rem;border-radius:.65rem;font-size:.8125rem;font-weight:700;line-height:1;transition:background .15s,color .15s,box-shadow .15s}
+.rcp-b svg{width:1rem;height:1rem;flex:none}
+.rcp-b:focus-visible{outline:2px solid #14b8a6;outline-offset:2px}
+.rcp-b--pri{color:#fff;background:#0f766e;box-shadow:0 1px 2px rgba(15,118,110,.3)}
+.rcp-b--pri:hover{background:#0d625c}
+.rcp-b--sec{color:#0f766e;background:#f0fdfa;border:1px solid #99f6e4;grid-column:1/-1;justify-content:flex-start}
+.rcp-b--sec:hover:not(:disabled){background:#ccfbf1}
+.rcp-b--sec:disabled{cursor:default}
+.rcp-b--ghost{color:#334155;background:#f1f5f9}
+.rcp-b--ghost:hover{background:#e2e8f0;color:#0f172a}
+.rcp-b kbd{font:inherit;font-size:.625rem;font-weight:700;padding:.05rem .3rem;border-radius:.3rem;background:#fff;border:1px solid #cbd5e1;color:#64748b}
+@keyframes rcpIn{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:none}}
+@keyframes rcpPop{from{transform:scale(.5);opacity:0}to{transform:scale(1);opacity:1}}
+@keyframes rcpDraw{to{stroke-dashoffset:0}}
+@keyframes rcpUp{from{transform:translateY(100%)}to{transform:none}}
+@media (max-width:480px){#receipt-choice-modal{align-items:flex-end!important;padding:0!important}.rcp{max-width:none;border-radius:1rem 1rem 0 0;max-height:90dvh;animation:rcpUp .22s ease-out both}.rcp-foot{padding-bottom:calc(.9rem + env(safe-area-inset-bottom,0px))}.rcp-b kbd{display:none}}
+@media (hover:none){.rcp-b kbd{display:none}}
+@media (prefers-reduced-motion:reduce){.rcp,.rcp-tick,.rcp-tick path{animation:none!important}.rcp-tick path{stroke-dashoffset:0}}
+</style>
+<div id="receipt-choice-modal" class="sp-modal-fit hidden fixed inset-0 z-50 items-center justify-center px-4" role="dialog" aria-modal="true" aria-labelledby="receipt-choice-title" aria-describedby="receipt-choice-message">
+    <div class="rcp">
+        <div class="rcp-head">
+            <div class="rcp-tick" aria-hidden="true">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>
+            </div>
+            <div class="rcp-hd">
+                <h2 id="receipt-choice-title" class="rcp-status">Sale completed</h2>
+                <p class="rcp-amount"><small>TZS</small><span id="receipt-choice-total">0</span></p>
+                <span id="receipt-choice-method" class="rcp-pay"><i></i><span>Cash</span></span>
+            </div>
+            <button id="receipt-choice-close" type="button" class="rcp-x" aria-label="Close">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+            </button>
+        </div>
+        <div class="rcp-body">
+            <dl class="rcp-list">
+                <div class="rcp-row"><dt>Receipt no.</dt><dd><button id="receipt-choice-copy" type="button" class="rcp-copy" title="Copy receipt number" aria-label="Copy receipt number"><span id="receipt-choice-no"></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg></button></dd></div>
+                <div class="rcp-row"><dt>Date &amp; time</dt><dd id="receipt-choice-time"></dd></div>
+                <div class="rcp-row"><dt id="receipt-choice-cust-label">Customer</dt><dd id="receipt-choice-cust"></dd></div>
+                <div class="rcp-row"><dt>Items</dt><dd id="receipt-choice-items"></dd></div>
+                <div id="receipt-choice-extra" style="display:contents"></div>
+            </dl>
+            <p id="receipt-choice-message" class="sr-only"></p>
+        </div>
+        <div class="rcp-foot">
+            <button id="receipt-send-sms-btn" type="button" class="rcp-b rcp-b--sec" style="display:none">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H7l-3 3V5z"/><path d="m8 9 4 3 4-3"/></svg>
+                <span class="min-w-0 text-left leading-tight"><span class="sms-label block">Send Receipt SMS</span><span class="sms-sub block text-[11px] font-normal text-ink-400 truncate"></span></span>
+            </button>
+            <button id="receipt-print-btn" type="button" class="rcp-b rcp-b--pri">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v7H6z"/></svg>
+                Print / View Receipt
+            </button>
+            <button id="receipt-continue-btn" type="button" class="rcp-b rcp-b--ghost">New sale <kbd aria-hidden="true">Esc</kbd></button>
+        </div>
+    </div>
+</div>
+
+<!-- Professional confirmation popup (same .spx-modal look as the rest of SmartPOS). Replaces the browser confirm() on "Clear all". -->
+<div class="spx-modal" id="pos-confirm-modal" role="alertdialog" aria-modal="true" aria-labelledby="pos-confirm-title" aria-describedby="pos-confirm-text" hidden>
+    <div class="spx-modal-card spx-modal-card--sm">
+        <div class="spx-modal-head">
+            <span class="spx-modal-ico spx-modal-ico--danger" id="pos-confirm-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg></span>
+            <div><h2 id="pos-confirm-title">Clear the cart?</h2><p id="pos-confirm-text"></p></div>
+            <button type="button" class="spx-modal-x" data-pos-confirm-cancel aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+        </div>
+        <div class="spx-modal-body"><p id="pos-confirm-detail" style="margin:0;padding:.65rem .8rem;border-radius:.65rem;background:#f8fafc;border:1px solid #eef2f7;font-size:.8125rem;color:#475569;line-height:1.45"></p></div>
+        <div class="spx-modal-foot">
+            <button type="button" class="spx-btn spx-btn--ghost" id="pos-confirm-cancel" data-pos-confirm-cancel>Keep items</button>
+            <button type="button" class="spx-btn spx-btn--danger" id="pos-confirm-ok">Yes, clear cart</button>
+        </div>
+    </div>
+</div>
+
+<!-- Loss warning: shown before a sale that would be recorded below purchase cost. Filled by posLossWarning(). -->
+<div class="spx-modal" id="pos-loss-modal" role="alertdialog" aria-modal="true" aria-labelledby="pos-loss-title" aria-describedby="pos-loss-text" hidden>
+    <div class="spx-modal-card spx-modal-card--sm">
+        <div class="spx-modal-head">
+            <span class="spx-modal-ico spx-modal-ico--danger"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg></span>
+            <div><h2 id="pos-loss-title">Review before you sell</h2><p id="pos-loss-text"></p></div>
+            <button type="button" class="spx-modal-x" data-pos-loss-cancel aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+        </div>
+        <div class="spx-modal-body" style="max-height:60vh;overflow:auto">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:.75rem;padding:.7rem .85rem;border-radius:.75rem;background:#fef2f2;border:1px solid #fecaca">
+                <span style="font-size:.75rem;font-weight:600;color:#991b1b;text-transform:uppercase;letter-spacing:.04em">Estimated loss on this sale</span>
+                <span id="pos-loss-amount" style="font-size:1.15rem;font-weight:800;color:#b91c1c;font-variant-numeric:tabular-nums"></span>
+            </div>
+            <div style="margin-top:.9rem;font-size:.75rem;font-weight:700;color:#334155;text-transform:uppercase;letter-spacing:.04em">Items priced below cost</div>
+            <ul id="pos-loss-items" style="list-style:none;margin:.4rem 0 0;padding:0;border:1px solid #e2e8f0;border-radius:.75rem;overflow:hidden"></ul>
+            <div style="margin-top:.9rem;font-size:.75rem;font-weight:700;color:#334155;text-transform:uppercase;letter-spacing:.04em">Recommended next steps</div>
+            <ol style="margin:.4rem 0 0;padding-left:1.15rem;font-size:.8125rem;line-height:1.5;color:#475569">
+                <li>Tap <strong>Go back and review</strong>, then remove the item or ask your manager to correct its selling price in Inventory.</li>
+                <li>Continue only with approval, for example a planned clearance of short-dated or damaged stock.</li>
+                <li>If you continue, the loss is recorded and will appear in your reports.</li>
+            </ol>
+        </div>
+        <div class="spx-modal-foot">
+            <button type="button" class="spx-btn spx-btn--ghost" id="pos-loss-ok" style="color:#b91c1c">Sell anyway</button>
+            <button type="button" class="spx-btn spx-btn--primary" id="pos-loss-cancel" data-pos-loss-cancel>Go back and review</button>
+        </div>
+    </div>
+</div>
+
+<!-- Professional Receipt SMS confirmation modal: avoids browser-native confirm() dialogs. -->
+<div id="receipt-sms-confirm-modal" class="sp-modal-fit hidden fixed inset-0 z-[60] items-center justify-center bg-slate-900/60 px-4" role="dialog" aria-modal="true" aria-labelledby="receipt-sms-confirm-title">
+    <div class="w-full max-w-sm rounded-2xl bg-white shadow-2xl border border-ink-100 p-5">
+        <div class="flex items-start gap-3">
+            <div class="w-10 h-10 rounded-xl bg-brand-50 text-brand-700 flex items-center justify-center shrink-0">
+                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H7l-3 3V5z"/><path d="m8 9 4 3 4-3"/></svg>
+            </div>
+            <div class="min-w-0">
+                <h2 id="receipt-sms-confirm-title" class="font-semibold text-lg">Send receipt by SMS?</h2>
+                <p class="text-sm text-ink-500 mt-1">The customer will receive a secure link to download the PDF receipt.</p>
+            </div>
+            <button id="receipt-sms-confirm-close" type="button" class="ml-auto text-ink-400 hover:text-ink-700" aria-label="Cancel">
+                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+            </button>
+        </div>
+        <div class="mt-4 rounded-xl bg-amber-50 border border-amber-200 px-4 py-3">
+            <p class="text-sm font-semibold text-amber-900">1 Premium Receipt SMS credit will be used.</p>
+            <p class="text-xs text-amber-800 mt-1">Only continue if the customer has requested the receipt by SMS.</p>
+        </div>
+        <div class="mt-5 grid grid-cols-2 gap-2">
+            <button id="receipt-sms-cancel-btn" type="button" class="btn btn-secondary w-full">Cancel</button>
+            <button id="receipt-sms-confirm-btn" type="button" class="btn btn-primary w-full">Confirm &amp; Send</button>
+        </div>
+    </div>
+</div>
+
+<template id="search-result-template">
+    <button type="button" class="result-item w-full text-left p-3 rounded-xl border border-ink-100 bg-white hover:bg-brand-50 hover:border-brand-200 active:scale-[.995] transition flex justify-between items-center gap-3">
+        <span class="result-thumb shrink-0 w-12 h-12 rounded-lg border border-ink-100 bg-ink-50 overflow-hidden grid place-items-center text-ink-300" style="display:none"><img alt="" class="result-img w-full h-full object-contain" loading="lazy" decoding="async"></span>
+        <div class="min-w-0 flex-1">
+            <p class="font-semibold text-sm text-ink-900 result-name truncate"></p>
+            <p class="text-xs text-ink-500 mt-0.5"><span class="result-stock font-medium text-ink-700"></span> in stock &middot; <span class="result-unit"></span></p><p class="text-[10px] text-ink-400 result-barcode"></p>
+            <p class="text-xs expiry-warning hidden"></p>
+            <p class="result-layaway hidden mt-1 inline-flex items-center gap-1 rounded-md bg-amber-50 border border-amber-200 px-1.5 py-0.5 text-[11px] font-semibold text-amber-800"></p>
+        </div>
+        <div class="shrink-0 flex items-center gap-2"><span class="font-bold text-sm text-brand-800 result-price tabular-nums"></span><span class="w-7 h-7 rounded-lg bg-brand-50 text-brand-700 flex items-center justify-center"><svg class="icon w-4 h-4" aria-hidden="true"><use href="#i-plus"/></svg></span></div>
+    </button>
+</template>
+
+<template id="cart-item-template">
+    <div class="cart-row py-2.5">
+        <div class="flex items-start gap-2">
+            <div class="min-w-0 flex-1">
+                <p class="font-semibold text-sm text-ink-900 leading-snug cart-name break-words"></p>
+                <p class="text-[11px] text-ink-500 mt-0.5 cart-price-wrap"><span class="cart-price"></span></p>
+            </div>
+            <span class="font-bold text-sm text-ink-900 cart-subtotal tabular-nums whitespace-nowrap pt-px"></span>
+        </div>
+        <div class="mt-1.5 flex items-center justify-between gap-2">
+            <div class="inline-flex items-center rounded-lg border border-ink-200 bg-white overflow-hidden">
+                <button type="button" class="qty-btn cart-qty-dec" aria-label="Decrease quantity">&minus;</button>
+                <input type="number" min="1" inputmode="numeric" aria-label="Quantity" class="cart-qty-input w-11 h-8 border-x border-ink-200 bg-white px-1 text-sm text-center font-semibold text-ink-900 focus:outline-none focus:bg-brand-50">
+                <button type="button" class="qty-btn cart-qty-inc" aria-label="Increase quantity">+</button>
+            </div>
+            <div class="flex items-center gap-1">
+                <button type="button" class="cart-discount-toggle hidden rounded-lg px-2 py-1 text-[11px] font-semibold text-brand-700 hover:bg-brand-50 transition">Discount</button>
+                <button type="button" class="cart-remove-btn shrink-0 w-7 h-7 rounded-lg flex items-center justify-center text-ink-400 hover:text-red-600 hover:bg-red-50 transition" aria-label="Remove item" title="Remove"><svg class="icon w-4 h-4" aria-hidden="true"><use href="#i-trash"/></svg></button>
+            </div>
+        </div>
+        <div class="cart-discount-wrap hidden mt-2 rounded-lg bg-ink-50 px-2.5 py-2"><label class="text-[11px] font-medium text-ink-600 flex flex-wrap items-center gap-1.5"><span class="cart-discount-label">Discount %</span> <input type="number" min="0" step="0.01" class="cart-discount-input w-20 rounded-lg border border-ink-200 bg-white px-2 py-1 text-sm" inputmode="decimal"></label><span class="cart-discount-help block text-[10px] text-ink-400 mt-1"></span></div>
+    </div>
+</template>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'js/pm-scanner.js' %}?v=2"></script>
+{% if can_restock %}
+<script src="{% static 'js/pm-inline-add.js' %}?v=2"></script>
+<script src="{% static 'js/pm-quick-stock.js' %}?v=6"></script>
+{% endif %}
+<script src="{% static 'js/offline-pos.js' %}?v=4"></script>
+<script>
+const CATALOG_URL = `{% url 'sales:offline_catalog_api' %}`;
+const SYNC_URL = `{% url 'sales:sync_offline_sales' %}`;
+const SESSION_STATUS_URL = `{% url 'sales:pos_session_status' %}`;
+const BARCODE_LOOKUP_URL = `{% url 'sales:barcode_lookup_api' %}`;
+const CAN_RESTOCK = {{ can_restock|yesno:"true,false" }};
+{% if can_restock %}const RESTOCK_CFG = { resolveUrl: `{% url 'inventory:scan_resolve' %}`, registerUrl: `{% url 'inventory:scan_register' %}`, restockUrl: `{% url 'inventory:scan_restock' 0 %}`, listUrl: `{% url 'inventory:product_list' %}`, stay: true };{% else %}const RESTOCK_CFG = null;{% endif %}
+let posMode = 'sell';
+const CUSTOMER_SEARCH_URL = `{% url 'sales:customer_search_api' %}`;
+const POS_BRANCH_ID = Number('{{ request.pharmacy.id|default:0 }}') || 0;
+const POS_BRANCH_NAME = `{{ request.pharmacy.name|default:''|escapejs }}`;
+window.POS_BRANCH_ID = POS_BRANCH_ID;
+let posBranchMismatch = false;
+const POS_SCOPE_KEY = `user-${Number('{{ request.user.id }}') || 0}-branch-${Number('{{ request.pharmacy.id|default:0 }}') || 0}`;
+// Every unfinished POS sale is private to the authenticated cashier account + active branch.
+// This prevents a cart from following a different account after logout/login or branch switching.
+const POS_DRAFT_KEY = `pharmacy-manager-pos-draft-v2:${POS_SCOPE_KEY}`;
+
+// Configure the offline database before any catalog/queue operation. The database itself
+// is scoped to the authenticated account and active branch, so pending offline sales and
+// cached products cannot leak between accounts or branches on the same browser/device.
+OfflinePOS.configureScope(POS_SCOPE_KEY);
+
+const searchInput = document.getElementById('product-search');
+const searchResults = document.getElementById('search-results');
+const searchTemplate = document.getElementById('search-result-template');
+const cartItemsEl = document.getElementById('cart-items');
+const cartEmptyMsg = document.getElementById('cart-empty-msg');
+const cartTotalEl = document.getElementById('cart-total');
+const cartTemplate = document.getElementById('cart-item-template');
+const paymentMethodEl = document.getElementById('payment-method');
+const paymentMethodSelect = document.getElementById('payment-method-select');
+const paymentMethodTrigger = paymentMethodSelect.querySelector('.custom-select-trigger');
+const paymentMethodLabel = document.getElementById('payment-method-label');
+const paymentMethodMenu = document.getElementById('payment-method-menu');
+const paymentMethodOptions = Array.from(paymentMethodMenu.querySelectorAll('.custom-option'));
+
+function closePaymentMethodDropdown() {
+    paymentMethodSelect.classList.remove('open');
+    paymentMethodTrigger.setAttribute('aria-expanded', 'false');
+}
+
+function openPaymentMethodDropdown() {
+    paymentMethodSelect.classList.add('open');
+    paymentMethodTrigger.setAttribute('aria-expanded', 'true');
+}
+
+paymentMethodTrigger.addEventListener('click', function () {
+    if (paymentMethodSelect.classList.contains('open')) closePaymentMethodDropdown();
+    else openPaymentMethodDropdown();
+});
+
+paymentMethodOptions.forEach(function (option) {
+    option.addEventListener('click', function () {
+        const value = this.dataset.value;
+        paymentMethodEl.value = value;
+        paymentMethodLabel.textContent = this.querySelector('span').textContent;
+        paymentMethodOptions.forEach(function (item) {
+            const selected = item === option;
+            item.classList.toggle('selected', selected);
+            item.setAttribute('aria-selected', selected ? 'true' : 'false');
+        });
+        paymentMethodEl.dispatchEvent(new Event('change', { bubbles: true }));
+        closePaymentMethodDropdown();
+        paymentMethodTrigger.focus();
+    });
+});
+
+document.addEventListener('click', function (event) {
+    if (!paymentMethodSelect.contains(event.target)) closePaymentMethodDropdown();
+});
+
+document.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape') closePaymentMethodDropdown();
+});
+
+const customerFields = document.getElementById('customer-modal');
+const customerLookupEl = document.getElementById('customer-lookup');
+const customerSuggestionsEl = document.getElementById('customer-suggestions');
+const customerStatusChipEl = document.getElementById('customer-status-chip');
+const customerHelpEl = document.getElementById('customer-help');
+const clearCustomerBtn = document.getElementById('clear-customer-btn');
+const checkoutBtn = document.getElementById('checkout-btn');
+const CHECKOUT_HTML = checkoutBtn.innerHTML;
+const receiptChoiceModal = document.getElementById('receipt-choice-modal');
+const receiptChoiceMessage = document.getElementById('receipt-choice-message');
+const receiptPrintBtn = document.getElementById('receipt-print-btn');
+const receiptSendSmsBtn = document.getElementById('receipt-send-sms-btn');
+const receiptContinueBtn = document.getElementById('receipt-continue-btn');
+const receiptChoiceClose = document.getElementById('receipt-choice-close');
+const receiptSmsConfirmModal = document.getElementById('receipt-sms-confirm-modal');
+const receiptSmsConfirmClose = document.getElementById('receipt-sms-confirm-close');
+const receiptSmsCancelBtn = document.getElementById('receipt-sms-cancel-btn');
+const receiptSmsConfirmBtn = document.getElementById('receipt-sms-confirm-btn');
+const statusBar = document.getElementById('offline-status-bar');
+const statusText = document.getElementById('offline-status-text');
+const syncNowBtn = document.getElementById('sync-now-btn');
+
+function setBranchMismatch(activeName) {
+    posBranchMismatch = true;
+    document.getElementById('branch-changed-name').textContent = activeName || 'another branch';
+    document.getElementById('branch-page-name').textContent = POS_BRANCH_NAME || 'the previous branch';
+    document.getElementById('branch-changed-banner').classList.remove('hidden');
+    const btn = document.getElementById('checkout-btn'); if (btn) btn.disabled = true;
+}
+async function verifyPosBranch() {
+    if (posBranchMismatch || !navigator.onLine) return;
+    try {
+        const r = await fetch(`{% url 'sales:pos_context_api' %}`, { cache: 'no-store', credentials: 'same-origin', headers: { 'Accept': 'application/json' } });
+        if (!r.ok) return;
+        const d = await r.json();
+        if (d.branch_id && POS_BRANCH_ID && d.branch_id !== POS_BRANCH_ID) setBranchMismatch(d.branch_name);
+    } catch (e) {}
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) verifyPosBranch(); });
+window.addEventListener('focus', verifyPosBranch);
+window.addEventListener('pos-branch-changed', () => { if (!posBranchMismatch) verifyPosBranch(); });
+document.getElementById('branch-reload-btn').addEventListener('click', () => location.reload());
+setInterval(verifyPosBranch, 60000);
+
+let cart = {}; // { product_id: { name, price, batch_prices, quantity_available, quantity, ... } }
+const openDiscountRows = new Set();
+const clearCartBtn = document.getElementById('clear-cart-btn');
+// Promise-based confirmation popup (accessible: focus on the safe button, Tab trap, Esc / backdrop = cancel).
+function posConfirm({ title, text, detail, okText = 'Confirm', cancelText = 'Cancel', danger = true }) {
+    return new Promise(resolve => {
+        const modal = document.getElementById('pos-confirm-modal');
+        const okBtn = document.getElementById('pos-confirm-ok'), cancelBtn = document.getElementById('pos-confirm-cancel');
+        const ico = document.getElementById('pos-confirm-ico'), previous = document.activeElement;
+        document.getElementById('pos-confirm-title').textContent = title;
+        document.getElementById('pos-confirm-text').textContent = text || '';
+        const det = document.getElementById('pos-confirm-detail'); det.textContent = detail || ''; det.style.display = detail ? '' : 'none';
+        okBtn.textContent = okText; cancelBtn.textContent = cancelText;
+        okBtn.className = 'spx-btn ' + (danger ? 'spx-btn--danger' : 'spx-btn--primary');
+        ico.className = 'spx-modal-ico ' + (danger ? 'spx-modal-ico--danger' : 'spx-modal-ico--brand');
+        modal.hidden = false; document.body.classList.add('spx-modal-open'); cancelBtn.focus();
+        const done = value => {
+            modal.hidden = true; document.body.classList.remove('spx-modal-open');
+            okBtn.removeEventListener('click', onOk); modal.removeEventListener('click', onBackdrop); document.removeEventListener('keydown', onKey, true);
+            if (previous && previous.isConnected && typeof previous.focus === 'function') previous.focus();
+            resolve(value);
+        };
+        const onOk = () => done(true);
+        const onBackdrop = e => { if (e.target === modal || e.target.closest('[data-pos-confirm-cancel]')) done(false); };
+        const onKey = e => {
+            if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); done(false); }
+            else if (e.key === 'Tab') {
+                const f = [cancelBtn, okBtn], i = f.indexOf(document.activeElement);
+                e.preventDefault(); f[(i + (e.shiftKey ? -1 : 1) + f.length) % f.length].focus();
+            }
+        };
+        okBtn.addEventListener('click', onOk); modal.addEventListener('click', onBackdrop); document.addEventListener('keydown', onKey, true);
+    });
+}
+
+clearCartBtn.addEventListener('click', async () => {
+    const ids = Object.keys(cart);
+    if (!ids.length) return;
+    const units = ids.reduce((t, id) => t + (Number(cart[id].quantity) || 0), 0);
+    const ok = await posConfirm({
+        title: 'Clear the cart?',
+        text: ids.length + (ids.length === 1 ? ' product' : ' products') + ' (' + units.toLocaleString() + (units === 1 ? ' unit' : ' units') + ') will be removed.',
+        detail: 'No sale has been made yet and stock is not affected. You can scan or search the items again.',
+        okText: 'Yes, clear cart', cancelText: 'Keep items', danger: true
+    });
+    if (!ok) return;
+    cart = {};
+    openDiscountRows.clear();
+    renderCart();
+    showToast('Cart cleared.', 'success');
+});
+
+// Loss warning popup. Resolves true only if the cashier explicitly chooses "Sell anyway".
+// Esc, the backdrop and the X all mean "go back". Product names are inserted as text, never as HTML.
+function posLossWarning(lines, totalLoss) {
+    return new Promise(resolve => {
+        const modal = document.getElementById('pos-loss-modal');
+        const okBtn = document.getElementById('pos-loss-ok'), backBtn = document.getElementById('pos-loss-cancel');
+        const previous = document.activeElement, n = lines.length;
+        document.getElementById('pos-loss-title').textContent = n === 1 ? 'This item is priced below cost' : n + ' items are priced below cost';
+        document.getElementById('pos-loss-text').textContent = 'Selling at this price means you lose money on this sale. Please review before you continue.';
+        document.getElementById('pos-loss-amount').textContent = 'TZS ' + Math.round(totalLoss).toLocaleString();
+        const list = document.getElementById('pos-loss-items');
+        list.textContent = '';
+        lines.slice(0, 6).forEach((l, i) => {
+            const li = document.createElement('li');
+            li.style.cssText = 'display:flex;justify-content:space-between;gap:.75rem;padding:.5rem .75rem;font-size:.8125rem;color:#334155;' + (i ? 'border-top:1px solid #eef2f7;' : '');
+            const name = document.createElement('span'); name.style.fontWeight = '600'; name.textContent = l.name + ' × ' + l.quantity.toLocaleString();
+            const amt = document.createElement('span'); amt.style.cssText = 'color:#b91c1c;font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums'; amt.textContent = '− TZS ' + Math.round(l.loss).toLocaleString();
+            li.append(name, amt); list.appendChild(li);
+        });
+        if (n > 6) {
+            const li = document.createElement('li');
+            li.style.cssText = 'padding:.5rem .75rem;font-size:.75rem;color:#64748b;border-top:1px solid #eef2f7;';
+            li.textContent = '+ ' + (n - 6) + ' more item' + (n - 6 === 1 ? '' : 's');
+            list.appendChild(li);
+        }
+        modal.hidden = false; document.body.classList.add('spx-modal-open'); backBtn.focus();
+        const done = value => {
+            modal.hidden = true; document.body.classList.remove('spx-modal-open');
+            okBtn.removeEventListener('click', onOk); modal.removeEventListener('click', onBackdrop); document.removeEventListener('keydown', onKey, true);
+            if (previous && previous.isConnected && typeof previous.focus === 'function') previous.focus();
+            resolve(value);
+        };
+        const onOk = () => done(true);
+        const onBackdrop = e => { if (e.target === modal || e.target.closest('[data-pos-loss-cancel]')) done(false); };
+        const onKey = e => {
+            if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); done(false); }
+            else if (e.key === 'Tab') {
+                const f = [backBtn, okBtn], i = f.indexOf(document.activeElement);
+                e.preventDefault(); f[(i + (e.shiftKey ? -1 : 1) + f.length) % f.length].focus();
+            }
+        };
+        okBtn.addEventListener('click', onOk); modal.addEventListener('click', onBackdrop); document.addEventListener('keydown', onKey, true);
+    });
+}
+
+let searchTimeout = null;
+
+function getCsrfToken() {
+    const input = document.querySelector('input[name="csrfmiddlewaretoken"]');
+    return input ? input.value : '';
+}
+
+function savePosDraft() {
+    try {
+        const draft = {
+            cart,
+            payment_method: paymentMethodEl.value,
+            customer_name: document.getElementById('customer-name')?.value || '',
+            customer_phone: document.getElementById('customer-phone')?.value || '',
+            deposit_amount: document.getElementById('debt-deposit')?.value || '',
+            deposit_method: document.getElementById('debt-deposit-method')?.value || 'CASH',
+            cash_paid: document.getElementById('split-cash')?.value || '',
+            saved_at: Date.now(),
+        };
+        sessionStorage.setItem(POS_DRAFT_KEY, JSON.stringify(draft));
+    } catch (e) {}
+}
+
+function clearPosDraft() {
+    try { sessionStorage.removeItem(POS_DRAFT_KEY); } catch (e) {}
+}
+
+function restorePosDraft() {
+    try {
+        const raw = sessionStorage.getItem(POS_DRAFT_KEY);
+        if (!raw) return;
+        const draft = JSON.parse(raw);
+        // Keep drafts only for the current browser tab/session and avoid
+        // restoring an abandoned sale after a long period.
+        if (!draft || !draft.saved_at || Date.now() - Number(draft.saved_at) > 6 * 60 * 60 * 1000) {
+            clearPosDraft();
+            return;
+        }
+        if (draft.cart && typeof draft.cart === 'object') cart = draft.cart;
+        if (paymentMethodEl && draft.payment_method) {
+            paymentMethodEl.value = draft.payment_method;
+            const opt = paymentMethodOptions.find(o => o.dataset.value === draft.payment_method);
+            if (opt) {
+                paymentMethodLabel.textContent = opt.querySelector('span').textContent;
+                paymentMethodOptions.forEach(item => {
+                    const selected = item === opt;
+                    item.classList.toggle('selected', selected);
+                    item.setAttribute('aria-selected', selected ? 'true' : 'false');
+                });
+            }
+        }
+        const name = document.getElementById('customer-name');
+        const phone = document.getElementById('customer-phone');
+        if (name) name.value = draft.customer_name || '';
+        if (phone) phone.value = draft.customer_phone || '';
+        renderCart();
+        paymentMethodEl.dispatchEvent(new Event('change', { bubbles: true }));
+        if (Object.keys(cart).length) showToast('Your unfinished sale was restored safely.', 'success');
+    } catch (e) { clearPosDraft(); }
+}
+
+async function keepPosSessionAlive() {
+    if (!navigator.onLine || document.visibilityState === 'hidden') return false;
+    try {
+        const r = await fetch(SESSION_STATUS_URL, {
+            method: 'GET', credentials: 'same-origin', cache: 'no-store',
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+        });
+        return r.ok;
+    } catch (e) { return false; }
+}
+
+async function ensurePosSession() {
+    if (!navigator.onLine) return false;
+    return keepPosSessionAlive();
+}
+
+// ---------- Online/offline status bar + sync ----------
+async function refreshStatusBar() {
+    const pendingCount = await OfflinePOS.getPendingCount();
+    const isOnline = navigator.onLine;
+
+    if (!isOnline) {
+        statusBar.className = 'mb-4 rounded-lg px-4 py-2.5 text-sm flex items-center justify-between gap-3 bg-amber-50 border border-amber-200 text-amber-800';
+        statusText.innerHTML = `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2.8 19a1.5 1.5 0 0 0 1.3 2.2h15.8a1.5 1.5 0 0 0 1.3-2.2L12 3z"/><path d="M12 9v4M12 17h.01"/></svg> You're offline — sales are being saved on this device${pendingCount ? ` (${pendingCount} pending)` : ''}.`;
+        syncNowBtn.classList.add('hidden');
+    } else if (pendingCount > 0) {
+        statusBar.className = 'mb-4 rounded-lg px-4 py-2.5 text-sm flex items-center justify-between gap-3 bg-brand-50 border border-brand-200 text-brand-800';
+        statusText.innerHTML = `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 0 0-14-5L4 8"/><path d="M4 4v4h4"/><path d="M4 13a8 8 0 0 0 14 5l2-2"/><path d="M20 20v-4h-4"/></svg> ${pendingCount} sale(s) waiting to sync.`;
+        syncNowBtn.classList.remove('hidden');
+    } else {
+        statusBar.classList.add('hidden');
+        return;
+    }
+    statusBar.classList.remove('hidden');
+}
+
+async function runSync(showResultToast) {
+    const result = await OfflinePOS.syncPendingSales(SYNC_URL, getCsrfToken());
+    if (showResultToast && (result.synced || result.needsReview)) {
+        let msg = '';
+        if (result.synced) msg += `${result.synced} offline sale(s) synced successfully. `;
+        if (result.needsReview) msg += `${result.needsReview} sale(s) need owner review (stock conflict).`;
+        showToast(msg.trim(), result.needsReview ? 'warning' : 'success');
+    }
+    await refreshStatusBar();
+}
+
+syncNowBtn.addEventListener('click', () => runSync(true));
+window.addEventListener('online', () => { refreshStatusBar(); runSync(true); });
+window.addEventListener('offline', refreshStatusBar);
+
+// Keep the local catalog warm, and try a sync, every time the page loads.
+OfflinePOS.refreshCatalog(CATALOG_URL);
+runSync(false);
+refreshStatusBar();
+restorePosDraft();
+// Keep an actively used POS session alive. This prevents the normal 8-hour
+// session window from surprising a cashier during a long shift.
+keepPosSessionAlive();
+setInterval(() => {
+    if (navigator.onLine) {
+        keepPosSessionAlive();
+        runSync(false);
+    }
+    refreshStatusBar();
+}, 5 * 60 * 1000);
+
+// ---------- Product search (online first, offline cache fallback) ----------
+let searchSeq = 0;   // every search gets a number; a late reply for an old search is ignored
+const searchClearBtn = document.getElementById('product-search-clear');
+
+function clearSearchResults() {
+    searchSeq++;                      // cancels any search still in flight
+    clearTimeout(searchTimeout);
+    searchResults.innerHTML = '';
+    if (searchClearBtn) { searchClearBtn.classList.add('hidden'); searchClearBtn.classList.remove('flex'); }
+}
+
+function syncSearchClearBtn() {
+    if (!searchClearBtn) return;
+    const has = searchInput.value.length > 0;
+    searchClearBtn.classList.toggle('hidden', !has);
+    searchClearBtn.classList.toggle('flex', has);
+}
+
+searchInput.addEventListener('input', function () {
+    clearTimeout(searchTimeout);
+    const q = this.value.trim();
+    syncSearchClearBtn();
+    // Search box emptied: remove the previous results so the cashier starts clean for the next product.
+    if (!q) { clearSearchResults(); return; }
+    searchTimeout = setTimeout(() => runSearch(q), 250);
+});
+
+searchInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && this.value) { this.value = ''; clearSearchResults(); }
+});
+
+if (searchClearBtn) searchClearBtn.addEventListener('click', function () {
+    searchInput.value = '';
+    clearSearchResults();
+    searchInput.focus();
+});
+
+async function runSearch(q) {
+    const seq = ++searchSeq;
+    if (navigator.onLine) {
+        try {
+            const r = await fetch(`{% url 'sales:product_search_api' %}?q=${encodeURIComponent(q)}`);
+            const data = await r.json();
+            if (seq !== searchSeq) return;           // the box was cleared or changed meanwhile
+            renderSearchResults(data.results, false);
+            return;
+        } catch (err) {
+            // fall through to offline cache
+        }
+    }
+    const cached = await OfflinePOS.searchCatalog(q);
+    if (seq !== searchSeq) return;
+    renderSearchResults(cached, true);
+}
+
+// Layaway stock is protected by default. Only a manager-approved override can release stock from an unpaid plan.
+function layawayLabel(p) {
+    const r = Number(p.layaway_reserved || 0), a = Number(p.quantity_available || 0);
+    const plans = Number(p.layaway_plans || 0);
+    const who = plans === 1 ? '1 layaway customer' : plans + ' layaway customers';
+    return r >= a
+        ? `Reserved for layaway: all ${a} in stock (${who})`
+        : `Reserved for layaway: ${r} of ${a} (${who})`;
+}
+
+function renderSearchResults(results, fromCache) {
+    searchResults.innerHTML = '';
+    if (fromCache && results.length > 0) {
+        const note = document.createElement('p');
+        note.className = 'text-xs text-amber-600 mb-1';
+        note.innerHTML = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2.8 19a1.5 1.5 0 0 0 1.3 2.2h15.8a1.5 1.5 0 0 0 1.3-2.2L12 3z"/><path d="M12 9v4M12 17h.01"/></svg> Showing saved prices (offline) — may not reflect the very latest stock.';
+        searchResults.appendChild(note);
+    }
+    if (results.length === 0) {
+        searchResults.innerHTML += '<p class="text-sm text-ink-400 py-2">No matching products in stock.</p>';
+        return;
+    }
+    results.forEach(p => {
+        const node = searchTemplate.content.cloneNode(true);
+        node.querySelector('.result-name').textContent = p.name;
+        if (p.image_url) {
+            const thumb = node.querySelector('.result-thumb'), pic = node.querySelector('.result-img');
+            if (thumb && pic) {
+                pic.addEventListener('error', () => { thumb.style.display = 'none'; }, { once: true });
+                pic.src = p.image_url;
+                thumb.style.display = '';
+            }
+        }
+        node.querySelector('.result-stock').textContent = p.quantity_available;
+        node.querySelector('.result-unit').textContent = p.unit;
+        if (node.querySelector('.result-barcode')) node.querySelector('.result-barcode').textContent = p.barcode ? 'Barcode: ' + p.barcode : '';
+        node.querySelector('.result-price').textContent = 'TZS ' + Number(p.selling_price).toLocaleString();
+        const warn = node.querySelector('.expiry-warning');
+        if (!fromCache && p.is_expiring_soon) {
+            warn.innerHTML = `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2.8 19a1.5 1.5 0 0 0 1.3 2.2h15.8a1.5 1.5 0 0 0 1.3-2.2L12 3z"/><path d="M12 9v4M12 17h.01"/></svg> Expires in ${p.days_to_expiry} day(s)`;
+            warn.classList.remove('hidden');
+            warn.classList.add('text-amber-600');
+        }
+        const lay = node.querySelector('.result-layaway');
+        if (lay && Number(p.layaway_reserved) > 0) {
+            lay.textContent = layawayLabel(p);
+            lay.classList.remove('hidden');
+        }
+        node.querySelector('.result-item').addEventListener('click', () => { if (posMode === 'restock' && window.PMQuickStock) PMQuickStock.openRestock(p.id); else addToCart(p); });
+        searchResults.appendChild(node);
+    });
+}
+
+function addToCart(p, requestedQuantity = 1) {
+    if (posBranchMismatch) { showToast('Branch changed. Reload the POS page before adding items.', 'warning'); return false; }
+    if (Number(p.layaway_reserved || 0) > 0 && !(cart[p.id])) {
+        const free = Math.max(0, Number(p.quantity_available || 0) - Number(p.layaway_reserved || 0));
+        showToast(`${layawayLabel(p)}. ${free > 0 ? free + ' unit(s) are free to sell.' : 'Selling these means a layaway customer may find none left.'}`, 'warning');
+    }
+    const qty = Math.floor(Number(requestedQuantity));
+    if (!Number.isFinite(qty) || qty < 1) { showToast('Enter a valid quantity (at least 1).', 'warning'); return false; }
+    const existingQty = cart[p.id] ? Number(cart[p.id].quantity || 0) : 0;
+    const available = Math.max(0, Number(p.quantity_available || 0));
+    if (existingQty + qty > available) {
+        showToast(`${p.name}: requested ${qty}, but only ${Math.max(0, available - existingQty)} more available.`, 'warning');
+        return false;
+    }
+    if (cart[p.id]) {
+        cart[p.id].batch_prices = p.batch_prices || cart[p.id].batch_prices || [];
+        cart[p.id].quantity_available = p.quantity_available;
+        cart[p.id].quantity += qty;
+    } else {
+        cart[p.id] = {
+            name: p.name, price: parseFloat(p.selling_price), batch_prices: p.batch_prices || [],
+            quantity_available: p.quantity_available, quantity: qty,
+            discount_enabled: !!p.discount_enabled,
+            discount_type: p.discount_type === 'AMOUNT' ? 'AMOUNT' : 'PERCENT',
+            min_discount: parseFloat((p.discount_type === 'AMOUNT' ? p.min_discount_amount : p.min_discount_percent) || 0),
+            max_discount: parseFloat((p.discount_type === 'AMOUNT' ? p.max_discount_amount : p.max_discount_percent) || 0),
+            discount_value: 0,
+        };
+    }
+    renderCart();
+    return true;
+}
+
+// Barcode-first quantity step: the cashier can enter 7, confirm, then immediately
+// scan the next item without reopening/editing the cart. Defaults to one for speed.
+function requestScanQuantity(product, maxQuantity) {
+    return new Promise(resolve => {
+        const remaining = Math.max(0, Math.floor(Number(maxQuantity) || 0));
+        if (remaining < 1) { resolve(0); return; }
+        const overlay = document.createElement('div');
+        overlay.className = 'scan-qty-overlay';
+        // Plain inline CSS on purpose: compiled Tailwind has no z-[100200] / bg-slate-950/55, so the dialog
+        // ended up BEHIND the camera scanner (z-index 100000) and the scan looked frozen.
+        overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;padding:1rem;background:rgba(11,18,32,.6)';
+        overlay.setAttribute('role', 'dialog'); overlay.setAttribute('aria-modal', 'true');
+        overlay.setAttribute('aria-label', 'Choose quantity');
+        overlay.innerHTML = `<div class="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl border border-ink-200">
+            <div class="flex items-start gap-3"><span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700"><svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M4 12h16M4 17h16"/><path d="M8 4v16M16 4v16"/></svg></span><div class="min-w-0 flex-1"><p class="text-xs font-bold uppercase tracking-wider text-brand-700">Scanned product</p><h3 class="mt-1 text-lg font-bold text-ink-900 break-words"></h3><p class="mt-1 text-sm text-ink-500">Available to add: <strong class="text-ink-800"></strong></p></div></div>
+            <label class="mt-5 block text-sm font-semibold text-ink-700" for="scan-quantity-input">Quantity for this customer</label>
+            <input id="scan-quantity-input" type="number" min="1" step="1" inputmode="numeric" value="1" class="form-input mt-1.5 !py-3 !text-lg font-semibold" autocomplete="off">
+            <p class="mt-1.5 text-xs text-ink-500">Confirm to add this quantity to the cart, then continue scanning other products.</p>
+            <p class="scan-quantity-error hidden mt-2 text-sm text-red-600" role="alert"></p>
+            <div class="mt-5 flex gap-2"><button type="button" class="scan-quantity-cancel btn flex-1">Cancel</button><button type="button" class="scan-quantity-add btn btn-primary flex-1">Add to cart</button></div>
+        </div>`;
+        const title = overlay.querySelector('h3');
+        title.textContent = product.name;
+        overlay.querySelector('strong').textContent = remaining.toLocaleString();
+        const input = overlay.querySelector('#scan-quantity-input');
+        const error = overlay.querySelector('.scan-quantity-error');
+        document.body.appendChild(overlay);
+        const finish = value => { overlay.remove(); resolve(value); };
+        const submit = () => {
+            const q = Number(input.value);
+            if (!Number.isInteger(q) || q < 1) { error.textContent = 'Enter a whole number greater than zero.'; error.classList.remove('hidden'); input.focus(); return; }
+            if (q > remaining) { error.textContent = `Only ${remaining} unit(s) are available to add.`; error.classList.remove('hidden'); input.focus(); input.select(); return; }
+            finish(q);
+        };
+        overlay.querySelector('.scan-quantity-add').addEventListener('click', submit);
+        overlay.querySelector('.scan-quantity-cancel').addEventListener('click', () => finish(0));
+        input.addEventListener('input', () => error.classList.add('hidden'));
+        input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); submit(); } if (e.key === 'Escape') { e.preventDefault(); finish(0); } });
+        requestAnimationFrame(() => { input.focus(); input.select(); });
+    });
+}
+
+// ---------- Barcode scanning (phone camera, USB / Bluetooth scanner, manual code) ----------
+// One scan = one exact match. Never guesses: unknown, out-of-stock and over-stock all say so clearly.
+async function lookupBarcode(code) {
+    // Try the exact scanned text first, then common UPC/EAN/GTIN variants. This
+    // handles scanners that add/remove a leading zero without ever using fuzzy search.
+    const candidates = [String(code || '').trim()];
+    if (window.PMScanner && typeof PMScanner.variants === 'function') {
+        PMScanner.variants(candidates[0]).forEach(v => { if (v && !candidates.includes(v)) candidates.push(v); });
+    }
+    if (navigator.onLine) {
+        for (const candidate of candidates) {
+            try {
+                const r = await fetch(`${BARCODE_LOOKUP_URL}?code=${encodeURIComponent(candidate)}`, {
+                    credentials: 'same-origin', headers: { 'Accept': 'application/json' }
+                });
+                if (r.ok) {
+                    const data = await r.json();
+                    if (data.status === 'ok' || data.status === 'out_of_stock') return data;
+                }
+            } catch (err) { /* try another exact representation, then offline snapshot */ }
+        }
+    }
+    for (const candidate of candidates) {
+        try {
+            const p = await OfflinePOS.findByBarcode(candidate);
+            if (p) return { status: 'ok', product: p, offline: true };
+        } catch (err) { /* offline catalog is optional */ }
+    }
+    return { status: 'not_found', code: candidates[0], offline: !navigator.onLine };
+}
+
+async function scanToCart(rawCode) {
+    if (posBranchMismatch) return { ok: false, message: 'Branch changed. Reload the POS page first.' };
+    const parsed = (window.PMScanner ? PMScanner.parse(rawCode) : { code: String(rawCode || '').trim() });
+    const code = parsed.code;
+    if (!code) return { ok: false, message: 'Empty code.' };
+    if (parsed.link) return { ok: false, message: 'That is a brand link/QR, not a product barcode. Scan the barcode (black lines).' };
+    const res = await lookupBarcode(code);
+    if (res.status === 'out_of_stock') return { ok: false, message: res.name + ' is out of stock. Add stock before selling.' };
+    if (res.status !== 'ok') return { ok: false, message: 'Barcode not found in this active branch: ' + code + (res.offline ? ' (offline catalog may be outdated; reconnect and refresh POS)' : '. Check that the real barcode was saved to this branch product.') };
+    const p = res.product;
+    const inCart = cart[p.id] ? Number(cart[p.id].quantity || 0) : 0;
+    const remaining = Math.max(0, Number(p.quantity_available || 0) - inCart);
+    if (remaining < 1) return { ok: false, message: p.name + ': no additional stock available; already in cart or out of stock.' };
+    const requestedQty = await requestScanQuantity(p, remaining);
+    if (!requestedQty) return { ok: false, message: 'Quantity selection cancelled for ' + p.name + '.' };
+    if (!addToCart(p, requestedQty)) return { ok: false, message: 'Could not add requested quantity for ' + p.name + '.' };
+    const qty = cart[p.id] ? cart[p.id].quantity : requestedQty;
+    return { ok: true, message: '\u2713 ' + p.name + ' +' + requestedQty + ' (cart total ' + qty + ')  \u00b7  ' + Object.keys(cart).length + ' product(s)' };
+}
+
+function openCameraScanner() {
+    if (posMode === 'restock' && window.PMQuickStock) { PMQuickStock.start(); return; }
+    if (!window.PMScanner) { showToast('Scanner failed to load. Reload the page.', 'error'); return; }
+    PMScanner.open({
+        title: 'Scan items to sell',
+        hint: 'Scan each item. Tap Done when finished.',
+        continuous: true,
+        onResult: function (parsed) { return scanToCart(parsed.raw); },
+        onClose: function () { if (window.matchMedia && window.matchMedia('(pointer:fine)').matches) searchInput.focus(); }
+    });
+}
+const posScanBtn = document.getElementById('pos-scan-btn');
+if (posScanBtn) posScanBtn.addEventListener('click', openCameraScanner);
+
+// Hardware scanners behave like a keyboard: they type the code very fast and press Enter.
+// Enter on something that looks like a code = exact-match add to cart (no need to tap the result).
+searchInput.addEventListener('keydown', async function (e) {
+    if (e.key !== 'Enter') return;
+    const v = this.value.trim();
+    if (!/^[A-Za-z0-9\-_.\/\x1d()]{4,64}$/.test(v)) return;
+    e.preventDefault();
+    if (posMode === 'restock' && window.PMQuickStock) {       // manager restock: open the restock form, never the cart
+        this.value = ''; clearSearchResults();
+        PMQuickStock.scanCode(v);
+        return;
+    }
+    const looksLikeCode = /^\d{6,}$/.test(v) || /^PM\d+$/i.test(v) || /^SKU-/i.test(v) || /^\(?01\)?\d{14}/.test(v);
+    const r = await scanToCart(v);
+    if (r.ok) {
+        this.value = '';
+        clearSearchResults();
+        if (window.PMScanner) PMScanner.beep(true);
+        showToast(r.message, 'success');
+    } else if (looksLikeCode) {
+        if (window.PMScanner) PMScanner.beep(false);
+        showToast(r.message, 'warning');
+    }
+});
+
+// ---------- Sell | Restock mode (managers / assistants only) ----------
+function setPosMode(mode) {
+    if (mode === 'restock' && (!CAN_RESTOCK || !window.PMQuickStock || !RESTOCK_CFG)) { showToast('Restock is not available for this account.', 'warning'); return; }
+    posMode = mode === 'restock' ? 'restock' : 'sell';
+    const restock = posMode === 'restock';
+    document.querySelectorAll('#pos-mode .pmode-btn').forEach(b => {
+        const on = b.dataset.mode === posMode;
+        b.classList.toggle('is-active', on); b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+    const card = document.getElementById('pos-search-card'); if (card) card.classList.toggle('is-restock', restock);
+    const hint = document.getElementById('pos-mode-hint');
+    if (hint) hint.textContent = restock ? 'Restock mode: scan a product to open its restock form. Nothing is added to the cart.' : 'Scanning adds items to the cart.';
+    searchInput.placeholder = restock ? 'Scan barcode to restock\u2026' : 'Search by name, or scan barcode\u2026';
+    if (posScanBtn) { const t = restock ? 'Scan product to restock' : 'Scan barcode with camera'; posScanBtn.title = t; posScanBtn.setAttribute('aria-label', t); }
+    if (window.PMQuickStock) PMQuickStock.setEnabled(restock);
+    if (window.matchMedia && window.matchMedia('(pointer:fine)').matches) searchInput.focus();
+}
+if (CAN_RESTOCK && window.PMQuickStock && RESTOCK_CFG) {
+    PMQuickStock.configure(RESTOCK_CFG);
+    PMQuickStock.setEnabled(false);          // Sell mode is the default, so a normal sale can never open a restock form by accident
+    document.querySelectorAll('#pos-mode .pmode-btn').forEach(b => b.addEventListener('click', () => setPosMode(b.dataset.mode)));
+    // After a restock is saved, keep any copy of this product in the cart in line with the new stock.
+    document.addEventListener('pqs:saved', function (e) {
+        const d = e.detail || {}, id = d.product && d.product.id;
+        if (id && cart[id] && typeof d.sellable === 'number') { cart[id].quantity_available = d.sellable; renderCart(); }
+    });
+}
+
+function getBatchAllocations(item) {
+    let remaining = Number(item.quantity || 0);
+    const allocations = [];
+    const batches = Array.isArray(item.batch_prices) ? item.batch_prices : [];
+    for (const batch of batches) {
+        if (remaining <= 0) break;
+        const available = Number(batch.quantity || 0);
+        if (available <= 0) continue;
+        const take = Math.min(available, remaining);
+        allocations.push({
+            ...batch,
+            quantity: take,
+            price: Number(batch.selling_price || 0),
+        });
+        remaining -= take;
+    }
+    return allocations;
+}
+
+const PROFIT_EPS = 0.005;
+function discountedBatchPrice(item, batch) {
+    const discount = Number(item.discount_value || 0);
+    if (item.discount_type === 'AMOUNT') return Math.max(batch.price - discount, 0);
+    return batch.price * (100 - discount) / 100;
+}
+
+function calculateCartItem(item) {
+    const allocations = getBatchAllocations(item);
+    let subtotal = 0;
+    const priced = allocations.map(batch => {
+        const requestedPrice = discountedBatchPrice(item, batch);
+        let finalPrice = requestedPrice;
+        // Same guards as the server: a discount never takes a unit below the cost of its batch, nor below the
+        // batch's own discount limit when the manager set one (max_discount: null/absent = follow the product policy).
+        const costFloor = Math.min(batch.price, Number(batch.purchase_price || 0));
+        const capRaw = batch.max_discount;
+        const cap = (capRaw === null || capRaw === undefined || capRaw === '') ? NaN : Number(capRaw);
+        const capFloor = Number.isFinite(cap) ? batch.price - Math.max(0, cap) : -Infinity;
+        const floor = Math.max(costFloor, capFloor);
+        if (finalPrice < floor) finalPrice = floor;
+        // Why was the discount reduced? 'batch' = manager's limit for this lot, 'cost' = never-below-cost guard.
+        const limitedBy = requestedPrice < finalPrice - PROFIT_EPS ? (capFloor > costFloor + PROFIT_EPS ? 'batch' : 'cost') : null;
+        subtotal += finalPrice * batch.quantity;
+        return {...batch, finalPrice, requestedPrice, limitedBy};
+    });
+    return {subtotal, allocations: priced};
+}
+
+// Profit safety check. Display and warning only: prices are still decided by calculateCartItem and the server.
+// status: 'loss' (sells below purchase cost), 'capped' (discount was reduced to protect the cost),
+//         'nogain' (sells exactly at cost) or 'ok'. Batches with no known cost are never flagged.
+function itemProfitStatus(allocations) {
+    let loss = 0, capped = false, nogain = false;
+    const batchLimited = allocations.some(a => a.limitedBy === 'batch');
+    allocations.forEach(a => {
+        const cost = Number(a.purchase_price || 0);
+        if (!(cost > 0)) return;
+        const qty = Number(a.quantity || 0);
+        if (a.finalPrice < cost - PROFIT_EPS) loss += (cost - a.finalPrice) * qty;
+        else if (a.finalPrice <= cost + PROFIT_EPS) nogain = true;
+        if (a.requestedPrice < a.finalPrice - PROFIT_EPS) capped = true;
+    });
+    const status = loss > 0 ? 'loss' : (capped ? 'capped' : (nogain ? 'nogain' : 'ok'));
+    return {status, loss, batchLimited};
+}
+
+function analyzeCartProfit() {
+    const lossLines = [];
+    let totalLoss = 0;
+    Object.keys(cart).forEach(id => {
+        const item = cart[id];
+        const r = itemProfitStatus(calculateCartItem(item).allocations);
+        if (r.status === 'loss') {
+            lossLines.push({name: item.name, quantity: Number(item.quantity) || 0, loss: r.loss});
+            totalLoss += r.loss;
+        }
+    });
+    return {lossLines, totalLoss};
+}
+
+function updateLayawayOverrideVisibility() {
+    const panel = document.getElementById('layaway-override-panel');
+    if (!panel) return;
+    // Never show a manager override on an empty cart or for products with no active
+    // Layaway reservation conflict. The server remains the final authority at checkout.
+    const hasConflict = Object.values(cart).some(item => {
+        const reserved = Math.max(0, Number(item.layaway_reserved || 0));
+        const stock = Math.max(0, Number(item.quantity_available || 0));
+        const quantity = Math.max(0, Number(item.quantity || 0));
+        const unreserved = Math.max(0, stock - reserved);
+        return reserved > 0 && quantity > unreserved;
+    });
+    panel.classList.toggle('hidden', !hasConflict);
+    if (!hasConflict) {
+        panel.open = false;
+        const approval = document.getElementById('allow-layaway-reserved-sale');
+        const reason = document.getElementById('layaway-override-reason');
+        if (approval) approval.checked = false;
+        if (reason) reason.value = '';
+    }
+}
+
+function renderCart() {
+    savePosDraft();
+    cartItemsEl.innerHTML = '';
+    const ids = Object.keys(cart);
+    clearCartBtn.classList.toggle('hidden', ids.length === 0);
+    updateLayawayOverrideVisibility();
+    if (ids.length === 0) {
+        cartEmptyMsg.classList.remove('hidden');
+        cartItemsEl.appendChild(cartEmptyMsg);
+        cartTotalEl.textContent = 'TZS 0';
+        return;
+    }
+    cartEmptyMsg.classList.add('hidden');
+
+    let total = 0;
+    ids.forEach(id => {
+        const item = cart[id];
+        const discount = Number(item.discount_value || 0);
+        const isAmount = item.discount_type === 'AMOUNT';
+        const pricing = calculateCartItem(item);
+        const allocations = pricing.allocations;
+        const subtotal = pricing.subtotal;
+        total += subtotal;
+
+        const node = cartTemplate.content.cloneNode(true);
+        node.querySelector('.cart-name').textContent = item.name;
+        const uniquePrices = [...new Set(allocations.map(a => a.price))];
+        const mixedPricing = uniquePrices.length > 1 || new Set(allocations.map(a => Math.round(a.finalPrice * 100))).size > 1;
+        if (mixedPricing) {
+            node.querySelector('.cart-price').textContent = 'Batch pricing — price changes by stock lot';
+        } else {
+            const displayPrice = uniquePrices.length ? uniquePrices[0] : item.price;
+            // Show the price the customer is really charged (after the cost guard), so the line always matches the subtotal.
+            const displayFinal = allocations.length ? allocations[0].finalPrice : (isAmount ? Math.max(displayPrice - discount, 0) : displayPrice * (100 - discount) / 100);
+            node.querySelector('.cart-price').textContent = 'TZS ' + displayPrice.toLocaleString() + (discount ? ` → TZS ${displayFinal.toLocaleString(undefined, {maximumFractionDigits: 2})}` : '');
+        }
+        node.querySelector('.cart-subtotal').textContent = 'TZS ' + subtotal.toLocaleString(undefined, {maximumFractionDigits: 2});
+        if (mixedPricing) {
+            const priceNote = document.createElement('div');
+            priceNote.className = 'text-[11px] text-ink-500 mt-0.5';
+            priceNote.textContent = allocations.map(a => `${a.quantity} × TZS ${a.finalPrice.toLocaleString(undefined, {maximumFractionDigits: 2})}${a.batch_number ? ` (${a.batch_number})` : ''}`).join(' + ');
+            node.querySelector('.cart-price').parentElement.appendChild(priceNote);
+        }
+        // Warn the cashier BEFORE the sale: loss, discount reduced to protect cost, or no profit.
+        const profit = itemProfitStatus(allocations);
+        if (profit.status !== 'ok') {
+            const tone = {
+                loss:   {bg: '#fef2f2', bd: '#fecaca', fg: '#b91c1c', msg: 'Selling below cost: this sale will record a loss. Ask your manager to review the price, or remove this item.'},
+                capped: {bg: '#fffbeb', bd: '#fde68a', fg: '#92400e', msg: profit.batchLimited
+                    ? 'Discount limited for this stock batch by your manager. The lowest allowed price has been applied.'
+                    : 'Discount limited to protect your profit. The lowest allowed price has been applied.'},
+                nogain: {bg: '#f8fafc', bd: '#e2e8f0', fg: '#475569', msg: 'No profit on this item at this price.'}
+            }[profit.status];
+            const profitNote = document.createElement('div');
+            profitNote.setAttribute('role', profit.status === 'loss' ? 'alert' : 'note');
+            profitNote.style.cssText = `margin-top:.4rem;padding:.35rem .55rem;border-radius:.5rem;border:1px solid ${tone.bd};background:${tone.bg};color:${tone.fg};font-size:11px;line-height:1.35;font-weight:600`;
+            profitNote.textContent = tone.msg;
+            node.querySelector('.cart-price').parentElement.appendChild(profitNote);
+        }
+
+        const discountWrap = node.querySelector('.cart-discount-wrap');
+        const discountInput = node.querySelector('.cart-discount-input');
+        const discountHelp = node.querySelector('.cart-discount-help');
+        if (item.discount_enabled && item.max_discount > 0) {
+            const discountToggle = node.querySelector('.cart-discount-toggle');
+            const showDiscount = () => discountWrap.classList.toggle('hidden', !(discount > 0 || openDiscountRows.has(id)));
+            discountToggle.classList.remove('hidden');
+            discountToggle.textContent = discount > 0 ? `Discount ${isAmount ? 'TZS ' : ''}${discount}${isAmount ? '' : '%'}` : 'Discount';
+            showDiscount();
+            discountToggle.addEventListener('click', () => {
+                if (openDiscountRows.has(id)) openDiscountRows.delete(id); else openDiscountRows.add(id);
+                discountWrap.classList.toggle('hidden', !(discount > 0 || openDiscountRows.has(id)));
+                if (!discountWrap.classList.contains('hidden')) discountInput.focus();
+            });
+            node.querySelector('.cart-discount-label').textContent = isAmount ? 'Discount TZS/unit' : 'Discount %';
+            // Zero is always a valid value: it explicitly means no discount.
+            // The configured minimum applies only when the cashier actually
+            // enters a positive discount. Do not silently coerce 0 to the
+            // minimum because a customer may accept the normal selling price.
+            discountInput.min = '0';
+            const lowestBatchPrice = getBatchAllocations(item).reduce((m, b) => Math.min(m, b.price), item.price);
+            discountInput.max = isAmount ? Math.min(item.max_discount, lowestBatchPrice) : item.max_discount;
+            discountInput.step = isAmount ? '1' : '0.01';
+            discountInput.value = discount;
+            discountHelp.textContent = isAmount
+                ? `Optional. Leave 0 for normal price · If used: TZS ${item.min_discount.toLocaleString()}–${Math.min(item.max_discount, getBatchAllocations(item).reduce((m, b) => Math.min(m, b.price), item.price)).toLocaleString()} per unit`
+                : `Optional. Leave 0 for normal price · If used: ${item.min_discount}%–${item.max_discount}%`;
+            if (allocations.some(a => a.max_discount !== null && a.max_discount !== undefined && a.max_discount !== '')) {
+                discountHelp.textContent += ' · Some stock batches have a lower limit set by your manager';
+            }
+            discountInput.addEventListener('change', function () {
+                let val = parseFloat(this.value);
+                if (!Number.isFinite(val) || val < 0) val = 0;
+                if (isAmount) val = Math.min(val, item.price);
+                if (val > 0 && (val < item.min_discount || val > item.max_discount)) {
+                    showToast(
+                        isAmount
+                            ? `Discount must be TZS ${item.min_discount.toLocaleString()}–${item.max_discount.toLocaleString()} per unit, or 0 for no discount.`
+                            : `Discount must be ${item.min_discount}%–${item.max_discount}% when applied, or 0% for no discount.`,
+                        'warning'
+                    );
+                    val = 0;
+                }
+                cart[id].discount_value = Math.round(val * 100) / 100;
+                renderCart();
+            });
+        }
+
+        const qtyInput = node.querySelector('.cart-qty-input');
+        qtyInput.value = item.quantity;
+        qtyInput.max = item.quantity_available;
+        qtyInput.addEventListener('change', function () {
+            let val = parseInt(this.value) || 1;
+            if (val > item.quantity_available) val = item.quantity_available;
+            if (val < 1) val = 1;
+            cart[id].quantity = val;
+            renderCart();
+        });
+
+        const decBtn = node.querySelector('.cart-qty-dec');
+        const incBtn = node.querySelector('.cart-qty-inc');
+        decBtn.disabled = item.quantity <= 1;
+        incBtn.disabled = item.quantity >= item.quantity_available;
+        decBtn.addEventListener('click', () => {
+            if (cart[id].quantity > 1) { cart[id].quantity -= 1; renderCart(); }
+        });
+        incBtn.addEventListener('click', () => {
+            if (cart[id].quantity < item.quantity_available) { cart[id].quantity += 1; renderCart(); }
+            else showToast(`Only ${item.quantity_available} in stock.`, 'warning');
+        });
+
+        node.querySelector('.cart-remove-btn').addEventListener('click', () => {
+            delete cart[id];
+            openDiscountRows.delete(id);
+            renderCart();
+        });
+
+        cartItemsEl.appendChild(node);
+    });
+
+    cartTotalEl.textContent = 'TZS ' + total.toLocaleString();
+    if (typeof updateDebtSplit === 'function') updateDebtSplit();
+}
+
+// Credit sale with a part-payment: show exactly what is received now and what becomes the customer's debt.
+function updateDebtSplit() {
+    const box = document.getElementById('debt-split-summary');
+    const dep = document.getElementById('debt-deposit');
+    if (!box || !dep) return;
+    const total = (typeof currentCartTotal === 'function') ? Number(currentCartTotal()) || 0 : 0;
+    const paid = Math.max(Number(dep.value) || 0, 0);
+    if (!total) { box.textContent = ''; return; }
+    if (paid > total) {
+        box.className = 'mt-2 text-xs font-semibold text-red-600';
+        box.textContent = 'Paid now is more than the sale total (TZS ' + total.toLocaleString() + ') - it will be capped.';
+        return;
+    }
+    box.className = 'mt-2 text-xs font-semibold text-ink-700';
+    box.textContent = 'Sale TZS ' + total.toLocaleString() + ' = paid now TZS ' + paid.toLocaleString() +
+        ' + on credit (debt) TZS ' + (total - paid).toLocaleString();
+}
+document.getElementById('debt-deposit')?.addEventListener('input', updateDebtSplit);
+
+paymentMethodEl.addEventListener('change', function () {
+    const splitBox = document.getElementById('split-box');
+    if (splitBox) splitBox.classList.toggle('hidden', this.value !== 'SPLIT');
+    if (this.value !== 'SPLIT') { const sc = document.getElementById('split-cash'); if (sc) sc.value = ''; }
+    if (typeof updateSplitMobile === 'function') updateSplitMobile();
+    const depositBox = document.getElementById('debt-deposit-box');
+    if (depositBox) depositBox.classList.toggle('hidden', this.value !== 'DEBT');
+    if (this.value !== 'DEBT') { const dep = document.getElementById('debt-deposit'); if (dep) dep.value = ''; }
+    updateDebtSplit();
+    if (this.value === 'DEBT') setCustomerOpen(true);
+    customerHelpEl.textContent = this.value === 'DEBT'
+        ? 'Customer name is required for Debt / Credit. Phone is strongly recommended.'
+        : (autoFilled ? 'Registered customer — details filled in.' : CUSTOMER_HELP_DEFAULT);
+    checkCustomerDebt();
+    updateCustomerIdentityState();
+});
+
+function currentCartTotal() {
+    try { return Object.keys(cart).reduce((sum, id) => sum + calculateCartItem(cart[id]).subtotal, 0); } catch (e) { return 0; }
+}
+function updateSplitMobile() {
+    const cashEl = document.getElementById('split-cash'), out = document.getElementById('split-mobile');
+    if (!cashEl || !out) return;
+    const mobile = Math.max(currentCartTotal() - (Number(cashEl.value) || 0), 0);
+    out.textContent = 'TZS ' + Math.round(mobile).toLocaleString();
+}
+document.addEventListener('input', function (e) { if (e.target && e.target.id === 'split-cash') updateSplitMobile(); });
+
+const customerNameEl = document.getElementById('customer-name');
+const customerPhoneEl = document.getElementById('customer-phone');
+const customerPhoneErrorEl = document.getElementById('customer-phone-error');
+const customerPhoneSuggestionsEl = document.getElementById('customer-phone-suggestions');
+const customerToggleEl = document.getElementById('customer-toggle');
+const customerBodyEl = document.getElementById('customer-body');
+const customerSummaryEl = document.getElementById('customer-summary');
+const customerChevronEl = document.getElementById('customer-chevron');
+const debtWarningEl = document.getElementById('debt-warning');
+const debtWarningTextEl = document.getElementById('debt-warning-text');
+const CUSTOMER_HELP_DEFAULT = 'Type a phone number (0712…, 6…, +255…) — registered customers fill in automatically.';
+let debtCheckTimeout = null;
+let autoFilled = null; // { name, phone } of the last registered customer filled in automatically
+
+customerNameEl.addEventListener('input', function () {
+    clearTimeout(debtCheckTimeout);
+    debtCheckTimeout = setTimeout(checkCustomerDebt, 400);
+});
+
+// ----- Customer pop-up (replaces the old inline section so the cart stays short) -----
+const customerModalEl = document.getElementById('customer-modal');
+const customerModalCardEl = document.getElementById('customer-modal-card');
+const customerModalErrorEl = document.getElementById('customer-modal-error');
+let customerModalReturnFocus = null;
+function setCustomerOpen(open) {
+    const isOpen = customerModalEl.classList.contains('is-open');
+    if (open === isOpen) return;
+    customerToggleEl.setAttribute('aria-expanded', open ? 'true' : 'false');
+    customerModalEl.setAttribute('aria-hidden', open ? 'false' : 'true');
+    if (open) {
+        customerModalReturnFocus = document.activeElement;
+        customerModalErrorEl.classList.add('hidden');
+        customerModalEl.classList.add('is-open');
+        document.body.style.overflow = 'hidden';
+        setTimeout(() => (customerNameEl.value.trim() && !customerPhoneEl.value.trim() ? customerPhoneEl : (customerPhoneEl.value ? customerNameEl : customerLookupEl)).focus(), 40);
+    } else {
+        customerModalEl.classList.remove('is-open');
+        document.body.style.overflow = '';
+        closeCustomerSuggestions();
+        if (customerModalReturnFocus && customerModalReturnFocus.focus) { try { customerModalReturnFocus.focus({ preventScroll: true }); } catch (e) {} }
+    }
+}
+customerToggleEl.addEventListener('click', () => setCustomerOpen(true));
+function finishCustomerModal() {
+    if (!validateCustomerPhone()) { customerPhoneEl.focus(); return; }
+    if (paymentMethodEl.value === 'DEBT' && !customerNameEl.value.trim()) {
+        customerModalErrorEl.textContent = 'Customer name is required for a Debt / Credit sale.';
+        customerModalErrorEl.classList.remove('hidden'); customerNameEl.focus(); return;
+    }
+    setCustomerOpen(false);
+}
+document.getElementById('customer-modal-done').addEventListener('click', finishCustomerModal);
+document.getElementById('customer-modal-x').addEventListener('click', () => setCustomerOpen(false));
+customerModalEl.addEventListener('mousedown', (e) => { if (e.target === customerModalEl) setCustomerOpen(false); });
+customerNameEl.addEventListener('input', () => customerModalErrorEl.classList.add('hidden'));
+document.addEventListener('keydown', (e) => {
+    if (!customerModalEl.classList.contains('is-open')) return;
+    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setCustomerOpen(false); return; }
+    if (e.key === 'Enter' && e.target && (e.target === customerNameEl)) { e.preventDefault(); customerPhoneEl.focus(); return; }
+    if (e.key !== 'Tab') return;
+    const f = Array.from(customerModalCardEl.querySelectorAll('button:not([disabled]):not(.hidden),input,select')).filter(el => el.offsetParent !== null);
+    if (!f.length) return;
+    const first = f[0], last = f[f.length - 1];
+    if (e.shiftKey && (document.activeElement === first || document.activeElement === customerModalCardEl)) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+}, true);
+
+function fmtPhone(p) {
+    const m = /^\+255(\d{3})(\d{3})(\d{3})$/.exec(p || '');
+    return m ? `+255 ${m[1]} ${m[2]} ${m[3]}` : (p || '');
+}
+
+let customerSearchTimeout = null;
+function updateCustomerIdentityState() {
+    const name = customerNameEl.value.trim();
+    const phone = customerPhoneEl.value.trim();
+    const hasIdentity = Boolean(name || phone);
+    customerStatusChipEl.textContent = hasIdentity ? 'Customer' : 'Walk-in';
+    customerStatusChipEl.className = 'chip shrink-0 ' + (hasIdentity ? 'chip-ok' : 'chip-idle');
+    clearCustomerBtn.classList.toggle('hidden', !hasIdentity);
+    customerSummaryEl.textContent = hasIdentity
+        ? [name, phone ? fmtPhone(normalizeTzPhone(phone) || phone) : ''].filter(Boolean).join(' · ')
+        : 'Walk-in · add for debt or SMS receipt';
+    const actionLabel = document.getElementById('customer-action-label');
+    if (actionLabel) actionLabel.textContent = hasIdentity ? 'Edit' : 'Add';
+}
+
+// ----- Live customer suggestions (shared by the "find" box and the phone field) -----
+const suggestBoxes = [
+    { input: customerLookupEl, box: customerSuggestionsEl, active: -1, seq: 0, results: [] },
+    { input: customerPhoneEl, box: customerPhoneSuggestionsEl, active: -1, seq: 0, results: [] },
+];
+function closeCustomerSuggestions() {
+    suggestBoxes.forEach(sb => {
+        sb.box.classList.add('hidden'); sb.box.innerHTML = ''; sb.active = -1; sb.results = [];
+        sb.input.setAttribute('aria-expanded', 'false');
+    });
+}
+function chooseCustomer(c, opts) {
+    customerNameEl.value = c.name || '';
+    customerPhoneEl.value = c.phone || '';
+    customerLookupEl.value = (opts && opts.keepLookup) ? customerLookupEl.value : (c.name || '');
+    autoFilled = { name: c.name || '', phone: c.phone || '' };
+    customerPhoneErrorEl.classList.add('hidden');
+    customerHelpEl.textContent = c && c.vip
+        ? 'VIP customer identified — eligible for ' + (c.vip_discount_label || ((c.vip_discount_type === 'AMOUNT') ? ('up to TZS ' + (c.vip_discount_amount || '0') + ' off per unit') : ('up to ' + (c.vip_discount_percent || '5') + '%'))) + ', subject to product margin and discount policy.'
+        : 'Registered customer — details filled in.';
+    closeCustomerSuggestions();
+    setCustomerOpen(true);
+    updateCustomerIdentityState(); savePosDraft(); checkCustomerDebt();
+}
+function setActiveSuggestion(sb, idx) {
+    const items = sb.box.querySelectorAll('.cust-opt');
+    if (!items.length) return;
+    sb.active = (idx + items.length) % items.length;
+    items.forEach((el, i) => el.classList.toggle('is-active', i === sb.active));
+    items[sb.active].scrollIntoView({ block: 'nearest' });
+}
+function renderSuggestions(sb, data, emptyText) {
+    sb.box.innerHTML = ''; sb.active = -1; sb.results = data.results || [];
+    if (!sb.results.length) {
+        if (!emptyText) { closeCustomerSuggestions(); return; }
+        const e = document.createElement('div'); e.className = 'px-3 py-3 text-xs text-ink-400'; e.textContent = emptyText; sb.box.appendChild(e);
+    } else sb.results.forEach(c => {
+        const b = document.createElement('button'); b.type = 'button'; b.setAttribute('role', 'option');
+        b.className = 'cust-opt w-full text-left px-3 py-2 border-b border-ink-100 last:border-0 transition flex items-center gap-2.5';
+        const av = document.createElement('span'); av.className = 'w-7 h-7 rounded-full bg-brand-50 text-brand-700 text-xs font-bold flex items-center justify-center shrink-0'; av.textContent = (c.name || '?').trim().charAt(0).toUpperCase();
+        const tx = document.createElement('span'); tx.className = 'min-w-0';
+        const n = document.createElement('span'); n.className = 'block text-sm font-semibold text-ink-900 truncate'; n.textContent = c.name;
+        if (c.vip) {
+            const badge = document.createElement('span');
+            badge.className = 'ml-1.5 inline-flex items-center rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-amber-800';
+            badge.textContent = 'VIP';
+            n.appendChild(badge);
+        } else if (c.loyalty_label === 'LOYAL') {
+            const badge = document.createElement('span');
+            badge.className = 'ml-1.5 inline-flex items-center rounded-full bg-teal-50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-teal-700';
+            badge.textContent = 'LOYAL';
+            n.appendChild(badge);
+        }
+        const ph = document.createElement('span'); ph.className = 'block text-xs text-ink-500 tabular-nums'; ph.textContent = fmtPhone(c.phone);
+        if (c.vip) {
+            const meta = document.createElement('span'); meta.className = 'block text-[10px] font-medium text-amber-700';
+            meta.textContent = (c.visits_90d || 0) + ' qualifying purchases · eligible for ' + (c.vip_discount_label || ((c.vip_discount_type === 'AMOUNT') ? ('up to TZS ' + (c.vip_discount_amount || '0') + ' off per unit') : ('up to ' + (c.vip_discount_percent || '5') + '% VIP discount')));
+            tx.append(n, ph, meta);
+        } else tx.append(n, ph);
+        b.append(av, tx);
+        b.addEventListener('mousedown', ev => ev.preventDefault()); // keep input focus
+        b.addEventListener('click', () => chooseCustomer(c, { keepLookup: sb.input === customerPhoneEl }));
+        sb.box.appendChild(b);
+    });
+    sb.box.classList.remove('hidden'); sb.input.setAttribute('aria-expanded', 'true');
+}
+async function fetchCustomers(q) {
+    const r = await fetch(`${CUSTOMER_SEARCH_URL}?q=${encodeURIComponent(q)}`, { headers: { 'Accept': 'application/json' } });
+    if (!r.ok) throw new Error('search failed');
+    return r.json();
+}
+async function searchCustomers(sb, q) {
+    const mine = ++sb.seq;
+    const isPhone = sb.input === customerPhoneEl;
+    if (!navigator.onLine || !q || (!isPhone && q.length < 2)) { if (!q) closeCustomerSuggestions(); return; }
+    try {
+        const data = await fetchCustomers(q);
+        if (mine !== sb.seq) return; // a newer keystroke superseded this response
+        if (isPhone) {
+            const full = normalizeTzPhone(q);
+            const hit = full && data.exact ? (data.results || []).find(c => c.phone === full) : null;
+            if (hit) {
+                // Complete number of a registered customer: fill name + phone without asking.
+                // The phone is the customer's identity key, so a registered number always wins.
+                chooseCustomer(hit, { keepLookup: true }); return;
+            } else if (full && !(data.results || []).length) {
+                customerHelpEl.textContent = 'New number — type the name; it will be saved to your customer list with this sale.';
+                closeCustomerSuggestions();
+                // Not registered: jump straight to the name field so the cashier can finish and complete the sale.
+                if (!customerNameEl.value.trim() && document.activeElement === customerPhoneEl) customerNameEl.focus();
+                return;
+            }
+        }
+        renderSuggestions(sb, data, isPhone ? '' : 'No registered customer found. Enter the details manually.');
+    } catch (e) { closeCustomerSuggestions(); }
+}
+suggestBoxes.forEach(sb => {
+    sb.input.addEventListener('input', function () {
+        clearTimeout(customerSearchTimeout);
+        const q = this.value.trim();
+        if (sb.input === customerPhoneEl) {
+            // Editing the phone away from an auto-filled customer must not leave that customer's name behind.
+            if (autoFilled && (normalizeTzPhone(q) || q) !== autoFilled.phone) {
+                if (customerNameEl.value === autoFilled.name) customerNameEl.value = '';
+                autoFilled = null; customerHelpEl.textContent = CUSTOMER_HELP_DEFAULT; checkCustomerDebt();
+            }
+            if (!/^[+\d\s().-]*$/.test(q)) { closeCustomerSuggestions(); return; }
+        }
+        customerSearchTimeout = setTimeout(() => searchCustomers(sb, q), 180);
+    });
+    sb.input.addEventListener('focus', function () {
+        const q = this.value.trim();
+        if (q && (sb.input === customerPhoneEl ? !normalizeTzPhone(q) : q.length >= 2)) searchCustomers(sb, q);
+    });
+    sb.input.addEventListener('keydown', function (e) {
+        if (sb.box.classList.contains('hidden') || !sb.results.length) return;
+        if (e.key === 'ArrowDown') { e.preventDefault(); setActiveSuggestion(sb, sb.active + 1); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); setActiveSuggestion(sb, sb.active - 1); }
+        else if (e.key === 'Enter') {
+            const c = sb.results[sb.active >= 0 ? sb.active : (sb.results.length === 1 ? 0 : -1)];
+            if (c) { e.preventDefault(); chooseCustomer(c, { keepLookup: sb.input === customerPhoneEl }); }
+        }
+        else if (e.key === 'Escape') { closeCustomerSuggestions(); }
+    });
+});
+clearCustomerBtn.addEventListener('click', function () {
+    customerNameEl.value = ''; customerPhoneEl.value = ''; customerLookupEl.value = ''; autoFilled = null;
+    customerPhoneErrorEl.classList.add('hidden'); customerHelpEl.textContent = CUSTOMER_HELP_DEFAULT;
+    closeCustomerSuggestions(); updateCustomerIdentityState(); savePosDraft(); checkCustomerDebt(); customerPhoneEl.focus();
+});
+document.addEventListener('click', function (e) { if (!customerFields.contains(e.target)) closeCustomerSuggestions(); });
+
+function checkCustomerDebt() {
+    if (!navigator.onLine) return; // debt lookup needs live data — skip quietly offline
+    const name = customerNameEl.value.trim();
+    if (!name) {
+        debtWarningEl.classList.add('hidden');
+        return;
+    }
+    fetch(`{% url 'sales:customer_debt_lookup_api' %}?name=${encodeURIComponent(name)}`)
+        .then(r => r.json())
+        .then(data => {
+            if (data.has_debt) {
+                const amount = Number(data.total_balance).toLocaleString();
+                debtWarningTextEl.textContent = `This customer already owes TZS ${amount} from a previous purchase. Please consider collecting it, or confirm before adding more debt.`;
+                debtWarningEl.classList.remove('hidden');
+            } else {
+                debtWarningEl.classList.add('hidden');
+            }
+        })
+        .catch(() => { debtWarningEl.classList.add('hidden'); });
+}
+
+// ---------- Checkout: online POST, offline queue fallback ----------
+function normalizeTzPhone(raw){
+    let v=(raw||'').trim().replace(/[\s().-]/g,'');
+    if(!v) return '';
+    if(v.startsWith('00')) v='+'+v.slice(2);
+    if(v.startsWith('+255')) return /^\+255[67][0-9]{8}$/.test(v) ? v : null;
+    if(v.startsWith('255')) return /^255[67][0-9]{8}$/.test(v) ? '+'+v : null;
+    if(/^0[67][0-9]{8}$/.test(v)) return '+255'+v.slice(1);
+    return null;
+}
+function validateCustomerPhone(){
+    if(!customerPhoneEl || !customerPhoneEl.value.trim()){ if(customerPhoneErrorEl) customerPhoneErrorEl.classList.add('hidden'); return true; }
+    const n=normalizeTzPhone(customerPhoneEl.value);
+    if(!n){ setCustomerOpen(true); if(customerPhoneErrorEl){customerPhoneErrorEl.textContent='Invalid phone number. Use 0712345678 or +255712345678.';customerPhoneErrorEl.classList.remove('hidden');} return false; }
+    customerPhoneEl.value=n; if(customerPhoneErrorEl) customerPhoneErrorEl.classList.add('hidden'); return true;
+}
+if(customerPhoneEl) customerPhoneEl.addEventListener('blur',validateCustomerPhone);
+customerNameEl.addEventListener('input', updateCustomerIdentityState);
+customerPhoneEl.addEventListener('input', updateCustomerIdentityState);
+updateCustomerIdentityState();
+
+['customer-name', 'customer-phone'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('input', savePosDraft);
+});
+window.addEventListener('beforeunload', savePosDraft);
+
+let completedReceiptUrl = '';
+let completedSaleId = null;
+
+function setReceiptSmsState(label, sub, disabled, done) {
+    receiptSendSmsBtn.querySelector('.sms-label').textContent = label;
+    receiptSendSmsBtn.querySelector('.sms-sub').textContent = sub || '';
+    receiptSendSmsBtn.disabled = Boolean(disabled);
+    receiptSendSmsBtn.classList.toggle('opacity-60', Boolean(done));
+}
+
+const RCP_METHOD_LABELS = { CASH: 'Cash', MOBILE_MONEY: 'Mobile Money', DEBT: 'Debt / Credit', SPLIT: 'Cash + Mobile Money' };
+function rcpMoney(n) { return 'TZS ' + Math.round(Number(n) || 0).toLocaleString(); }
+function rcpAddRow(box, label, value, cls) {
+    const row = document.createElement('div'); row.className = 'rcp-row' + (cls ? ' ' + cls : '');
+    const dt = document.createElement('dt'); dt.textContent = label;
+    const dd = document.createElement('dd'); dd.textContent = value;
+    row.appendChild(dt); row.appendChild(dd); box.appendChild(row);
+}
+
+function openReceiptChoice(saleId, total, receiptNo, customerPhone, paymentMethod, customerName, meta) {
+    meta = meta || {};
+    completedSaleId = saleId;
+    completedReceiptUrl = `/sales/receipts/${saleId}/pdf/`;
+    const canSend = Boolean(customerPhone) && paymentMethod !== 'DEBT';
+    // Fresh state for every sale (the buttons are reused between sales).
+    receiptSendSmsBtn.style.display = canSend ? 'flex' : 'none';
+    setReceiptSmsState('Send Receipt SMS', canSend ? 'to ' + fmtPhone(normalizeTzPhone(customerPhone) || customerPhone) : '', false, false);
+    receiptSmsConfirmBtn.disabled = false;
+    receiptSmsConfirmBtn.textContent = 'Confirm & Send';
+
+    const receiptLabel = receiptNo || ('#' + saleId);
+    const customerLabel = (customerName || '').trim() || (customerPhone ? fmtPhone(normalizeTzPhone(customerPhone) || customerPhone) : 'Walk-in');
+    const methodLabel = RCP_METHOD_LABELS[paymentMethod] || paymentMethod || '';
+    document.getElementById('receipt-choice-total').textContent = Math.round(Number(total)).toLocaleString();
+    document.getElementById('receipt-choice-no').textContent = receiptLabel;
+    document.getElementById('receipt-choice-cust').textContent = customerLabel;
+    document.getElementById('receipt-choice-time').textContent = new Date().toLocaleString([], { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    const n = Number(meta.lines) || 0, q = Number(meta.units) || 0;
+    document.getElementById('receipt-choice-items').textContent = n ? `${n} ${n === 1 ? 'product' : 'products'} · ${q} ${q === 1 ? 'unit' : 'units'}` : '—';
+    const pay = document.getElementById('receipt-choice-method');
+    pay.querySelector('span').textContent = methodLabel;
+    pay.classList.toggle('is-debt', paymentMethod === 'DEBT');
+    const copyBtn = document.getElementById('receipt-choice-copy'); copyBtn.classList.remove('is-done');
+
+    // Payment breakdown rows (only where they add information).
+    const extra = document.getElementById('receipt-choice-extra'); extra.textContent = '';
+    if (paymentMethod === 'SPLIT' && meta.cash > 0) {
+        rcpAddRow(extra, 'Cash received', rcpMoney(meta.cash));
+        rcpAddRow(extra, 'Mobile money', rcpMoney(Number(total) - meta.cash));
+    } else if (paymentMethod === 'DEBT') {
+        const paid = Math.min(Number(meta.deposit) || 0, Number(total));
+        if (paid > 0) rcpAddRow(extra, 'Paid now', rcpMoney(paid), 'is-paid');
+        rcpAddRow(extra, 'Balance due', rcpMoney(Number(total) - paid), 'is-due');
+    }
+
+    receiptChoiceMessage.textContent = `Sale completed. Receipt ${receiptLabel}. Total TZS ${Number(total).toLocaleString()}. Payment: ${methodLabel}.`;
+    receiptChoiceModal.classList.remove('hidden');
+    receiptChoiceModal.classList.add('flex');
+    receiptPrintBtn.focus();
+}
+
+document.getElementById('receipt-choice-copy').addEventListener('click', async function () {
+    const text = document.getElementById('receipt-choice-no').textContent;
+    try { await navigator.clipboard.writeText(text); } catch (e) {
+        const t = document.createElement('textarea'); t.value = text; t.setAttribute('readonly', ''); t.style.position = 'fixed'; t.style.opacity = '0';
+        document.body.appendChild(t); t.select(); try { document.execCommand('copy'); } catch (e2) {} t.remove();
+    }
+    this.classList.add('is-done'); showToast('Receipt number copied.', 'success');
+});
+
+function closeReceiptChoice() {
+    receiptChoiceModal.classList.add('hidden');
+    receiptChoiceModal.classList.remove('flex');
+    searchInput.focus();
+}
+
+receiptSendSmsBtn.addEventListener('click', function () {
+    if (!completedSaleId) return;
+    receiptSmsConfirmModal.classList.remove('hidden');
+    receiptSmsConfirmModal.classList.add('flex');
+    receiptSmsConfirmBtn.focus();
+});
+
+function closeReceiptSmsConfirm() {
+    receiptSmsConfirmModal.classList.add('hidden');
+    receiptSmsConfirmModal.classList.remove('flex');
+}
+
+receiptSmsConfirmClose.addEventListener('click', closeReceiptSmsConfirm);
+receiptSmsCancelBtn.addEventListener('click', closeReceiptSmsConfirm);
+receiptSmsConfirmModal.addEventListener('click', function (event) {
+    if (event.target === receiptSmsConfirmModal) closeReceiptSmsConfirm();
+});
+
+receiptSmsConfirmBtn.addEventListener('click', async function () {
+    if (!completedSaleId) return;
+    receiptSmsConfirmBtn.disabled = true;
+    receiptSmsConfirmBtn.textContent = 'Sending…';
+    try {
+        const response = await fetch(`/sales/receipts/${completedSaleId}/send-sms/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCsrfToken(),
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json',
+            },
+        });
+        let data;
+        try {
+            data = await response.json();
+        } catch (parseErr) {
+            throw new Error(`Server returned an unexpected response (HTTP ${response.status}). Please refresh the page and try again.`);
+        }
+        if (response.ok && data.success) {
+            closeReceiptSmsConfirm();
+            setReceiptSmsState('SMS sent ✓', 'Receipt link delivered', true, true);
+            showToast(data.message || 'Receipt SMS sent successfully.', 'success');
+        } else {
+            receiptSmsConfirmBtn.disabled = false;
+            receiptSmsConfirmBtn.textContent = 'Confirm & Send';
+            if (data.already_sent) {
+                closeReceiptSmsConfirm();
+                setReceiptSmsState('Already sent', 'Receipt link was sent before', true, true);
+            }
+            showToast(data.error || 'Could not send receipt SMS.', 'warning');
+        }
+    } catch (err) {
+        receiptSmsConfirmBtn.disabled = false;
+        receiptSmsConfirmBtn.textContent = 'Confirm & Send';
+        showToast(err.message || 'Unable to contact the server. Please check your connection and try again.', 'error');
+    }
+});
+
+receiptPrintBtn.addEventListener('click', function () {
+    if (completedReceiptUrl) window.open(completedReceiptUrl, '_blank', 'noopener');
+    closeReceiptChoice();
+});
+receiptContinueBtn.addEventListener('click', closeReceiptChoice);
+receiptChoiceClose.addEventListener('click', closeReceiptChoice);
+receiptChoiceModal.addEventListener('click', function (event) {
+    if (event.target === receiptChoiceModal) closeReceiptChoice();
+});
+document.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape') {
+        if (!receiptSmsConfirmModal.classList.contains('hidden')) closeReceiptSmsConfirm();
+        else if (!receiptChoiceModal.classList.contains('hidden')) closeReceiptChoice();
+    }
+});
+
+document.getElementById('late-entry-enabled')?.addEventListener('change', function () {
+    const lf = document.getElementById('late-entry-fields');
+    if (lf) { lf.classList.toggle('hidden', !this.checked); lf.classList.toggle('grid', this.checked); }
+});
+
+checkoutBtn.addEventListener('click', async function () {
+    if (posBranchMismatch) { showToast('Branch changed. Reload the POS page before selling.', 'warning'); return; }
+    if(!validateCustomerPhone()){customerPhoneEl?.focus();return;}
+    const ids = Object.keys(cart);
+    if (ids.length === 0) {
+        showToast('Your cart is empty. Add at least one product before completing the sale.', 'warning');
+        return;
+    }
+    const paymentMethod = paymentMethodEl.value;
+    const customerName = document.getElementById('customer-name').value.trim();
+    const customerPhone = document.getElementById('customer-phone').value.trim();
+
+    if (paymentMethod === 'SPLIT') {
+        const cashPart = Number(document.getElementById('split-cash')?.value) || 0;
+        const total = currentCartTotal();
+        if (cashPart <= 0 || cashPart >= total) {
+            showToast('Cash + Mobile Money: enter a cash amount greater than 0 and less than the total (TZS ' + Math.round(total).toLocaleString() + '). The rest is taken as mobile money.', 'warning');
+            document.getElementById('split-cash')?.focus();
+            return;
+        }
+    }
+    if (paymentMethod === 'DEBT' && !customerName) {
+        setCustomerOpen(true); customerNameEl.focus();
+        showToast('Please enter the customer name — it is required for debt sales.', 'warning');
+        return;
+    }
+
+    // Late entry (sale made on an earlier day). The server validates everything again.
+    const lateEnabled = !!document.getElementById('late-entry-enabled')?.checked;
+    let lateData = {};
+    if (lateEnabled) {
+        const lateDateEl = document.getElementById('late-entry-date');
+        const lateReasonEl = document.getElementById('late-entry-reason');
+        if (!lateReasonEl.value) {
+            showToast('Choose why this sale was not recorded on the day.', 'warning');
+            lateReasonEl.focus();
+            return;
+        }
+        if (!navigator.onLine) {
+            showToast('An earlier-day sale needs a live connection. Reconnect, then try again.', 'warning');
+            return;
+        }
+        const lateLabel = lateDateEl.options[lateDateEl.selectedIndex].text;
+        const lateOk = await posConfirm({
+            title: 'Record this sale for an earlier day?',
+            text: 'Date: ' + lateLabel,
+            detail: 'It will be counted on that day in reports and the cash drawer, not today. The owner will see it marked as a late entry.',
+            okText: 'Yes, record sale', cancelText: 'Go back', danger: false
+        });
+        if (!lateOk) return;
+        lateData = { business_date: lateDateEl.value, late_entry_reason: lateReasonEl.value, late_entry_note: '' };
+    }
+
+    // Client-side guard for a better cashier experience. The server repeats
+    // this validation and remains the final authority, including offline sync.
+    for (const id of ids) {
+        const item = cart[id];
+        const discount = Number(item.discount_value || 0);
+        if (discount === 0) continue;
+        if (!item.discount_enabled || discount < item.min_discount || discount > item.max_discount) {
+            showToast(
+                item.discount_type === 'AMOUNT'
+                    ? `Discount for ${item.name} must be TZS ${item.min_discount.toLocaleString()}–${item.max_discount.toLocaleString()} per unit, or 0 for no discount.`
+                    : `Discount for ${item.name} must be ${item.min_discount}%–${item.max_discount}% when applied, or 0% for no discount.`,
+                'warning'
+            );
+            return;
+        }
+        if (item.discount_type === 'AMOUNT' && discount > item.price) {
+            showToast(`Discount for ${item.name} cannot exceed its selling price.`, 'warning');
+            return;
+        }
+    }
+
+    // Loss warning: explain the risk and the professional next steps before the sale is recorded.
+    const profitCheck = analyzeCartProfit();
+    if (profitCheck.lossLines.length) {
+        const proceed = await posLossWarning(profitCheck.lossLines, profitCheck.totalLoss);
+        if (!proceed) return;
+    }
+
+    const clientTotal = ids.reduce((sum, id) => sum + calculateCartItem(cart[id]).subtotal, 0);
+    const cartPayload = ids.map(id => ({ product_id: parseInt(id), quantity: cart[id].quantity, discount_value: cart[id].discount_value || 0, batch_prices: cart[id].batch_prices || [] }));
+    const saleData = { branch_id: POS_BRANCH_ID, cart: cartPayload, expected_total: Number(clientTotal.toFixed(2)), payment_method: paymentMethod, customer_name: customerName, customer_phone: customerPhone,
+        deposit_amount: paymentMethod === 'DEBT' ? (Number(document.getElementById('debt-deposit')?.value) || 0) : 0,
+        deposit_method: document.getElementById('debt-deposit-method')?.value || 'CASH',
+        cash_paid: paymentMethod === 'SPLIT' ? (Number(document.getElementById('split-cash')?.value) || 0) : 0,
+        allow_layaway_reserved_sale: !!document.getElementById('allow-layaway-reserved-sale')?.checked,
+        layaway_override_reason: document.getElementById('layaway-override-reason')?.value.trim() || '',
+        ...lateData };
+
+    // Snapshot for the sale-complete card (the cart is cleared right after a successful sale).
+    const saleSummary = { lines: ids.length, units: ids.reduce((n, id) => n + (Number(cart[id].quantity) || 0), 0), cash: saleData.cash_paid, deposit: saleData.deposit_amount };
+
+    checkoutBtn.disabled = true;
+    checkoutBtn.innerHTML = '<span class="spinner"></span> Processing...';
+
+    function resetSaleForm() {
+        clearPosDraft();
+        cart = {};
+        renderCart();
+        clearSearchResults();
+        searchInput.value = '';
+        syncSearchClearBtn();
+        document.getElementById('customer-name').value = '';
+        document.getElementById('customer-phone').value = '';
+        if (customerLookupEl) customerLookupEl.value = '';
+        autoFilled = null; customerHelpEl.textContent = CUSTOMER_HELP_DEFAULT;
+        openDiscountRows.clear();
+        closeCustomerSuggestions();
+        setCustomerOpen(false);
+        updateCustomerIdentityState();
+        debtWarningEl.classList.add('hidden');
+        const lateToggle = document.getElementById('late-entry-enabled');
+        if (lateToggle) {
+            lateToggle.checked = false;
+            const lf2 = document.getElementById('late-entry-fields');
+            if (lf2) { lf2.classList.add('hidden'); lf2.classList.remove('grid'); }
+            const lr = document.getElementById('late-entry-reason'); if (lr) lr.value = '';
+        }
+        checkoutBtn.disabled = false;
+        checkoutBtn.innerHTML = CHECKOUT_HTML;
+    }
+
+    if (!navigator.onLine) {
+        if (saleData.allow_layaway_reserved_sale) {
+            showToast('Manager-approved Layaway reservation changes require a live connection. Reconnect before completing this sale.', 'warning');
+            checkoutBtn.disabled = false; checkoutBtn.innerHTML = CHECKOUT_HTML;
+            return;
+        }
+        await OfflinePOS.queueSale(saleData);
+        showToast('No connection — sale saved on this device and will sync automatically when you\'re back online.', 'warning');
+        resetSaleForm();
+        refreshStatusBar();
+        return;
+    }
+
+    async function submitCheckoutWithSessionRetry() {
+        const endpoint = `{% url 'sales:checkout' %}`;
+        const requestCheckout = () => fetch(endpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCsrfToken(),
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json',
+            },
+            credentials: 'same-origin',
+            cache: 'no-store',
+            body: JSON.stringify(saleData),
+        });
+
+        let response = await requestCheckout();
+        if (response.status === 401 || response.status === 403) {
+            // One silent heartbeat/retry prevents transient session/connection
+            // hiccups from interrupting a cashier's sale. Do not duplicate the
+            // sale: the server receives the same request only after a fresh check.
+            const alive = await ensurePosSession();
+            if (alive) response = await requestCheckout();
+        }
+
+        let data;
+        const contentType = response.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+            data = await response.json();
+        } else {
+            throw new Error(`The server returned an unexpected response (HTTP ${response.status}). Your sale has not been submitted.`);
+        }
+        if (!response.ok) {
+            const error = new Error(data.error || (response.status === 403
+                ? 'The security check could not be completed. Your cart is still safely preserved.'
+                : 'Checkout could not be completed.'));
+            error.httpStatus = response.status;
+            if (data.branch_changed) { error.branchChanged = true; setBranchMismatch(data.active_branch); }
+            if (data.workday_closed) { error.workdayClosed = true; }
+            if (data.closed_day_correction) { error.closedDay = { canAck: !!data.can_ack }; }
+            throw error;
+        }
+        return data;
+    }
+
+    function runCheckout() { return submitCheckoutWithSessionRetry()
+        .then(data => {
+            if (data.success) {
+                if (data.closed_day_correction) {
+                    showToast('Saved on a CLOSED cash day. Open Cash Control and use Reopen & Recount for that day to reconcile the drawer.', 'warning');
+                }
+                // Speed: show the confirmation card FIRST (the card already confirms the sale, so no extra toast),
+                // then clear the cart/form on the next frame so the cashier never waits for that DOM work.
+                if (data.sale_id) openReceiptChoice(data.sale_id, data.total, data.receipt_no, customerPhone, paymentMethod, customerName, saleSummary);
+                else showToast(`Sale completed! Total: TZS ${Number(data.total).toLocaleString()}`, 'success');
+                requestAnimationFrame(resetSaleForm);
+            } else {
+                checkoutBtn.disabled = false;
+                checkoutBtn.innerHTML = CHECKOUT_HTML;
+                showToast(data.error || 'Checkout failed.', 'error');
+            }
+        })
+        .catch(async (err) => {
+            // A fetch that fails outright (not just a bad response) usually means the
+            // connection dropped mid-request — queue it offline rather than lose it.
+            if (err.closedDay && err.closedDay.canAck) {
+                // Owner/manager: the selected day is already closed and verified. Confirm before posting.
+                checkoutBtn.disabled = false;
+                checkoutBtn.innerHTML = CHECKOUT_HTML;
+                const closedOk = await posConfirm({
+                    title: 'That day is already closed',
+                    text: err.message,
+                    detail: 'If you continue, the sale is added to that closed day and the owner must reconcile the cash drawer.',
+                    okText: 'Continue anyway', cancelText: 'Cancel', danger: true
+                });
+                if (closedOk) {
+                    saleData.ack_closed_day = true;
+                    checkoutBtn.disabled = true;
+                    checkoutBtn.innerHTML = '<span class="spinner"></span> Processing...';
+                    runCheckout();
+                }
+                return;
+            }
+            if (err instanceof TypeError && lateEnabled) {
+                // Never queue an earlier-day sale offline: it needs the server's date/cash-day checks.
+                checkoutBtn.disabled = false;
+                checkoutBtn.innerHTML = CHECKOUT_HTML;
+                showToast('Connection lost. The earlier-day sale was NOT saved — check Sales History, then try again when online.', 'error');
+            } else if (err instanceof TypeError) {
+                await OfflinePOS.queueSale(saleData);
+                showToast('Connection lost — sale saved on this device and will sync automatically.', 'warning');
+                resetSaleForm();
+                refreshStatusBar();
+            } else {
+                checkoutBtn.disabled = false;
+                checkoutBtn.innerHTML = CHECKOUT_HTML;
+                showToast(err.message || 'Network error. Please try again.', 'error');
+            }
+        }); }
+    runCheckout();
+});
+</script>
+<script>
+(function () {
+    var items = document.getElementById('cart-items'), total = document.getElementById('cart-total');
+    var chip = document.getElementById('cart-count-chip'), bar = document.getElementById('pos-mobile-bar');
+    if (!items || !total || !chip || !bar) return;
+    function sync() {
+        var n = items.querySelectorAll('.cart-row').length;
+        var label = n + (n === 1 ? ' item' : ' items');
+        chip.textContent = label; chip.className = 'chip ' + (n ? 'chip-ok' : 'chip-idle');
+        document.getElementById('pos-bar-count').textContent = label;
+        document.getElementById('pos-bar-total').textContent = total.textContent;
+        bar.hidden = n === 0;
+        document.body.classList.toggle('sp-bar-on', !!n && window.matchMedia('(max-width: 1023px)').matches);
+        document.body.style.paddingBottom = '';
+    }
+    new MutationObserver(sync).observe(items, { childList: true, subtree: true });
+    new MutationObserver(sync).observe(total, { childList: true, characterData: true, subtree: true });
+    document.getElementById('pos-bar-go').addEventListener('click', function () {
+        var c = document.getElementById('cart-panel'); if (c) c.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    // The summary bar is only needed while the cart is out of view; showing it on top of the cart hid the payment tiles and Complete Sale.
+    var cartPanel = document.getElementById('cart-panel');
+    if (cartPanel && 'IntersectionObserver' in window) {
+        new IntersectionObserver(function (entries) {
+            bar.classList.toggle('is-away', entries[0].intersectionRatio > 0.35);
+        }, { threshold: [0, 0.2, 0.35, 0.6, 1] }).observe(cartPanel);
+    }
+    window.addEventListener('resize', sync); sync();
+})();
+</script>
+
+<script>
+(function () {
+    var group = document.getElementById('pay-tiles'), native = document.getElementById('payment-method');
+    if (!group || !native) return;
+    var tiles = Array.prototype.slice.call(group.querySelectorAll('.pay-tile'));
+    function sync() {
+        tiles.forEach(function (b) { b.setAttribute('aria-checked', b.dataset.pay === native.value ? 'true' : 'false'); b.tabIndex = b.dataset.pay === native.value ? 0 : -1; });
+    }
+    tiles.forEach(function (b, i) {
+        b.addEventListener('click', function () {
+            // Reuse the original option handler so totals, debt warnings and drafts behave exactly as before.
+            var opt = document.querySelector('#payment-method-menu .custom-option[data-value="' + b.dataset.pay + '"]');
+            if (opt) opt.click(); else { native.value = b.dataset.pay; native.dispatchEvent(new Event('change', { bubbles: true })); }
+            sync();
+        });
+        b.addEventListener('keydown', function (e) {
+            var d = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
+            if (!d) return; e.preventDefault();
+            var n = tiles[(i + d + tiles.length) % tiles.length]; n.focus(); n.click();
+        });
+    });
+    native.addEventListener('change', sync);
+    new MutationObserver(sync).observe(document.getElementById('payment-method-menu'), { attributes: true, subtree: true, attributeFilter: ['class', 'aria-selected'] });
+    sync();
+})();
+</script>
+{% endblock %}

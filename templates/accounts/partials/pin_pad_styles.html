@@ -1,0 +1,81 @@
+<style>
+    /* ===== SmartPOS PIN pad v117.13 — professional, dynamic, animated ===== */
+    .pin-root{--pin-brand:#0f766e;--pin-brand-2:#14b8a6;--pin-ok:#16a34a;--pin-bad:#dc2626}
+    .pin-root>*{animation:pinRise .45s cubic-bezier(.2,.8,.2,1) both}
+    .pin-root>*:nth-child(2){animation-delay:.04s}.pin-root>*:nth-child(3){animation-delay:.08s}.pin-root>*:nth-child(4){animation-delay:.12s}
+    @keyframes pinRise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+    /* Dots */
+    .pin-dots{display:flex;justify-content:center;align-items:center;gap:.8rem;margin-top:.9rem;min-height:2rem}
+    .pin-dot{position:relative;display:inline-flex;align-items:center;justify-content:center;height:.85rem;width:.85rem;border-radius:9999px;border:2px solid #94a3b8;background:transparent;color:#fff;font-size:.95rem;font-weight:700;line-height:1;transition:all .22s cubic-bezier(.34,1.56,.64,1)}
+    .pin-dot.is-filled{background:linear-gradient(135deg,var(--pin-brand-2),var(--pin-brand));border-color:var(--pin-brand);transform:scale(1.12);animation:pinPop .32s cubic-bezier(.34,1.56,.64,1)}
+    .pin-dot.is-filled::after{content:"";position:absolute;inset:-2px;border-radius:inherit;border:2px solid var(--pin-brand-2);opacity:0;animation:pinRing .55s ease-out}
+    @keyframes pinPop{0%{transform:scale(.4)}60%{transform:scale(1.4)}100%{transform:scale(1.12)}}
+    @keyframes pinRing{0%{opacity:.7;transform:scale(1)}100%{opacity:0;transform:scale(2.3)}}
+    .pin-dot .pin-dot-char{display:none}
+    .pin-dots.is-revealed .pin-dot{height:2rem;width:1.7rem;border-radius:.6rem;transform:none}
+    .pin-dots.is-revealed .pin-dot.is-filled{animation:none}
+    .pin-dots.is-revealed .pin-dot.is-filled .pin-dot-char{display:inline}
+    .pin-dots.is-shake{animation:pinShake .38s ease}
+    .pin-dots.is-shake .pin-dot{border-color:var(--pin-bad);background:rgba(220,38,38,.12)}
+    .pin-dots.is-ok .pin-dot{background:var(--pin-ok);border-color:var(--pin-ok);animation:pinWave .5s ease both}
+    .pin-dots.is-ok .pin-dot:nth-child(2){animation-delay:.07s}.pin-dots.is-ok .pin-dot:nth-child(3){animation-delay:.14s}.pin-dots.is-ok .pin-dot:nth-child(4){animation-delay:.21s}.pin-dots.is-ok .pin-dot:nth-child(5){animation-delay:.28s}.pin-dots.is-ok .pin-dot:nth-child(6){animation-delay:.35s}
+    .pin-dots.is-busy-wave .pin-dot{animation:pinWave .9s ease-in-out infinite}
+    .pin-dots.is-busy-wave .pin-dot:nth-child(2){animation-delay:.1s}.pin-dots.is-busy-wave .pin-dot:nth-child(3){animation-delay:.2s}.pin-dots.is-busy-wave .pin-dot:nth-child(4){animation-delay:.3s}.pin-dots.is-busy-wave .pin-dot:nth-child(5){animation-delay:.4s}.pin-dots.is-busy-wave .pin-dot:nth-child(6){animation-delay:.5s}
+    @keyframes pinWave{0%,100%{transform:translateY(0) scale(1.12)}50%{transform:translateY(-7px) scale(1.12)}}
+    @keyframes pinShake{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-5px)}80%{transform:translateX(5px)}}
+
+    /* Show / hide + sound toggle */
+    .pin-eye{margin:.55rem auto 0;display:inline-flex;align-items:center;gap:.35rem;border:0;background:transparent;color:#64748b;font-size:.68rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;padding:.2rem .5rem;border-radius:9999px;transition:color .15s,background .15s}
+    .pin-eye:hover{color:var(--pin-brand);background:#f0fdfa}
+    .pin-eye svg{height:.9rem;width:.9rem}
+    .pin-eye:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(20,184,166,.35)}
+
+    /* Keypad */
+    .pin-pad{display:grid;grid-template-columns:repeat(3,3.55rem);gap:.6rem .8rem;justify-content:center;margin-top:1rem}
+    .pin-key{position:relative;overflow:hidden;height:3.55rem;width:3.55rem;border-radius:9999px;border:1px solid #e2e8f0;background:linear-gradient(180deg,#fff,#f1f5f9);box-shadow:0 1px 2px rgba(15,23,42,.06),0 4px 10px -4px rgba(15,23,42,.12);font-size:1.25rem;font-weight:650;color:#0f172a;display:inline-flex;align-items:center;justify-content:center;transition:background .15s,border-color .15s,transform .1s,box-shadow .15s;-webkit-tap-highlight-color:transparent;touch-action:manipulation;opacity:0;animation:pinKeyIn .4s cubic-bezier(.2,.8,.2,1) forwards}
+    .pin-pad>*:nth-child(1){animation-delay:.10s}.pin-pad>*:nth-child(2){animation-delay:.14s}.pin-pad>*:nth-child(3){animation-delay:.18s}.pin-pad>*:nth-child(4){animation-delay:.22s}.pin-pad>*:nth-child(5){animation-delay:.26s}.pin-pad>*:nth-child(6){animation-delay:.30s}.pin-pad>*:nth-child(7){animation-delay:.34s}.pin-pad>*:nth-child(8){animation-delay:.38s}.pin-pad>*:nth-child(9){animation-delay:.42s}.pin-pad>*:nth-child(11){animation-delay:.46s}.pin-pad>*:nth-child(12){animation-delay:.50s}
+    @keyframes pinKeyIn{from{opacity:0;transform:translateY(12px) scale(.9)}to{opacity:1;transform:none}}
+    .pin-key:hover{background:linear-gradient(180deg,#f0fdfa,#ccfbf1);border-color:#5eead4;box-shadow:0 2px 4px rgba(15,118,110,.12),0 8px 16px -6px rgba(15,118,110,.28)}
+    .pin-key:active{transform:scale(.92);background:#99f6e4}
+    .pin-key:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(20,184,166,.4)}
+    .pin-key.pin-ghost{border-color:transparent;background:transparent;box-shadow:none;color:#64748b}
+    .pin-key.pin-ghost:hover{background:#f1f5f9}
+    .pin-key:disabled{opacity:.45!important;cursor:not-allowed}
+    .pin-ripple{position:absolute;border-radius:9999px;background:rgba(20,184,166,.35);transform:scale(0);animation:pinRipple .55s ease-out forwards;pointer-events:none}
+    @keyframes pinRipple{to{transform:scale(2.6);opacity:0}}
+    .pin-root.is-busy .pin-key{opacity:.6;pointer-events:none}
+
+    /* Confirm button */
+    .pin-confirm{position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;gap:.5rem;width:100%;max-width:12.4rem;margin:1.1rem auto 0;height:2.9rem;border:0;border-radius:.8rem;font-size:.85rem;font-weight:700;letter-spacing:.02em;color:#fff;background:linear-gradient(135deg,var(--pin-brand-2),var(--pin-brand));box-shadow:0 8px 18px -8px rgba(15,118,110,.7);cursor:pointer;transition:transform .12s,box-shadow .2s,background .25s,opacity .2s,filter .2s;touch-action:manipulation}
+    .pin-confirm:hover:not(:disabled){filter:brightness(1.06);box-shadow:0 10px 22px -8px rgba(15,118,110,.8)}
+    .pin-confirm:active:not(:disabled){transform:scale(.97)}
+    .pin-confirm:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(20,184,166,.45)}
+    .pin-confirm:disabled{cursor:not-allowed;opacity:.5;filter:grayscale(.35);box-shadow:none}
+    .pin-confirm.is-ready{animation:pinReady 1.8s ease-in-out infinite}
+    @keyframes pinReady{0%,100%{box-shadow:0 8px 18px -8px rgba(15,118,110,.7),0 0 0 0 rgba(20,184,166,.5)}50%{box-shadow:0 8px 18px -8px rgba(15,118,110,.7),0 0 0 8px rgba(20,184,166,0)}}
+    .pin-confirm .pin-spin{display:none;height:1rem;width:1rem;border-radius:9999px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;animation:pinSpin .7s linear infinite}
+    .pin-confirm .pin-check{display:none;height:1.35rem;width:1.35rem}
+    .pin-confirm.is-busy{opacity:.9;cursor:progress}.pin-confirm.is-busy .pin-spin{display:inline-block}
+    .pin-confirm.is-success{background:linear-gradient(135deg,#22c55e,var(--pin-ok));opacity:1;filter:none;animation:none}
+    .pin-confirm.is-success .pin-check{display:inline-block}
+    .pin-confirm.is-success .pin-check .pc-ring{stroke-dasharray:60;stroke-dashoffset:60;animation:pinDraw .45s ease forwards}
+    .pin-confirm.is-success .pin-check .pc-tick{stroke-dasharray:16;stroke-dashoffset:16;animation:pinDraw .3s .35s ease forwards}
+    .pin-confirm.is-success{animation:pinSuccessPop .5s cubic-bezier(.34,1.56,.64,1)!important}
+    @keyframes pinSuccessPop{0%{transform:scale(.96)}60%{transform:scale(1.04)}100%{transform:scale(1)}}
+    .pin-root.is-leaving{transition:opacity .45s ease,transform .45s ease,filter .45s ease;opacity:0;transform:translateY(-10px) scale(.985);filter:blur(3px)}
+    @keyframes pinSlide{0%{transform:translateX(-110%)}100%{transform:translateX(280%)}}
+    @keyframes pinHalo{0%{box-shadow:0 0 0 0 rgba(94,234,212,.45)}100%{box-shadow:0 0 0 22px rgba(94,234,212,0)}}
+    @keyframes pinSpin{to{transform:rotate(360deg)}}
+    @keyframes pinDraw{to{stroke-dashoffset:0}}
+
+    /* Messages */
+    #pin-error,#pin-lock-error{transition:opacity .2s,transform .2s}
+    .pin-status-ok{color:var(--pin-ok)!important}
+
+    @media(max-width:380px){.pin-pad{grid-template-columns:repeat(3,3.15rem)}.pin-key{width:3.15rem;height:3.15rem}}
+    @media(max-height:760px){.pin-pad{grid-template-columns:repeat(3,3.25rem);gap:.45rem .65rem;margin-top:.7rem}.pin-key{width:3.25rem;height:3.25rem;font-size:1.1rem}.pin-dots{margin-top:.5rem}.pin-confirm{height:2.6rem;margin-top:.8rem}}
+    @media(max-height:640px){.pin-pad{grid-template-columns:repeat(3,2.9rem);gap:.35rem .5rem;margin-top:.5rem}.pin-key{width:2.9rem;height:2.9rem;font-size:1rem}.pin-key svg{height:1.1rem;width:1.1rem}.pin-confirm{height:2.4rem;margin-top:.6rem}}
+    @media(prefers-reduced-motion:reduce){.pin-root>*,.pin-key,.pin-dot,.pin-dots,.pin-confirm,.pin-ripple{animation:none!important;transition:none!important}.pin-key{opacity:1}}
+</style>
+{% include "accounts/partials/signin_splash.html" %}

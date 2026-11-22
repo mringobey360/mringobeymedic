@@ -1,0 +1,362 @@
+{% extends 'base.html' %}
+{% load humanize %}
+{% block title %}Cash Control{% endblock %}
+{% block content %}
+<div class="space-y-6 max-w-screen-2xl mx-auto" id="cash-control-panel">
+  <div class="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-4">
+    <div>
+      <p class="text-xs font-bold uppercase tracking-[0.14em] text-brand-700">Financial Control</p>
+      <h1 class="text-2xl md:text-3xl font-extrabold text-ink-900 mt-1">Daily Cash Control</h1>
+      <p class="text-sm text-ink-500 mt-2 max-w-3xl">Automatic day-end control, manager-verified physical counts, variance detection and verified carry-forward — all in one auditable workflow.</p>
+      <div class="flex flex-wrap gap-2">
+        <a href="{% url 'expenses:cash_reset_cycle' %}" class="inline-flex items-center justify-center rounded-xl border border-amber-300 bg-white px-4 py-3 text-sm font-bold text-amber-800 hover:bg-amber-50">Reset / Start New Cash Cycle</a>
+      </div>
+    </div>
+  </div>
+
+  {% if last_reset %}
+  <div class="card p-4 border border-ink-200 text-sm flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+    <div><span class="text-xs font-bold uppercase tracking-[0.14em] text-ink-500">Current cash-control cycle</span>
+      <p class="mt-1 text-ink-800">Started <strong>{{ last_reset.start_date }}</strong> with opening <strong>TZS {{ last_reset.opening_cash|floatformat:0|intcomma }}</strong> by {{ last_reset.reset_by.get_full_name|default:last_reset.reset_by.get_username }} · <span class="text-ink-500">{{ last_reset.reason|truncatechars:80 }}</span></p></div>
+    <a href="{% url 'expenses:cash_reset_cycle' %}" class="font-semibold text-amber-800 underline whitespace-nowrap">Reset history</a>
+  </div>
+  {% endif %}
+
+  {% if auto_message %}
+  <div class="card p-4 border border-emerald-200 bg-emerald-50 text-emerald-800 text-sm"><strong>Automatic carry-forward:</strong> {{ auto_message }}</div>
+  {% endif %}
+
+  {% if attention and not blocked_day %}
+  <div class="card p-5 md:p-6 border border-amber-300 bg-amber-50" role="alert">
+    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
+      <div class="min-w-0">
+        <p class="text-xs font-bold uppercase tracking-[0.14em] text-amber-700">Next step</p>
+        {% if attention.reason == 'POST_CLOSE' %}
+        <h2 class="text-lg md:text-xl font-extrabold text-ink-900 mt-1">{{ attention.day.date }} needs a recount before today can be closed</h2>
+        <p class="text-sm text-ink-700 mt-2 max-w-3xl">Net cash after close: <strong>TZS {{ attention.activity|floatformat:0|intcomma }}</strong> was recorded after {{ attention.day.date }} was closed (original closing count TZS {{ attention.day.actual_closing_cash|floatformat:0|intcomma }}). This is the movement after the close only — the full-day net in the timeline below also includes the activity before the close. Reopen it with a reason, recount, and close it again. Trading is not blocked.</p>
+        <p class="mt-2 text-sm"><a class="font-semibold text-amber-800 underline" href="{% url 'expenses:cash_activity_detail' attention.day.pk %}">View the {{ attention.day.date }} post-close transactions</a></p>
+        </div>
+        <a href="{% url 'expenses:cash_reopen' attention.day.pk %}" class="btn btn-primary whitespace-nowrap">Reopen &amp; recount {{ attention.day.date }}</a>
+        {% elif attention.reason == 'UNVERIFIED' %}
+        <h2 class="text-lg md:text-xl font-extrabold text-ink-900 mt-1">{{ attention.day.date }} still needs its physical count</h2>
+        <p class="text-sm text-ink-700 mt-2 max-w-3xl">The earlier cash day must be physically verified before the next day can be fully reconciled. Count the physical drawer once; the system will calculate the variance and carry the verified closing balance forward.</p>
+        </div>
+        <a href="{% url 'expenses:cash_close' attention.day.pk %}" class="btn btn-primary whitespace-nowrap">Count &amp; Close {{ attention.day.date }}</a>
+        {% elif attention.reason == 'PROVISIONAL_CLOSED' %}
+        <h2 class="text-lg md:text-xl font-extrabold text-ink-900 mt-1">{{ attention.day.date }} needs opening reconciliation</h2>
+        <p class="text-sm text-ink-700 mt-2 max-w-3xl">This day was already physically closed, but its opening was created provisionally while an earlier day was unresolved. Resolve the earlier day first; if the verified opening changes, this day can be reopened safely with a permanent audit record.</p>
+        </div>
+        <a href="{% url 'expenses:cash_reopen' attention.day.pk %}" class="btn btn-primary whitespace-nowrap">Review &amp; reconcile {{ attention.day.date }}</a>
+        {% else %}
+        <h2 class="text-lg md:text-xl font-extrabold text-ink-900 mt-1">{{ attention.day.date }} is waiting for an earlier day</h2>
+        <p class="text-sm text-ink-700 mt-2 max-w-3xl">Its opening balance is provisional until the earlier cash day is verified.</p>
+        </div>
+        {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% if blocked_day %}
+  <div class="card p-5 md:p-6 border border-amber-200 bg-amber-50">
+    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
+      <div class="min-w-0">
+        <div class="flex items-center gap-2"><span class="inline-flex h-9 w-9 items-center justify-center rounded-full bg-amber-100 text-amber-800 font-extrabold">!</span><p class="text-xs font-bold uppercase tracking-[0.14em] text-amber-700">Action required</p></div>
+        <h2 class="text-lg md:text-xl font-extrabold text-ink-900 mt-2">Verify cash for {{ blocked_day.date }} to continue</h2>
+        <p class="text-sm text-ink-700 mt-2 max-w-3xl">The system has already calculated the cash activity. We only need the manager to count the physical drawer once. After verification, the system closes this day and carries the verified closing balance forward automatically.</p>
+        <div class="mt-3 flex flex-wrap gap-2 text-xs font-semibold"><span class="rounded-full bg-white/70 border border-amber-200 px-3 py-1">Expected: TZS {{ blocked_day.expected_closing_cash|floatformat:0|intcomma }}</span><span class="rounded-full bg-white/70 border border-amber-200 px-3 py-1">Physical: {% if blocked_day.actual_closing_cash is None %}Not counted yet{% else %}TZS {{ blocked_day.actual_closing_cash|floatformat:0|intcomma }}{% endif %}</span></div>
+      </div>
+      <a href="{% url 'expenses:cash_close' blocked_day.pk %}" class="btn btn-primary whitespace-nowrap">Count &amp; Close {{ blocked_day.date }}</a>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if not current and not blocked_day %}
+  {% if yesterday_activity %}
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+    <div class="card p-4"><p class="text-xs uppercase tracking-wide text-ink-400">Yesterday cash sales</p><p class="text-xl font-extrabold mt-1">TZS {{ yesterday_activity.cash_sales|floatformat:0|intcomma }}</p><p class="text-xs text-ink-500 mt-1">{{ yesterday_activity.sales_count }} cash sale{{ yesterday_activity.sales_count|pluralize }}</p></div>
+    <div class="card p-4"><p class="text-xs uppercase tracking-wide text-ink-400">Refunds</p><p class="text-xl font-extrabold mt-1">TZS {{ yesterday_activity.cash_refunds|floatformat:0|intcomma }}</p><p class="text-xs text-ink-500 mt-1">Automatically sourced from approved returns</p></div>
+    <div class="card p-4 border border-amber-200 bg-amber-50"><p class="text-xs uppercase tracking-wide text-amber-700">Physical opening</p><p class="text-xl font-extrabold mt-1 text-amber-900">Not verified</p><p class="text-xs text-amber-800 mt-1">Historical sales are not treated as cash in drawer.</p></div>
+  </div>
+  {% endif %}
+  <div class="card p-5 md:p-6 border border-amber-200 bg-amber-50">
+    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
+      <div>
+        <p class="text-xs font-bold uppercase tracking-wide text-amber-700">First cash-control anchor required</p>
+        <h2 class="text-lg font-bold text-ink-900 mt-1">Count the actual opening cash once</h2>
+        <p class="text-sm text-ink-700 mt-2 max-w-3xl">The system already tracks historical cash activity, but it will never invent physical cash from sales. Enter the amount actually counted in the drawer; after that, the verified closing of each day becomes the next day's opening automatically.</p>
+      </div>
+      <a href="{% url 'expenses:cash_open' %}" class="btn btn-primary whitespace-nowrap">Set Physical Opening Cash</a>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if current %}
+  <div class="card p-5 md:p-6 rounded-2xl shadow-sm">
+    <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+      <div>
+        <div class="flex items-center gap-2 flex-wrap"><span class="text-xs font-bold uppercase tracking-wide text-ink-400">Today · {{ current.date }}</span>{% if current.status == 'CLOSED' and current.post_close_cash_activity %}<span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-red-50 text-red-700">POST-CLOSE ACTIVITY</span>{% elif current.status == 'CLOSED' %}<span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700">RECONCILED</span>{% elif current.status == 'DAY_ENDED' %}<span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-800">DAY ENDED</span>{% else %}<span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700">OPEN</span>{% endif %}</div>
+        <h2 class="text-xl font-extrabold text-ink-900 mt-2">{% if current.status == 'CLOSED' and current.post_close_cash_activity %}Cash day closed with post-close cash activity{% elif current.status == 'CLOSED' %}Cash day reconciled{% elif current.status == 'DAY_ENDED' %}Cash day ended — physical close required{% else %}Cash day in progress{% endif %}</h2>
+        {% if current.status == 'OPEN' %}<p class="text-xs font-semibold text-ink-500 mt-2">Current control state: trading is active. Interim counts monitor the drawer; final reconciliation occurs at day end.</p>{% endif %}
+        <p class="text-sm text-ink-500 mt-1">{% if current.opening_is_provisional %}Opening is provisional while {{ current.carried_from.date }} awaits physical verification. Trading remains active; the system will reconcile this opening automatically.{% elif current.is_carried_forward %}Opening automatically carried from {{ current.carried_from.date }} verified closing of TZS {{ current.opening_cash|floatformat:0|intcomma }}.{% else %}Opening source: {{ current.get_opening_source_display }}.{% endif %}</p>
+      </div>
+    </div>
+
+    {% if current.opening_is_provisional %}
+    {% if handover %}
+    <div class="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-950">
+      <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div>
+          <p class="text-xs font-bold uppercase tracking-[0.14em] text-emerald-700">Opening handover verified</p>
+          <h3 class="font-extrabold text-ink-900 mt-1">Use this untouched opening count to verify {{ handover.previous.date }}</h3>
+          <p class="text-sm text-ink-700 mt-1">The drawer was counted at <strong>TZS {{ handover.count.physical_cash|floatformat:0|intcomma }}</strong> before any Oct. 3 cash movement, and it exactly matches today's provisional opening. The system can safely use this handover count as {{ handover.previous.date }}'s physical closing verification.</p>
+        </div>
+        <form method="post" action="{% url 'expenses:cash_verify_previous_from_opening' current.pk %}" class="shrink-0">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-primary whitespace-nowrap">Verify {{ handover.previous.date }} from Opening Count</button>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+    <div class="mt-5 rounded-2xl border border-blue-200 bg-blue-50 p-4 text-blue-950">
+      <div class="flex gap-3 items-start">
+        <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-100 text-blue-700 font-black">i</span>
+        <div><p class="font-extrabold">Provisional opening — trading is not blocked</p><p class="text-sm mt-1 leading-6">This branch can continue sales and normal cash operations. The opening amount is a temporary system reference because the previous cash day has not yet received its physical verification. Once the previous day is closed, the system will reconcile this opening and preserve the adjustment in the audit trail.</p></div>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mt-6">
+      <div class="rounded-xl bg-ink-50 p-4"><p class="text-[11px] uppercase tracking-wide font-semibold text-ink-400">Opening balance</p><p class="font-extrabold text-lg mt-1">TZS {{ current.opening_cash|floatformat:0|intcomma }}</p><p class="text-[10px] text-ink-500 mt-1">Start of business day</p>{% if current.status != 'CLOSED' %}<a href="{% url 'expenses:cash_opening_adjust' current.pk %}" class="inline-block mt-2 text-[11px] font-semibold text-brand-700 underline">Adjust opening (audited)</a>{% endif %}</div>
+      <div class="rounded-xl bg-ink-50 p-4"><p class="text-[11px] uppercase tracking-wide font-semibold text-ink-400">Cash sales</p><p class="font-bold mt-1">TZS {{ current.cash_sales|floatformat:0|intcomma }}</p><p class="text-[10px] text-ink-500 mt-1">Recorded today</p></div>
+      <div class="rounded-xl bg-ink-50 p-4"><p class="text-[11px] uppercase tracking-wide font-semibold text-ink-400">Refunds</p><p class="font-bold mt-1">TZS {{ current.cash_refunds|floatformat:0|intcomma }}</p><p class="text-[10px] text-ink-500 mt-1">Approved cash refunds</p></div>
+      <div class="rounded-xl bg-ink-50 p-4"><p class="text-[11px] uppercase tracking-wide font-semibold text-ink-400">Expenses &amp; meals</p><p class="font-bold mt-1">TZS {{ current.approved_cash_expenses|floatformat:0|intcomma }}</p><p class="text-[10px] text-ink-500 mt-1">{% with b=current.expected_breakdown %}{% if b.staff_meals %}Meals TZS {{ b.staff_meals|floatformat:0|intcomma }} · Other TZS {{ b.other_expenses|floatformat:0|intcomma }}{% else %}Approved expenses &amp; meals{% endif %}{% endwith %}</p></div>
+      <div class="rounded-xl bg-brand-50 border border-brand-100 p-4"><p class="text-[11px] uppercase tracking-wide font-semibold text-brand-700">Expected cash</p><p class="font-extrabold text-lg mt-1 text-brand-700">TZS {{ current.expected_closing_cash|floatformat:0|intcomma }}</p><p class="text-[10px] text-brand-700/70 mt-1">Opening + sales − refunds − expenses &amp; meals</p></div>
+      <div class="rounded-xl {% if latest_count and not count_is_outdated %}bg-emerald-50 border border-emerald-200{% else %}bg-amber-50 border border-amber-200{% endif %} p-4">
+        <p class="text-[11px] uppercase tracking-wide font-semibold {% if latest_count and not count_is_outdated %}text-emerald-700{% else %}text-amber-700{% endif %}">{% if current.status == 'OPEN' %}Latest counted cash{% else %}Verified closing cash{% endif %}</p>
+        <p class="font-extrabold text-lg mt-1">{% if latest_count and not count_is_outdated %}TZS {{ latest_count.physical_cash|floatformat:0|intcomma }}{% elif current.actual_closing_cash is not None %}TZS {{ current.actual_closing_cash|floatformat:0|intcomma }}{% else %}Pending count{% endif %}</p>
+        {% if latest_count and not count_is_outdated and current.status == 'OPEN' %}<p class="text-[10px] mt-1 text-emerald-700 font-semibold">Counted {{ latest_count.counted_at|date:"H:i" }}</p>{% endif %}
+      </div>
+    </div>
+    <div class="mt-4 rounded-2xl border border-blue-200 bg-blue-50 p-4 md:p-5 text-blue-950">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+        <div><p class="font-extrabold">Meal payments &amp; expected cash</p><p class="text-sm mt-1 leading-6">Expected cash is what should physically be in the drawer: it already deducts approved expenses paid from the branch drawer. Earned meals are now deducted <strong>automatically</strong> as a meal payment when the employee scans (or the manager approves a network-outage claim) and sales fund it. Do <strong>not</strong> also record them as a Staff Meals expense. Pending meals, earned entitlements and meal debt are not automatically treated as cash paid. This prevents the system from deducting unpaid meals or counting a payment twice.</p></div>
+        <a href="{% url 'expenses:create' %}" class="btn btn-secondary whitespace-nowrap">Record meal / business expense</a>
+      </div>
+    </div>
+    {% with mm=current.mobile_money_totals %}
+    <div class="mt-4 rounded-2xl border border-brand-200 bg-brand-50 p-4 md:p-5" id="total-money">
+      <p class="text-[11px] uppercase tracking-wide font-semibold text-brand-700">Total money (drawer cash + mobile money)</p>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-2">
+        <div><p class="text-xs text-ink-500">Expected total</p><p class="font-extrabold text-lg text-brand-700">TZS {{ current.expected_total_money|floatformat:0|intcomma }}</p><p class="text-[10px] text-ink-500">Drawer TZS {{ current.expected_closing_cash|floatformat:0|intcomma }} + mobile TZS {{ current.expected_mobile_balance|floatformat:0|intcomma }}</p></div>
+        <div><p class="text-xs text-ink-500">Counted total</p><p class="font-extrabold text-lg">{% if current.counted_total_money is not None %}TZS {{ current.counted_total_money|floatformat:0|intcomma }}{% else %}Pending{% endif %}</p><p class="text-[10px] text-ink-500">Counted cash + mobile money statement</p></div>
+        <div><p class="text-xs text-ink-500">Difference</p>{% with t=current.total_money_difference %}<p class="font-extrabold text-lg {% if t is None %}text-ink-400{% elif t == 0 %}text-emerald-700{% elif t < 0 %}text-red-700{% else %}text-amber-700{% endif %}">{% if t is None %}—{% elif t == 0 %}Matched{% elif t < 0 %}Shortage TZS {{ t|floatformat:0|intcomma }}{% else %}Overage TZS +{{ t|floatformat:0|intcomma }}{% endif %}</p>{% endwith %}</div>
+      </div>
+    </div>
+
+    <div class="mt-4 rounded-2xl border border-ink-200 bg-white p-4 md:p-5" id="mobile-money-check">
+      <p class="font-extrabold">Mobile money account</p>
+      <p class="text-xs text-ink-500 mt-1">Works like the drawer: opening, movements, expected balance, then the statement balance you count.</p>
+      <dl class="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-1 mt-3 text-sm">
+        <div class="flex justify-between gap-2"><dt class="text-ink-500">Opening balance</dt><dd class="font-semibold">TZS {{ current.mobile_opening_balance|floatformat:0|intcomma }}</dd></div>
+        <div class="flex justify-between gap-2"><dt class="text-ink-500">+ Received today</dt><dd class="font-semibold">TZS {{ mm.received|floatformat:0|intcomma }}</dd></div>
+        <div class="flex justify-between gap-2"><dt class="text-ink-500">− Mobile expenses &amp; charges</dt><dd class="font-semibold">TZS {{ mm.expenses|floatformat:0|intcomma }}</dd></div>
+        <div class="flex justify-between gap-2"><dt class="text-ink-500">+ Cash put into mobile</dt><dd class="font-semibold">TZS {{ mm.deposits|floatformat:0|intcomma }}</dd></div>
+        <div class="flex justify-between gap-2"><dt class="text-ink-500">− Cashed out to drawer</dt><dd class="font-semibold">TZS {{ mm.cash_outs|floatformat:0|intcomma }}</dd></div>
+        <div class="flex justify-between gap-2 text-brand-700"><dt class="font-semibold">= Expected balance</dt><dd class="font-extrabold">TZS {{ current.expected_mobile_balance|floatformat:0|intcomma }}</dd></div>
+      </dl>
+      <p class="text-[11px] text-ink-400 mt-1">Received = mobile sales + split-payment mobile share + debt repayments + layaway instalments, less sale refunds and layaway refunds. Layaway handover sales are excluded from receipts because instalments were counted when received.</p>
+      {% if mm.layaway_received or mm.layaway_refunds %}<p class="text-xs text-ink-500 mt-2">Layaway mobile instalments: <strong>TZS {{ mm.layaway_received|floatformat:0|intcomma }}</strong> · Layaway mobile refunds: <strong>TZS {{ mm.layaway_refunds|floatformat:0|intcomma }}</strong></p>{% endif %}
+      {% if current.actual_mobile_balance is not None %}
+      {% with d=current.mobile_money_difference %}
+      <p class="mt-3 text-sm font-semibold {% if d == 0 %}text-emerald-700{% elif d < 0 %}text-red-700{% else %}text-amber-700{% endif %}">
+        Statement balance: TZS {{ current.actual_mobile_balance|floatformat:0|intcomma }} ·
+        {% if d == 0 %}Matched{% elif d < 0 %}Shortage TZS {{ d|floatformat:0|intcomma }}{% else %}Overage TZS +{{ d|floatformat:0|intcomma }}{% endif %}
+      </p>
+      <p class="text-xs text-ink-500 mt-1">{% if current.mobile_checked_by %}Checked by {% firstof current.mobile_checked_by.get_full_name current.mobile_checked_by.username %}{% endif %}{% if current.mobile_checked_at %} · {{ current.mobile_checked_at|date:"d M Y, H:i" }}{% endif %}{% if current.mobile_check_note %} · {{ current.mobile_check_note }}{% endif %}</p>
+      {% endwith %}
+      {% else %}
+      <p class="mt-3 text-xs text-amber-700 font-semibold">Statement balance not entered yet.</p>
+      {% endif %}
+
+      {% if request.user.is_management_user %}
+      <div class="grid lg:grid-cols-2 gap-4 mt-4">
+        <form method="post" action="{% url 'expenses:mobile_money_check' current.pk %}" class="flex flex-col gap-2 rounded-xl bg-ink-50 p-4">
+          {% csrf_token %}
+          <p class="text-sm font-bold">Count mobile money</p>
+          <label for="mm-actual" class="text-xs font-semibold text-ink-600">Balance per statement (TZS)</label>
+          <input id="mm-actual" name="actual_mobile_balance" type="number" min="0" step="0.01" inputmode="decimal" class="form-input currency-field" placeholder="e.g. 450,000" value="{% if current.actual_mobile_balance is not None %}{{ current.actual_mobile_balance|stringformat:'.2f' }}{% endif %}">
+          <input name="note" type="text" maxlength="255" class="form-input" placeholder="Optional note" value="{{ current.mobile_check_note }}">
+          <details class="text-xs text-ink-600"><summary class="cursor-pointer font-semibold">Set or correct the opening balance</summary>
+            <p class="mt-1">Use this once when you start tracking mobile money, or to correct the carried opening.</p>
+            <input name="opening_mobile" type="number" min="0" step="0.01" inputmode="decimal" class="form-input currency-field mt-1" placeholder="Opening balance (TZS)" value="{% if current.opening_mobile is not None %}{{ current.opening_mobile|stringformat:'.2f' }}{% endif %}">
+          </details>
+          <button class="btn btn-primary" type="submit">{% if current.actual_mobile_balance is not None %}Update mobile money count{% else %}Save mobile money count{% endif %}</button>
+        </form>
+        {% if current.status == 'OPEN' %}
+        <form method="post" action="{% url 'expenses:cash_transfer' %}" id="cash-transfer" class="flex flex-col gap-2 rounded-xl bg-ink-50 p-4" data-transfer-form>
+          {% csrf_token %}
+          <p class="text-sm font-bold">Move money between drawer and mobile</p>
+          <select name="direction" class="form-input" aria-label="Direction">
+            <option value="CASH_TO_MOBILE">Drawer cash → Mobile money (e.g. banked at an agent)</option>
+            <option value="MOBILE_TO_CASH">Mobile money → Drawer cash (cash out)</option>
+          </select>
+          <input name="amount" type="number" min="0.01" step="0.01" inputmode="decimal" required class="form-input currency-field" placeholder="Amount (TZS)">
+          <input name="reference" type="text" maxlength="100" class="form-input" placeholder="Transaction reference (optional)" data-transfer-ref>
+          <p class="text-[11px] text-amber-700 hidden" data-transfer-ref-hint>Required for cash-out: enter the M-Pesa / Tigo / Airtel / HaloPesa transaction ID so it can be matched to your statement.</p>
+          <input name="note" type="text" maxlength="255" class="form-input" placeholder="Reason (optional)">
+          <button class="btn btn-secondary" type="submit">Record transfer</button>
+          <a class="text-xs font-semibold text-emerald-700 underline" href="{% url 'expenses:cash_transfer_history' %}">View all transfers &amp; download</a>
+          <script>(function(){var f=document.querySelector('[data-transfer-form]');if(!f)return;var d=f.querySelector('select[name=direction]'),r=f.querySelector('[data-transfer-ref]'),h=f.querySelector('[data-transfer-ref-hint]');function u(){var m=d.value==='MOBILE_TO_CASH';r.required=m;r.placeholder=m?'Transaction ID (required)':'Transaction reference (optional)';h.classList.toggle('hidden',!m);}d.addEventListener('change',u);u();f.addEventListener('submit',function(e){var a=f.querySelector('input[name=amount]').value;if(!window.confirm('Record this transfer of TZS '+Number(a||0).toLocaleString()+'? A mistake can only be corrected by recording the opposite transfer.')){e.preventDefault();}});})();</script>
+          <p class="text-[11px] text-ink-500">Total money does not change: one side goes up by what the other goes down.</p>
+        </form>
+        {% endif %}
+      </div>
+      {% endif %}
+      {% with trs=current.day_transfers %}{% if trs %}
+      <div class="mt-4"><p class="text-xs font-bold text-ink-600 mb-1">Today's transfers</p>
+        <ul class="text-xs text-ink-600 space-y-1">{% for t in trs %}<li class="flex flex-wrap justify-between gap-2"><span>{{ t.created_at|date:"d M, H:i:s" }} · {{ t.get_direction_display }}{% if t.note %} · {{ t.note }}{% endif %}{% if t.reference %} · {{ t.reference }}{% endif %}</span><strong>TZS {{ t.amount|floatformat:0|intcomma }}</strong></li>{% endfor %}</ul>
+        <p class="text-[10px] text-ink-400 mt-1">A wrong transfer is corrected by recording the opposite transfer, so the audit trail stays complete.</p>
+      </div>
+      {% endif %}{% endwith %}
+    </div>
+    {% endwith %}
+
+    <div class="mt-4 rounded-2xl border border-ink-100 bg-white p-4 md:p-5">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-1 mb-3">
+        <div><p class="font-extrabold">Cash by employee today <span class="text-ink-400 font-semibold text-xs">(reference)</span></p><p class="text-xs text-ink-500 mt-1">Each employee's cash sales minus refunds they handed back and their meal money. Same figure the employee sees on their dashboard.</p></div>
+        {% if meals_not_deducted %}<span class="chip chip-warn">TZS {{ meals_not_deducted|floatformat:0|intcomma }} meals claimed but not yet deducted (no funding sale / awaiting settlement)</span>{% endif %}
+      </div>
+      <div class="overflow-x-auto"><table class="w-full text-sm">
+        <thead><tr class="text-left border-b border-ink-100 th-sm"><th class="py-2 font-bold">Employee</th><th class="font-bold text-right">Cash sales</th><th class="font-bold text-right">− Refunds</th><th class="font-bold text-right">− Meal (deducted)</th><th class="font-bold text-right">Expected cash</th><th class="font-bold text-right">Meal not yet deducted</th></tr></thead>
+        <tbody>
+        {% for r in employee_cash_rows %}<tr class="border-b border-ink-100">
+          <td class="py-2.5 font-medium"><a href="{% url 'dashboard:my_cash_history' %}?employee={{ r.employee.pk }}" class="hover:underline text-brand-700">{% firstof r.employee.get_full_name r.employee.username %}</a></td>
+          <td class="text-right">TZS {{ r.cash_sales|floatformat:0|intcomma }}</td>
+          <td class="text-right {% if r.cash_refunds %}text-rose-700 font-semibold{% else %}text-ink-400{% endif %}">TZS {{ r.cash_refunds|floatformat:0|intcomma }}</td>
+          <td class="text-right">TZS {{ r.meal_earned|floatformat:0|intcomma }}</td>
+          <td class="text-right font-bold text-brand-700">TZS {{ r.expected|floatformat:0|intcomma }}</td>
+          <td class="text-right {% if r.meal_not_deducted %}text-amber-700 font-semibold{% else %}text-ink-400{% endif %}">TZS {{ r.meal_not_deducted|floatformat:0|intcomma }}</td>
+        </tr>{% empty %}<tr><td colspan="6" class="py-6 text-center text-ink-400">No cash sales or meals recorded today yet.</td></tr>{% endfor %}
+        </tbody>
+      </table></div>
+    </div>
+
+    {% if current.status == 'DAY_ENDED' %}
+    <div class="mt-5 rounded-2xl border border-amber-300 bg-amber-50 p-5 md:p-6">
+      <div class="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-5">
+        <div>
+          <p class="text-xs font-extrabold uppercase tracking-[0.14em] text-amber-700">Automatic day-end lock</p>
+          <h2 class="mt-1 text-xl font-extrabold text-amber-950">{{ current.date }} business day has ended</h2>
+          <p class="mt-2 text-sm leading-6 text-amber-900 max-w-3xl">The system automatically ended this business date. This is not a physical cash close. Count the actual drawer, review the expected amount and complete the manager verification before the balance can carry forward.</p>
+          {% if current.day_ended_at %}<p class="mt-2 text-xs text-amber-800">Day ended automatically at {{ current.day_ended_at|date:"d M Y, H:i" }}.</p>{% endif %}
+        </div>
+        <a href="{% url 'expenses:cash_close' current.pk %}" class="btn btn-primary whitespace-nowrap">Count &amp; Close Day</a>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if current.status == 'OPEN' %}
+    {% if count_is_outdated %}
+    <div class="mt-5 rounded-xl border border-red-200 bg-red-50 p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+      <div><p class="font-bold text-red-900">Previous physical count is outdated</p><p class="text-sm text-red-800 mt-1">New cash transactions were recorded after the last count{% if latest_count %} at {{ latest_count.counted_at|date:"H:i" }}{% endif %}. That count remains in the audit trail, but it must not be treated as the current drawer balance.</p></div>
+      <div class="flex flex-col sm:flex-row gap-2 shrink-0">
+        <a href="{% url 'expenses:cash_count' current.pk %}" class="btn btn-primary whitespace-nowrap">Recount Now</a>
+        <a href="{% url 'expenses:cash_count_correct' current.pk %}" class="btn btn-secondary whitespace-nowrap">Correct Recorded Count</a>
+      </div>
+    </div>
+    {% elif latest_count %}
+    <div class="mt-5 rounded-2xl border {% if latest_count.variance_clean == 0 %}border-emerald-200 bg-emerald-50{% elif latest_count.variance_clean < 0 %}border-red-200 bg-red-50{% else %}border-amber-200 bg-amber-50{% endif %} p-5">
+      <div class="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
+        <div class="min-w-0">
+          <div class="flex flex-wrap items-center gap-2">
+            <p class="font-extrabold {% if latest_count.variance_clean == 0 %}text-emerald-950{% elif latest_count.variance_clean < 0 %}text-red-950{% else %}text-amber-950{% endif %}">Interim cash count</p>
+            {% if latest_count.variance_clean == 0 %}<span class="rounded-full bg-white/70 border border-emerald-200 px-2.5 py-1 text-[10px] uppercase tracking-wider font-extrabold text-emerald-700">Count matched</span>{% elif latest_count.variance_clean < 0 %}<span class="rounded-full bg-white/70 border border-red-200 px-2.5 py-1 text-[10px] uppercase tracking-wider font-extrabold text-red-700">Shortage</span>{% else %}<span class="rounded-full bg-white/70 border border-amber-200 px-2.5 py-1 text-[10px] uppercase tracking-wider font-extrabold text-amber-700">Overage</span>{% endif %}
+          </div>
+          <p class="text-sm mt-2 {% if latest_count.variance_clean == 0 %}text-emerald-900{% elif latest_count.variance_clean < 0 %}text-red-900{% else %}text-amber-900{% endif %}">Counted <strong>TZS {{ latest_count.physical_cash|floatformat:0|intcomma }}</strong> at {{ latest_count.counted_at|date:"d M Y, H:i" }} against expected cash of <strong>TZS {{ latest_count.expected_cash|floatformat:0|intcomma }}</strong>. Current variance: <strong>{% if latest_count.variance_clean < 0 %}-{% endif %}TZS {{ latest_count.variance_clean|floatformat:0|intcomma|cut:"-" }}</strong>.</p>
+          <p class="text-xs mt-2 {% if latest_count.variance_clean == 0 %}text-emerald-800{% elif latest_count.variance_clean < 0 %}text-red-800{% else %}text-amber-800{% endif %}">This is an interim verification only. The business day remains open, and the final close will use the latest valid count after the business day ends.</p>
+        </div>
+        <div class="flex flex-col sm:flex-row gap-2 shrink-0">
+        <a href="{% url 'expenses:cash_count_correct' current.pk %}" class="btn btn-secondary whitespace-nowrap">Correct Recorded Count</a>
+        {% if current.date < today %}{% if latest_count.variance_clean == 0 and not attention %}<form method="post" action="{% url 'expenses:cash_close' current.pk %}" data-confirm="Quick close this cash day?" data-confirm-detail="The latest physical count of TZS {{ latest_count.physical_cash|floatformat:0|intcomma }} will be used because no cash activity has occurred since that count." data-confirm-accept="Quick Close">{% csrf_token %}<input type="hidden" name="use_latest_count" value="1"><button type="submit" class="btn btn-primary whitespace-nowrap">Quick Close with this Count</button></form>{% else %}<a href="{% url 'expenses:cash_close' current.pk %}" class="btn btn-primary whitespace-nowrap">Count &amp; Close Day</a>{% endif %}{% else %}<span class="text-xs font-semibold text-ink-400 self-center">Final close opens after today ends.</span>{% endif %}
+      </div>
+    </div>
+    {% else %}
+    <div class="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+      <div><p class="font-bold text-amber-900">No physical count recorded yet</p><p class="text-sm text-amber-800 mt-1">Current expected cash is <strong>TZS {{ current.expected_closing_cash|floatformat:0|intcomma }}</strong>. You can record an intraday count at any time, or perform the final closing count when the business day ends.</p></div>
+      <a href="{% url 'expenses:cash_count' current.pk %}" class="btn btn-primary whitespace-nowrap">Spot Check</a>
+    </div>
+    {% endif %}
+    {% else %}
+    {% if current.post_close_cash_activity %}
+    <div class="mt-5 rounded-2xl border border-amber-300 bg-gradient-to-br from-amber-50 to-white p-5 md:p-6 text-amber-950 shadow-sm">
+      <div class="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-5">
+        <div class="flex gap-3 min-w-0">
+          <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-800 text-xl font-black">!</span>
+          <div><div class="flex flex-wrap items-center gap-2"><p class="font-extrabold text-lg">Post-close exception requires review</p><span class="rounded-full bg-amber-100 px-2.5 py-1 text-[10px] uppercase tracking-wider font-extrabold text-amber-800">Manager action</span></div>
+          <p class="text-sm mt-2 leading-6 text-amber-900">Cash transactions were recorded after the final close. The original closing count and variance remain frozen for audit. Review the later transactions before reopening and performing a new physical count.</p>
+          <p class="text-xs mt-2 text-amber-800">Do not use the old closing amount as a new opening until this exception is resolved.</p></div>
+        </div>
+        <a href="{% url 'expenses:cash_reopen' current.pk %}" class="inline-flex items-center justify-center rounded-xl bg-amber-700 hover:bg-amber-800 px-4 py-3 text-sm font-bold text-white shadow-sm whitespace-nowrap">Review &amp; Reconcile</a>
+      </div>
+    </div>
+    {% endif %}
+    <div class="mt-5 rounded-xl p-4 {% if current.cash_difference == 0 %}bg-emerald-50 border border-emerald-200 text-emerald-800{% elif current.cash_difference < 0 %}bg-red-50 border border-red-200 text-red-800{% else %}bg-amber-50 border border-amber-200 text-amber-800{% endif %}">
+      <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3"><div><p class="font-bold">{% if current.cash_difference == 0 %}Cash matched exactly{% elif current.cash_difference < 0 %}Cash shortage detected{% else %}Cash overage detected{% endif %}</p><p class="text-sm mt-1">Expected: <strong>TZS {{ current.expected_closing_cash|floatformat:0|intcomma }}</strong> · Physical: <strong>TZS {{ current.actual_closing_cash|floatformat:0|intcomma }}</strong> · Variance: <strong>TZS {{ current.cash_difference|floatformat:0|intcomma }}</strong></p></div><div class="text-xs text-ink-500">{% if current.physical_counted_by %}Counted by <strong>{% firstof current.physical_counted_by.get_full_name current.physical_counted_by.username %}</strong>{% endif %}{% if current.physical_counted_at %} · {{ current.physical_counted_at|date:"d M Y, H:i" }}{% endif %}</div></div>
+      {% if current.cash_difference != 0 and current.variance_reason %}<div class="mt-3 pt-3 border-t border-current/10 text-sm"><strong>Manager explanation:</strong> {{ current.variance_reason }}</div>{% endif %}
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if count_history %}
+  <div class="card overflow-hidden rounded-2xl shadow-sm">
+    <div class="px-5 py-4 border-b border-ink-100">
+      <h2 class="font-bold text-ink-900">Physical count audit trail</h2>
+      <p class="text-xs text-ink-500 mt-1">Every physical count is retained as an immutable audit record. A correction creates a new record instead of editing the original.</p>
+    </div>
+    <div class="divide-y divide-ink-100">
+      {% for c in count_history %}
+      <div class="px-5 py-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 {% if c.supersedes_id %}bg-blue-50/40{% endif %}">
+        <div class="min-w-0">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="font-bold text-ink-900">TZS {{ c.physical_cash|floatformat:0|intcomma }}</span>
+            {% if c.supersedes_id %}<span class="rounded-full bg-blue-100 text-blue-700 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide">Correction</span>{% elif c.corrections.exists %}<span class="rounded-full bg-ink-100 text-ink-600 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide">Superseded</span>{% endif %}
+          </div>
+          <p class="text-xs text-ink-500 mt-1">{{ c.counted_at|date:"d M Y, H:i" }} · {% firstof c.counted_by.get_full_name c.counted_by.username %} · Expected TZS {{ c.expected_cash|floatformat:0|intcomma }} · Difference {% if c.variance < 0 %}-{% endif %}TZS {{ c.variance|floatformat:0|intcomma|cut:"-" }}</p>
+          {% if c.correction_reason %}<p class="text-xs text-blue-800 mt-1"><strong>Correction reason:</strong> {{ c.correction_reason }}</p>{% endif %}
+        </div>
+        {% if c.note %}<p class="text-xs text-ink-600 lg:max-w-sm">{{ c.note }}</p>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <div id="cash-activity" class="card overflow-hidden rounded-2xl shadow-sm">
+    <div class="px-5 py-4 border-b border-ink-100 flex flex-col md:flex-row md:items-center md:justify-between gap-2"><div><h2 class="font-bold text-ink-900">Cash activity &amp; reconciliation timeline</h2><p class="text-xs text-ink-500 mt-1">90-day source-ledger history. Historical activity is informational until a physical cash anchor exists.</p></div><span class="text-xs font-semibold text-ink-400">{{ activity_page.paginator.count }} recorded day{{ activity_page.paginator.count|pluralize }}</span></div>
+    <div class="overflow-x-auto"><table class="w-full text-sm min-w-[820px]"><thead class="bg-ink-50"><tr><th class="text-left px-5 py-3">Date</th><th class="text-right px-5 py-3">Cash sales</th><th class="text-right px-5 py-3">Refunds</th><th class="text-right px-5 py-3">Expenses &amp; meals</th><th class="text-right px-5 py-3">Net activity</th><th class="text-center px-5 py-3">Control state</th></tr></thead><tbody class="divide-y divide-ink-100">
+      {% for row in activity_page %}<tr class="hover:bg-ink-50/50"><td class="px-5 py-3 font-semibold">{{ row.date }}</td><td class="px-5 py-3 text-right">TZS {{ row.cash_sales|floatformat:0|intcomma }}{% if row.cash_debt_collected %}<span class="block text-[11px] text-emerald-700">+ TZS {{ row.cash_debt_collected|floatformat:0|intcomma }} debt repaid</span>{% endif %}</td><td class="px-5 py-3 text-right">TZS {{ row.cash_refunds|floatformat:0|intcomma }}</td><td class="px-5 py-3 text-right">TZS {{ row.cash_expenses|floatformat:0|intcomma }}</td><td class="px-5 py-3 text-right font-bold">TZS {{ row.net_cash_activity|floatformat:0|intcomma }}{% if row.post_close_net is not None and row.cash_day %}<a href="{% url 'expenses:cash_activity_detail' row.cash_day.pk %}" class="block text-[11px] font-semibold text-amber-700 underline">of which TZS {{ row.post_close_net|floatformat:0|intcomma }} after close</a>{% endif %}</td><td class="px-5 py-3 text-center">{% if row.state == 'RECONCILED' %}<span class="px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-bold">Reconciled</span>{% elif row.state == 'NEEDS_RECONCILIATION' %}<span class="px-2 py-1 rounded-full bg-amber-50 text-amber-800 text-[11px] font-bold">Needs reconciliation</span>{% elif row.state == 'DAY_ENDED' %}<span class="px-2 py-1 rounded-full bg-amber-50 text-amber-800 text-[11px] font-bold">Day ended</span>{% elif row.state == 'OPEN' %}<span class="px-2 py-1 rounded-full bg-blue-50 text-blue-700 text-[11px] font-bold">Open</span>{% else %}<span class="px-2 py-1 rounded-full bg-ink-50 text-ink-500 text-[11px] font-bold">Historical</span>{% endif %}</td></tr>
+      {% empty %}<tr><td colspan="6" class="px-5 py-12 text-center text-ink-400">No cash activity found for the selected history window.</td></tr>{% endfor %}
+    </tbody></table></div>
+    {% include "partials/pagination.html" with page_obj=activity_page page_param="activity_page" page_anchor="cash-activity" %}
+  </div>
+
+  <div id="cash-reconciled" class="card overflow-hidden rounded-2xl shadow-sm">
+    <div class="px-5 py-4 border-b border-ink-100 flex flex-col md:flex-row md:items-center md:justify-between gap-2"><div><h2 class="font-bold text-ink-900">Reconciled cash days</h2><p class="text-xs text-ink-500 mt-1">The opening amount is the balance at the start of that business day. The verified closing amount is the physical cash confirmed at day end and becomes the next day's opening.</p></div><span class="text-xs font-semibold text-ink-400">{{ days_page.paginator.count }} reconciled day{{ days_page.paginator.count|pluralize }}</span></div>
+    <div class="overflow-x-auto"><table class="w-full text-sm min-w-[900px]"><thead class="bg-ink-50"><tr><th class="text-left px-5 py-3">Date</th><th class="text-right px-5 py-3">Opening</th><th class="px-5 py-3">Source</th><th class="text-right px-5 py-3">Expected</th><th class="text-right px-5 py-3">Verified closing</th><th class="text-right px-5 py-3">Variance</th><th class="px-5 py-3">Status</th></tr></thead><tbody class="divide-y divide-ink-100">
+      {% for d in days_page %}<tr class="hover:bg-ink-50/50"><td class="px-5 py-3 font-semibold">{{ d.date }}</td><td class="px-5 py-3 text-right">TZS {{ d.opening_cash|floatformat:0|intcomma }}</td><td class="px-5 py-3 text-center">{{ d.get_opening_source_display }}</td><td class="px-5 py-3 text-right">TZS {{ d.expected_closing_cash|floatformat:0|intcomma }}</td><td class="px-5 py-3 text-right">{% if d.actual_closing_cash is not None %}<strong>TZS {{ d.actual_closing_cash|floatformat:0|intcomma }}</strong>{% else %}—{% endif %}</td><td class="px-5 py-3 text-right font-semibold">{% if d.cash_difference is None %}—{% elif d.cash_difference < 0 %}<span class="text-red-700">Shortage · TZS {{ d.cash_difference|floatformat:0|intcomma }}</span>{% elif d.cash_difference > 0 %}<span class="text-amber-700">Overage · TZS +{{ d.cash_difference|floatformat:0|intcomma }}</span>{% else %}<span class="text-emerald-700">Matched</span>{% endif %}</td><td class="px-5 py-3 text-center">{% if d.opening_is_provisional %}<span class="px-2 py-1 rounded-full bg-amber-50 text-amber-800 text-[11px] font-bold">Opening needs verification</span>{% elif d.reconciliation_state == 'RECONCILED' %}<span class="px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-bold">Reconciled</span>{% elif d.status == 'DAY_ENDED' %}<span class="px-2 py-1 rounded-full bg-amber-50 text-amber-800 text-[11px] font-bold">Day ended</span>{% else %}<span class="px-2 py-1 rounded-full bg-blue-50 text-blue-700 text-[11px] font-bold">Open</span>{% endif %}</td></tr>
+      {% empty %}<tr><td colspan="7" class="px-5 py-12 text-center text-ink-400">No cash days have been fully reconciled yet.</td></tr>{% endfor %}
+    </tbody></table></div>
+    {% include "partials/pagination.html" with page_obj=days_page page_param="cash_page" page_anchor="cash-reconciled" %}
+  </div>
+
+  <div id="cash-audit" class="card overflow-hidden rounded-2xl shadow-sm mt-6">
+    <div class="px-5 py-4 border-b border-ink-100"><h2 class="font-bold text-ink-900">Audit trail</h2><p class="text-xs text-ink-500 mt-1">Append-only record of every cash-control action. Entries cannot be edited or deleted.</p></div>
+    <div class="overflow-x-auto"><table class="w-full text-sm min-w-[820px]"><thead class="bg-ink-50"><tr><th class="text-left px-5 py-3">When</th><th class="text-left px-5 py-3">Business date</th><th class="text-left px-5 py-3">Action</th><th class="text-left px-5 py-3">By</th><th class="text-left px-5 py-3">Change</th><th class="text-left px-5 py-3">Reason</th></tr></thead><tbody class="divide-y divide-ink-100">
+      {% for ev in audit_page %}<tr class="hover:bg-ink-50/50"><td class="px-5 py-3 whitespace-nowrap">{{ ev.created_at|date:"d M Y · H:i" }}</td><td class="px-5 py-3">{{ ev.business_date }}</td><td class="px-5 py-3 font-semibold">{{ ev.get_action_display }}</td><td class="px-5 py-3">{% if ev.actor %}{{ ev.actor.get_full_name|default:ev.actor.get_username }}{% else %}System{% endif %}</td><td class="px-5 py-3">{% if ev.old_value or ev.new_value %}{{ ev.old_value|default:"—" }} → {{ ev.new_value|default:"—" }}{% else %}—{% endif %}</td><td class="px-5 py-3 text-ink-600 max-w-xs">{{ ev.reason|default:"—"|truncatechars:140 }}</td></tr>
+      {% empty %}<tr><td colspan="6" class="px-5 py-12 text-center text-ink-400">No audit events yet.</td></tr>{% endfor %}
+    </tbody></table></div>
+    {% include "partials/pagination.html" with page_obj=audit_page page_param="audit_page" page_anchor="cash-audit" %}
+  </div>
+</div>
+{% endblock %}

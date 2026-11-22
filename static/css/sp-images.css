@@ -1,0 +1,39 @@
+/* SmartPOS - system-wide image policy (loaded by every layout).
+   1) Photos are never cropped.  2) Calm loading / failure states on weak networks. */
+
+/* Profile photos: the server stores the WHOLE photo on a square canvas; older uploads that are
+   not square are shown completely too (never cover-cropped). */
+img[src*="/profile_photos/"],
+img[data-sp-avatar] {
+  object-fit: contain !important;
+  object-position: center;
+  background-color: #eef2f6;
+}
+
+/* Logos keep their proportions. */
+img[src*="/pharmacy_logos/"],
+img[src*="/marketplace/stores/"] {
+  object-fit: contain !important;
+  object-position: center;
+}
+
+/* Loading: soft shimmer on the image itself (no wrapper needed). */
+img[data-sp-img="loading"],
+img[data-sp-img="slow"] {
+  background: linear-gradient(100deg, #eef2f6 30%, #f8fafc 50%, #eef2f6 70%) 0 0 / 220% 100%;
+  animation: sp-img-shimmer 1.3s linear infinite;
+}
+@keyframes sp-img-shimmer { from { background-position: 120% 0; } to { background-position: -100% 0; } }
+
+/* Gave up after retries: neutral tile instead of the browser's broken-image icon. */
+img[data-sp-img="error"] {
+  object-fit: contain !important;
+  background-color: #f1f5f9;
+  animation: none;
+}
+
+/* Save-Data / 2G: no animations, no extra work. */
+.sp-lowdata img[data-sp-img] { animation: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  img[data-sp-img] { animation: none !important; }
+}

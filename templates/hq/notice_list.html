@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}System Notices - HQ{% endblock %}
+{% block content %}
+<div class="max-w-6xl mx-auto">
+
+    <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-6">
+        <div>
+            <h1 class="text-2xl font-bold text-ink-900 tracking-tight">System Notices</h1>
+            <p class="text-sm text-ink-500 mt-1">Professional banners shown at the top of the app: improvements, planned maintenance, issues you are fixing and the "resolved" follow-up. Every notice is reviewed in a full preview before you publish it.</p>
+        </div>
+        <a href="{% url 'hq:notice_create' %}" class="btn btn-primary text-sm">
+            <svg class="icon !w-4 !h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+            New notice
+        </a>
+    </div>
+
+    <div class="card !py-3.5 mb-6">
+        <p class="text-sm text-ink-700">
+            <span class="font-semibold">{{ live_count }}</span> notice{{ live_count|pluralize }} showing to customers right now{% if draft_count %}, and <span class="font-semibold">{{ draft_count }}</span> draft{{ draft_count|pluralize }} waiting for your review{% endif %}.
+            Banners reach people who are signed in (and the login page if you choose it).
+            To reach customers who are not online, also send an
+            <a href="{% url 'hq:announcement_compose' %}" class="font-medium text-brand-700 hover:text-brand-800">SMS announcement &rarr;</a>
+        </p>
+    </div>
+
+    <div class="card">
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-left border-b border-ink-200">
+                        <th class="py-2 pr-4">Notice</th>
+                        <th class="py-2 pr-4">Audience</th>
+                        <th class="py-2 pr-4">Shown</th>
+                        <th class="py-2 pr-4">Status</th>
+                        <th class="py-2"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for n in page_obj %}
+                    <tr class="border-b border-ink-100 align-top">
+                        <td class="py-3 pr-4 max-w-sm">
+                            <span class="badge {% if n.kind == 'INCIDENT' %}bg-red-100 text-red-700{% elif n.kind == 'MAINTENANCE' %}bg-amber-100 text-amber-700{% elif n.kind == 'RESOLVED' %}bg-emerald-100 text-emerald-700{% else %}bg-brand-100 text-brand-700{% endif %}">{{ n.badge }}</span>
+                            <a href="{% url 'hq:notice_edit' n.pk %}" class="font-medium text-brand-700 hover:text-brand-800 ml-1">{{ n.title }}</a>
+                            <p class="text-xs text-ink-400 mt-0.5">{{ n.message|truncatechars:90 }}</p>
+                        </td>
+                        <td class="py-3 pr-4 text-ink-600">
+                            {{ n.get_audience_display }}
+                            {% if n.show_on_login %}<p class="text-xs text-ink-400">+ login page</p>{% endif %}
+                        </td>
+                        <td class="py-3 pr-4 text-ink-500 whitespace-nowrap">
+                            {{ n.starts_at|date:"d M Y H:i" }}
+                            <p class="text-xs text-ink-400">{% if n.ends_at %}until {{ n.ends_at|date:"d M Y H:i" }}{% else %}until switched off{% endif %}</p>
+                        </td>
+                        <td class="py-3 pr-4">
+                            {% with st=n.status %}
+                            <span class="badge {% if st == 'LIVE' %}bg-emerald-100 text-emerald-700{% elif st == 'SCHEDULED' %}bg-brand-100 text-brand-700{% elif st == 'DRAFT' %}bg-amber-100 text-amber-700{% else %}bg-ink-100 text-ink-600{% endif %}">{% if st == 'LIVE' %}Live{% elif st == 'SCHEDULED' %}Scheduled{% elif st == 'EXPIRED' %}Expired{% elif st == 'DRAFT' %}Draft{% else %}Off{% endif %}</span>
+                            {% if n.is_published and n.published_at %}<p class="text-xs text-ink-400 mt-1">Published {{ n.published_at|date:"d M H:i" }}</p>{% endif %}
+                            {% endwith %}
+                        </td>
+                        <td class="py-3 text-right whitespace-nowrap">
+                            <div class="flex flex-wrap items-center justify-end gap-1.5">
+                                {% if n.is_published %}
+                                <a href="{% url 'hq:notice_review' n.pk %}" class="btn btn-secondary !px-3 !py-1.5 !text-xs">Preview</a>
+                                {% if n.kind == 'INCIDENT' or n.kind == 'MAINTENANCE' %}
+                                <form method="post" action="{% url 'hq:notice_resolve' n.pk %}" class="inline">{% csrf_token %}
+                                    <button type="submit" class="btn btn-secondary !px-3 !py-1.5 !text-xs" title="Turn this into a green 'resolved' notice that hides itself">Mark resolved</button>
+                                </form>
+                                {% endif %}
+                                {% if n.status == 'SCHEDULED' %}
+                                <form method="post" action="{% url 'hq:notice_show_now' n.pk %}" class="inline">{% csrf_token %}
+                                    <button type="submit" class="btn btn-primary !px-3 !py-1.5 !text-xs" title="Customers cannot see it until the start time. Start showing it right now.">Show now</button>
+                                </form>
+                                {% endif %}
+                                <form method="post" action="{% url 'hq:notice_toggle' n.pk %}" class="inline">{% csrf_token %}
+                                    <button type="submit" class="btn btn-secondary !px-3 !py-1.5 !text-xs">{% if n.is_active %}Switch off{% else %}Switch on{% endif %}</button>
+                                </form>
+                                <form method="post" action="{% url 'hq:notice_unpublish' n.pk %}" class="inline">{% csrf_token %}
+                                    <button type="submit" class="btn btn-secondary !px-3 !py-1.5 !text-xs" title="Hide it from customers and move it back to drafts">Unpublish</button>
+                                </form>
+                                {% else %}
+                                <a href="{% url 'hq:notice_review' n.pk %}" class="btn btn-primary !px-3 !py-1.5 !text-xs">Review &amp; publish</a>
+                                {% endif %}
+                                <a href="{% url 'hq:notice_edit' n.pk %}" class="btn btn-secondary !px-3 !py-1.5 !text-xs">Edit</a>
+                                <form method="post" action="{% url 'hq:notice_delete' n.pk %}" class="inline" onsubmit="return confirm('Delete this notice?');">{% csrf_token %}
+                                    <button type="submit" class="btn btn-secondary !px-3 !py-1.5 !text-xs">Delete</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="5" class="py-12 text-center">
+                        <p class="text-ink-500">No notices yet.</p>
+                        <a href="{% url 'hq:notice_create' %}" class="text-sm font-medium text-brand-700 hover:text-brand-800">Create your first notice &rarr;</a>
+                    </td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% include "partials/pagination.html" with page_obj=page_obj %}
+    </div>
+</div>
+{% endblock %}

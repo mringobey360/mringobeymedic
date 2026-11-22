@@ -1,0 +1,17 @@
+<style>
+  body::after{content:"";position:fixed;inset:0;border:3px solid #f59e0b;pointer-events:none;z-index:9998}
+  .imp-pill{position:fixed;top:.5rem;left:50%;transform:translateX(-50%);z-index:9999;max-width:calc(100vw - 1rem);
+    display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;justify-content:center;
+    background:#78350f;color:#fff;border-radius:999px;padding:.35rem .5rem .35rem .9rem;font-size:.78rem;
+    box-shadow:0 6px 20px rgba(0,0,0,.25)}
+  .imp-pill b{font-weight:700}
+  .imp-pill button{background:#fff;color:#78350f;border:0;border-radius:999px;padding:.3rem .8rem;font-weight:700;font-size:.78rem;cursor:pointer}
+  .imp-pill .imp-mode{background:#f59e0b;color:#451a03;border-radius:999px;padding:.1rem .5rem;font-weight:700}
+  @media (max-width:640px){.imp-pill{border-radius:1rem;top:.25rem;font-size:.72rem}}
+</style>
+<div class="imp-pill" role="status" aria-live="polite">
+  <span>Viewing <b>{{ IMPERSONATION.pharmacy_name }}</b> as {{ IMPERSONATION.target_username }}</span>
+  <span class="imp-mode">{{ IMPERSONATION.get_mode_display }}</span>
+  <span>{{ IMPERSONATION_MINUTES_LEFT }} min left</span>
+  <form method="post" action="{{ IMPERSONATION_EXIT_URL }}" style="margin:0">{% csrf_token %}<button type="submit">Exit to my account</button></form>
+</div>

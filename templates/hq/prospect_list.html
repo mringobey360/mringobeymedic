@@ -1,0 +1,279 @@
+{% extends "base.html" %}
+{% block title %}Prospects - HQ{% endblock %}
+{% block content %}
+<style>
+.pp{max-width:76rem;margin:0 auto;color:var(--sp-text)}
+.pp *{box-sizing:border-box}
+.pp-hero{display:flex;flex-wrap:wrap;gap:1rem;align-items:center;justify-content:space-between;padding:1.5rem;border-radius:1.25rem;background:linear-gradient(135deg,#0f766e 0%,#115e59 55%,#134e4a 100%);color:#fff;box-shadow:var(--sp-shadow);margin-bottom:1.25rem}
+.pp-hero h1{font-size:1.5rem;font-weight:800;letter-spacing:-.02em;margin:0}
+.pp-hero p{margin:.35rem 0 0;font-size:.875rem;color:rgba(255,255,255,.82);max-width:40rem;line-height:1.5}
+.pp-hero-actions{display:flex;flex-wrap:wrap;gap:.5rem}
+.pp-btn{display:inline-flex;align-items:center;gap:.45rem;padding:.6rem 1rem;border-radius:.75rem;font-size:.8125rem;font-weight:700;border:1px solid var(--sp-border);background:var(--sp-surface);color:var(--sp-text);cursor:pointer;text-decoration:none;transition:.15s}
+.pp-btn:hover{background:var(--sp-surface-2)}
+.pp-btn svg{width:1rem;height:1rem}
+.pp-btn.primary{background:var(--sp-accent);border-color:var(--sp-accent);color:#fff}
+.pp-btn.primary:hover{background:var(--sp-accent-hover)}
+.pp-hero .pp-btn.light{background:#fff;color:#115e59;border-color:#fff}
+.pp-hero .pp-btn.ghost{background:rgba(255,255,255,.12);color:#fff;border-color:rgba(255,255,255,.35)}
+.pp-btn.sm{padding:.35rem .65rem;font-size:.75rem;border-radius:.6rem}
+.pp-btn.danger{color:var(--sp-danger)}
+.pp-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:.875rem;margin-bottom:1.25rem}
+@media(max-width:900px){.pp-kpis{grid-template-columns:repeat(2,1fr)}}
+.pp-card{background:var(--sp-surface);border:1px solid var(--sp-border);border-radius:1.1rem;box-shadow:0 1px 2px rgba(15,23,42,.04)}
+.pp-kpi{display:flex;gap:.8rem;align-items:center;padding:1rem}
+.pp-ico{width:2.6rem;height:2.6rem;border-radius:.85rem;display:flex;align-items:center;justify-content:center;flex:none;background:var(--sp-accent-soft);color:var(--sp-accent)}
+.pp-ico svg{width:1.25rem;height:1.25rem}
+.pp-ico.blue{background:#dbeafe;color:#1d4ed8}.pp-ico.green{background:#dcfce7;color:#15803d}.pp-ico.amber{background:#fef3c7;color:#b45309}
+html[data-theme="dark"] .pp-ico.blue{background:#172554;color:#93c5fd}html[data-theme="dark"] .pp-ico.green{background:#052e16;color:#86efac}html[data-theme="dark"] .pp-ico.amber{background:#422006;color:#fcd34d}
+.pp-kpi small{display:block;font-size:.72rem;font-weight:600;color:var(--sp-muted);text-transform:uppercase;letter-spacing:.04em}
+.pp-kpi b{display:block;font-size:1.55rem;line-height:1.15;font-weight:800}
+.pp-funnel{padding:1rem 1.1rem;margin-bottom:1.25rem}
+.pp-funnel-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.7rem;font-size:.8rem;color:var(--sp-muted)}
+.pp-funnel-head b{color:var(--sp-text);font-size:.9rem}
+.pp-bar{display:flex;height:.7rem;border-radius:999px;overflow:hidden;background:var(--sp-surface-3)}
+.pp-bar span{display:block;height:100%}
+.pp-legend{display:flex;flex-wrap:wrap;gap:.4rem 1.1rem;margin-top:.7rem;font-size:.75rem;color:var(--sp-muted)}
+.pp-legend i{display:inline-block;width:.6rem;height:.6rem;border-radius:50%;margin-right:.35rem}
+.c-NEW{background:#94a3b8}.c-CONTACTED{background:#0d9488}.c-JOINED{background:#16a34a}.c-OPTED_OUT{background:#ef4444}
+.pp-add{margin-bottom:1.25rem}
+.pp-tabs{display:flex;gap:.25rem;padding:.35rem;margin:1rem 1rem 0;background:var(--sp-surface-3);border-radius:.8rem;width:fit-content}
+.pp-tab{border:0;background:transparent;padding:.5rem .95rem;border-radius:.6rem;font-size:.8125rem;font-weight:700;color:var(--sp-muted);cursor:pointer}
+.pp-tab.on{background:var(--sp-surface);color:var(--sp-text);box-shadow:0 1px 3px rgba(15,23,42,.12)}
+.pp-pane{display:none;padding:1rem 1.1rem 1.2rem}.pp-pane.on{display:block}
+.pp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem}
+@media(max-width:760px){.pp-grid{grid-template-columns:1fr}}
+.pp-in,.pp-sel,.pp-ta{width:100%;padding:.62rem .8rem;border:1px solid var(--sp-border);border-radius:.7rem;background:var(--sp-input);color:var(--sp-text);font-size:.875rem;font-family:inherit}
+.pp-in:focus,.pp-sel:focus,.pp-ta:focus{outline:0;border-color:var(--sp-accent);box-shadow:0 0 0 3px var(--sp-focus)}
+.pp-ta{min-height:7.5rem;resize:vertical;line-height:1.5}
+.pp-lab{display:block;font-size:.72rem;font-weight:700;color:var(--sp-muted);margin-bottom:.3rem;text-transform:uppercase;letter-spacing:.04em}
+.pp-hint{font-size:.78rem;color:var(--sp-muted);margin:0 0 .7rem;line-height:1.5}
+.pp-hint code{background:var(--sp-surface-3);padding:.05rem .35rem;border-radius:.35rem;font-size:.75rem}
+.pp-foot{display:flex;justify-content:flex-end;margin-top:.9rem}
+.pp-tool{display:flex;flex-wrap:wrap;gap:.6rem;align-items:center;padding:1rem 1.1rem;border-bottom:1px solid var(--sp-border)}
+.pp-search{position:relative;flex:1 1 14rem;max-width:20rem}
+.pp-search svg{position:absolute;left:.7rem;top:50%;transform:translateY(-50%);width:1rem;height:1rem;color:var(--sp-muted)}
+.pp-search input{padding-left:2.2rem}
+.pp-pills{display:flex;flex-wrap:wrap;gap:.35rem}
+.pp-pill{padding:.35rem .75rem;border-radius:999px;border:1px solid var(--sp-border);font-size:.75rem;font-weight:700;color:var(--sp-muted);text-decoration:none;background:var(--sp-surface)}
+.pp-pill.on{background:var(--sp-accent);border-color:var(--sp-accent);color:#fff}
+.pp-pill em{font-style:normal;opacity:.75;margin-left:.3rem}
+.pp-table-wrap{overflow-x:auto}
+.pp-table{width:100%;border-collapse:collapse;font-size:.85rem}
+.pp-table th{padding:.7rem 1.1rem;text-align:left;font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;color:var(--sp-muted);background:var(--sp-surface-2);border-bottom:1px solid var(--sp-border);white-space:nowrap}
+.pp-table td{padding:.8rem 1.1rem;border-bottom:1px solid var(--sp-border);vertical-align:middle}
+.pp-table tr:last-child td{border-bottom:0}
+.pp-table tbody tr:hover{background:var(--sp-surface-2)}
+.pp-who{display:flex;gap:.75rem;align-items:center;min-width:12rem}
+.pp-av{width:2.4rem;height:2.4rem;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.9rem;color:var(--sp-accent);background:var(--sp-accent-soft);flex:none}
+.pp-who b{display:block;font-weight:700}
+.pp-sub{display:block;font-size:.75rem;color:var(--sp-muted)}
+.pp-phone{font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:600}
+.pp-type{display:inline-block;padding:.2rem .55rem;border-radius:.5rem;background:var(--sp-surface-3);font-size:.75rem;font-weight:600}
+.pp-st{display:inline-flex;align-items:center;gap:.4rem;padding:.25rem .65rem;border-radius:999px;font-size:.75rem;font-weight:700}
+.pp-st i{width:.45rem;height:.45rem;border-radius:50%;background:currentColor}
+.pp-st.NEW{background:#f1f5f9;color:#475569}.pp-st.CONTACTED{background:#ccfbf1;color:#0f766e}.pp-st.JOINED{background:#dcfce7;color:#15803d}.pp-st.OPTED_OUT{background:#fee2e2;color:#b91c1c}
+html[data-theme="dark"] .pp-st.NEW{background:#1e293b;color:#cbd5e1}html[data-theme="dark"] .pp-st.CONTACTED{background:#123d3b;color:#5eead4}html[data-theme="dark"] .pp-st.JOINED{background:#052e16;color:#86efac}html[data-theme="dark"] .pp-st.OPTED_OUT{background:#450a0a;color:#fca5a5}
+.pp-acts{display:flex;gap:.35rem;justify-content:flex-end;white-space:nowrap}
+.pp-acts form{display:inline-flex;margin:0}
+.pp-empty{text-align:center;padding:3.2rem 1rem}
+.pp-empty svg{width:4rem;height:4rem;color:var(--sp-accent);opacity:.85}
+.pp-empty h3{margin:.8rem 0 .25rem;font-size:1.05rem;font-weight:800}
+.pp-empty p{margin:0;color:var(--sp-muted);font-size:.85rem}
+.pp-pager{display:flex;justify-content:space-between;align-items:center;padding:.9rem 1.1rem;border-top:1px solid var(--sp-border);font-size:.8rem;color:var(--sp-muted)}
+.pp-msgs{margin-bottom:1rem}
+
+/* Edit panel (toast-style floating form) */
+#pp-edit .pp-lab{color:#64748b}
+html[data-theme="dark"] #pp-edit{background:var(--sp-surface);border-color:var(--sp-border);color:var(--sp-text)}
+html[data-theme="dark"] #pp-edit h3{color:var(--sp-text)}
+html[data-theme="dark"] #pp-edit .float-ico{background:var(--sp-accent-soft);color:var(--sp-accent)}
+/* The panel scrolls, so the dropdown list opens inline inside it instead of floating (and being clipped). */
+#pp-edit .custom-select-menu{position:static;display:none;opacity:1;visibility:visible;transform:none;margin-top:.35rem;max-height:11rem;box-shadow:none}
+#pp-edit .custom-select.open .custom-select-menu{display:block}
+.pp-acts .pp-btn.edit{color:var(--sp-accent)}
+
+/* Dropdowns: the global enhancer copies the select's classes onto its wrapper, so neutralise the
+   input styling on the wrapper (it caused a double box) and style the trigger/menu like our inputs. */
+.pp .custom-select.pp-sel{padding:0;border:0;background:transparent;box-shadow:none;border-radius:0}
+.pp .custom-select-trigger{background:var(--sp-input);border:1px solid var(--sp-border);border-radius:.7rem;color:var(--sp-text);min-height:2.6rem;padding:.55rem .8rem;font-size:.875rem}
+.pp .custom-select-trigger:hover{background:var(--sp-surface-2);border-color:var(--sp-border)}
+.pp .custom-select.open .custom-select-trigger,.pp .custom-select-trigger:focus-visible{border-color:var(--sp-accent);box-shadow:0 0 0 3px var(--sp-focus)}
+.pp .custom-select-menu{background:var(--sp-surface);border:1px solid var(--sp-border);box-shadow:var(--sp-shadow);z-index:80}
+.pp .custom-option{color:var(--sp-text)}
+.pp .custom-option:hover,.pp .custom-option:focus-visible,.pp .custom-option.selected{background:var(--sp-accent-soft);color:var(--sp-accent)}
+.pp-tool .custom-select.pp-sel{width:auto;min-width:12rem;flex:0 0 auto}
+.pp-tool{border-radius:1.1rem 1.1rem 0 0}
+</style>
+
+<div class="pp">
+    <div class="pp-hero">
+        <div>
+            <h1>Prospects</h1>
+            <p>Collect business owners' phone numbers and send them an official invitation to join SmartPOS, with your system link. Track who was contacted and who joined.</p>
+        </div>
+        <div class="pp-hero-actions">
+            <a class="pp-btn ghost" href="{% url 'hq:prospect_export' %}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 20h16"/></svg>Download CSV</a>
+            <a class="pp-btn light" href="{% url 'hq:prospect_campaign' %}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg>Send SMS invitation</a>
+        </div>
+    </div>
+
+    <div class="pp-kpis">
+        <div class="pp-card pp-kpi"><span class="pp-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H7a4 4 0 00-4 4v2"/><circle cx="10" cy="7" r="4"/><path d="M21 21v-2a4 4 0 00-3-3.9M16 3.1a4 4 0 010 7.8"/></svg></span><div><small>Total numbers</small><b>{{ total }}</b></div></div>
+        <div class="pp-card pp-kpi"><span class="pp-ico blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg></span><div><small>Eligible to message</small><b>{{ eligible }}</b></div></div>
+        <div class="pp-card pp-kpi"><span class="pp-ico amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span><div><small>Not messaged yet</small><b>{{ never_messaged }}</b></div></div>
+        <div class="pp-card pp-kpi"><span class="pp-ico green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span><div><small>Joined</small><b>{{ totals.JOINED|default:0 }}</b></div></div>
+    </div>
+
+    {% if total %}
+    <div class="pp-card pp-funnel">
+        <div class="pp-funnel-head"><span>Status of all prospects</span><span>Join rate: <b>{{ join_rate }}%</b></span></div>
+        <div class="pp-bar">{% for label, n, value in bar %}{% if n %}<span class="c-{{ value }}" style="width:{% widthratio n total 100 %}%" title="{{ label }}: {{ n }}"></span>{% endif %}{% endfor %}</div>
+        <div class="pp-legend">{% for label, n, value in bar %}<span><i class="c-{{ value }}"></i>{{ label }} ({{ n }})</span>{% endfor %}</div>
+    </div>
+    {% endif %}
+
+    <div class="pp-card pp-add">
+        <div class="pp-tabs" role="tablist">
+            <button type="button" class="pp-tab on" data-pane="one">Add one number</button>
+            <button type="button" class="pp-tab" data-pane="many">Paste many numbers</button>
+        </div>
+        <div class="pp-pane on" id="pane-one">
+            <form method="post" action="{% url 'hq:prospect_add' %}">
+                {% csrf_token %}
+                <div class="pp-grid">
+                    <div><label class="pp-lab">Phone number *</label><input class="pp-in" name="phone_number" placeholder="0712 345 678" required></div>
+                    <div><label class="pp-lab">Owner name</label><input class="pp-in" name="name" placeholder="Optional"></div>
+                    <div><label class="pp-lab">Business name</label><input class="pp-in" name="business_name" placeholder="Optional"></div>
+                    <div><label class="pp-lab">Business type</label><select class="pp-sel" name="business_type">{% for v, l in type_choices %}<option value="{{ v }}" {% if v == 'OTHER' %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+                    <div><label class="pp-lab">Region / Area</label><input class="pp-in" name="region" placeholder="e.g. Dodoma"></div>
+                    <div><label class="pp-lab">Notes</label><input class="pp-in" name="notes" placeholder="Optional"></div>
+                </div>
+                <div class="pp-foot"><button class="pp-btn primary">Save number</button></div>
+            </form>
+        </div>
+        <div class="pp-pane" id="pane-many">
+            <p class="pp-hint">One business owner per line. Examples: <code>0712345678</code> &middot; <code>Juma, 0655 111 222</code> &middot; <code>0754000111 Duka la Neema</code>. Numbers already saved or invalid are not saved twice.</p>
+            <form method="post" action="{% url 'hq:prospect_import' %}">
+                {% csrf_token %}
+                <textarea class="pp-ta" name="contacts" placeholder="0712345678&#10;Juma, 0655111222&#10;0754 000 111 Duka la Neema" required></textarea>
+                <div class="pp-grid" style="margin-top:.75rem;grid-template-columns:1fr 1fr">
+                    <div><label class="pp-lab">Business type (for all)</label><select class="pp-sel" name="business_type">{% for v, l in type_choices %}<option value="{{ v }}" {% if v == 'OTHER' %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+                    <div><label class="pp-lab">Region / Area (for all)</label><input class="pp-in" name="region" placeholder="Optional"></div>
+                </div>
+                <div class="pp-foot"><button class="pp-btn primary">Save all numbers</button></div>
+            </form>
+        </div>
+    </div>
+
+    <div class="pp-card">
+        <form method="get" class="pp-tool">
+            <div class="pp-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><input class="pp-in" type="search" name="q" value="{{ q }}" placeholder="Search name, number or region"></div>
+            <select class="pp-sel" name="type" style="width:auto" onchange="this.form.submit()">
+                <option value="">All types</option>
+                {% for v, l in type_choices %}<option value="{{ v }}" {% if current_type == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
+            </select>
+            {% if current_status %}<input type="hidden" name="status" value="{{ current_status }}">{% endif %}
+            <button class="pp-btn sm">Search</button>
+            <div class="pp-pills" style="margin-left:auto">
+                <a class="pp-pill {% if not current_status %}on{% endif %}" href="?q={{ q }}&type={{ current_type }}">All<em>{{ total }}</em></a>
+                {% for v, l in status_choices %}<a class="pp-pill {% if current_status == v %}on{% endif %}" href="?status={{ v }}&q={{ q }}&type={{ current_type }}">{{ l }}{% for label, n, value in bar %}{% if value == v %}<em>{{ n }}</em>{% endif %}{% endfor %}</a>{% endfor %}
+            </div>
+        </form>
+
+        <div class="pp-table-wrap">
+        <table class="pp-table">
+            <thead><tr><th>Business owner</th><th>Number</th><th>Type / Area</th><th>Status</th><th>SMS</th><th style="text-align:right">Actions</th></tr></thead>
+            <tbody>
+            {% for p in page_obj %}
+            <tr>
+                <td><div class="pp-who"><span class="pp-av">{{ p.display_name|slice:":1"|upper }}</span><div><b>{{ p.name|default:p.business_name|default:"No name" }}</b><span class="pp-sub">{% if p.name %}{{ p.business_name }}{% endif %}</span></div></div></td>
+                <td class="pp-phone">{{ p.phone_number }}</td>
+                <td><span class="pp-type">{{ p.get_business_type_display }}</span>{% if p.region %}<span class="pp-sub" style="margin-top:.2rem">{{ p.region }}</span>{% endif %}</td>
+                <td><span class="pp-st {{ p.status }}"><i></i>{{ p.get_status_display }}</span></td>
+                <td><b>{{ p.sms_count }}</b>{% if p.last_sms_at %}<span class="pp-sub">{{ p.last_sms_at|date:"d M Y" }}</span>{% endif %}</td>
+                <td>
+                    <div class="pp-acts">
+                        {% if p.status == 'OPTED_OUT' %}<form method="post" action="{% url 'hq:prospect_action' p.pk %}">{% csrf_token %}<button name="action" value="reactivate" class="pp-btn sm">Restore</button></form>
+                        {% elif p.status != 'JOINED' %}<form method="post" action="{% url 'hq:prospect_action' p.pk %}">{% csrf_token %}<button name="action" value="optout" class="pp-btn sm" title="Will not be messaged again">Opt out</button></form>{% endif %}
+                        <button type="button" class="pp-btn sm edit pp-edit-btn" data-update="{% url 'hq:prospect_update' p.pk %}"
+                                data-phone="{{ p.phone_number }}" data-name="{{ p.name }}" data-biz="{{ p.business_name }}"
+                                data-type="{{ p.business_type }}" data-region="{{ p.region }}" data-notes="{{ p.notes }}">Edit</button>
+                        <form method="post" action="{% url 'hq:prospect_action' p.pk %}"
+                              data-confirm="Delete this number?"
+                              data-confirm-detail="{{ p.display_name }} ({{ p.phone_number }}) will be permanently removed from your prospects. This cannot be undone."
+                              data-confirm-accept="Delete number" data-confirm-busy="Deleting&hellip;">{% csrf_token %}
+                            <input type="hidden" name="action" value="delete">
+                            <button type="submit" class="pp-btn sm danger">Delete</button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6"><div class="pp-empty">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H7a4 4 0 00-4 4v2"/><circle cx="10" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg>
+                <h3>{% if q or current_status or current_type %}No results{% else %}No numbers registered yet{% endif %}</h3>
+                <p>{% if q or current_status or current_type %}Change your search or filters.{% else %}Add one number or paste a whole list above.{% endif %}</p>
+            </div></td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        </div>
+
+        {% if page_obj.paginator.num_pages > 1 %}
+        <div class="pp-pager">
+            {% if page_obj.has_previous %}<a class="pp-btn sm" href="?page={{ page_obj.previous_page_number }}&q={{ q }}&status={{ current_status }}&type={{ current_type }}">&larr; Previous</a>{% else %}<span></span>{% endif %}
+            <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }} &middot; {{ page_obj.paginator.count }} results</span>
+            {% if page_obj.has_next %}<a class="pp-btn sm" href="?page={{ page_obj.next_page_number }}&q={{ q }}&status={{ current_status }}&type={{ current_type }}">Next &rarr;</a>{% else %}<span></span>{% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<section id="pp-edit" class="float-panel" role="dialog" aria-labelledby="pp-edit-title" hidden>
+    <div class="float-head">
+        <span class="float-ico"><svg class="icon" aria-hidden="true"><use href="#i-edit"/></svg></span>
+        <div class="min-w-0 flex-1"><h3 id="pp-edit-title" class="text-sm font-bold text-ink-900">Edit prospect</h3><p class="text-xs text-ink-500 mt-0.5">Update the details. You can keep using the page while this is open.</p></div>
+        <button type="button" class="toast-close" data-float-close aria-label="Close"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></button>
+    </div>
+    <form method="post" id="pp-edit-form" class="float-body" action="">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+        <div><label class="pp-lab" for="pe-phone">Phone number *</label><input class="pp-in" id="pe-phone" name="phone_number" required></div>
+        <div><label class="pp-lab" for="pe-name">Owner name</label><input class="pp-in" id="pe-name" name="name" maxlength="150" placeholder="Optional"></div>
+        <div><label class="pp-lab" for="pe-biz">Business name</label><input class="pp-in" id="pe-biz" name="business_name" maxlength="150" placeholder="Optional"></div>
+        <div><label class="pp-lab" for="pe-type">Business type</label><select class="pp-sel" id="pe-type" name="business_type">{% for v, l in type_choices %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select></div>
+        <div><label class="pp-lab" for="pe-region">Region / Area</label><input class="pp-in" id="pe-region" name="region" maxlength="60" placeholder="e.g. Dodoma"></div>
+        <div><label class="pp-lab" for="pe-notes">Notes</label><input class="pp-in" id="pe-notes" name="notes" maxlength="300" placeholder="Optional"></div>
+        <div class="flex justify-end gap-2"><button type="button" class="btn btn-ghost btn-sm" data-float-close data-icon="x">Cancel</button><button type="submit" class="btn btn-primary btn-sm" data-icon="save">Save changes</button></div>
+    </form>
+</section>
+
+<script>
+(function () {
+    // Edit: fill the toast-style panel with the row's details and open it.
+    var form = document.getElementById('pp-edit-form');
+    document.addEventListener('click', function (e) {
+        var b = e.target.closest('.pp-edit-btn');
+        if (!b || !form) return;
+        form.action = b.dataset.update;
+        form.elements.phone_number.value = b.dataset.phone || '';
+        form.elements.name.value = b.dataset.name || '';
+        form.elements.business_name.value = b.dataset.biz || '';
+        form.elements.region.value = b.dataset.region || '';
+        form.elements.notes.value = b.dataset.notes || '';
+        var sel = form.elements.business_type;
+        sel.value = b.dataset.type || 'OTHER';
+        sel.dispatchEvent(new Event('change', { bubbles: true }));   // keeps the styled dropdown label in sync
+        if (window.floatPanel) window.floatPanel.open('pp-edit');
+    });
+    var tabs = document.querySelectorAll('.pp-tab');
+    tabs.forEach(function (t) {
+        t.addEventListener('click', function () {
+            tabs.forEach(function (x) { x.classList.toggle('on', x === t); });
+            document.getElementById('pane-one').classList.toggle('on', t.dataset.pane === 'one');
+            document.getElementById('pane-many').classList.toggle('on', t.dataset.pane === 'many');
+        });
+    });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,11 @@
+{% comment %}
+  SmartPOS Free Plan banner. Inputs: st (branch billing state with st.trial and st.free_usage) OR legacy (Subscription with is_trial).
+  Shows this month's free-sales meter, the value already built in the account and an Upgrade button.
+  Never locks anything. Self-contained CSS, light/dark safe, reduced-motion safe.
+{% endcomment %}
+{% if st %}
+  {% include 'partials/_trial_banner_card.html' with usage=st.free_usage value=st.free_value href=st.renew_url %}
+{% else %}
+  {% url 'hq:packages_center' as legacy_href %}
+  {% include 'partials/_trial_banner_card.html' with usage=None value=None href=legacy_href|add:"?renew=1" %}
+{% endif %}

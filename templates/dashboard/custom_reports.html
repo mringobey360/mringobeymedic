@@ -1,0 +1,254 @@
+{% extends "base.html" %}
+{% block title %}Advanced Reports & Profit Comparison{% endblock %}
+{% load smartpos_numbers %}
+{% block content %}
+<div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 mb-6">
+  <div>
+    <div class="text-xs font-semibold uppercase tracking-wider text-brand-700 mb-1">Reports & Analytics</div>
+    <h1 class="text-2xl font-bold text-ink-900 tracking-tight">Advanced Report Builder</h1>
+    <p class="text-sm text-ink-500 mt-1">See daily sales, actual receipts, product costs, staff meals, approved expenses and estimated net profit for any date range.</p>
+  </div>
+</div>
+
+<div class="card mb-6">
+  <h2 class="font-semibold text-ink-900 mb-4">1. Select Report Period</h2>
+  <form method="get" class="grid grid-cols-1 lg:grid-cols-4 gap-4" id="report-period-form">
+    <div class="lg:col-span-2">
+      <label class="block text-xs font-medium text-ink-600 mb-1">Report period</label>
+      <select id="period-preset" class="input w-full" aria-label="Select report period">
+        <option value="today">Today</option>
+        <option value="yesterday">Yesterday</option>
+        <option value="week">This Week</option>
+        <option value="last_week">Last Week</option>
+        <option value="7">Last 7 Days</option>
+        <option value="30">Last 30 Days</option>
+        <option value="month">This Month</option>
+        <option value="last_month">Last Month</option>
+        <option value="year">This Year</option>
+        <option value="custom">Custom Date Range</option>
+      </select>
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-ink-600 mb-1">Or pick a month</label>
+      <input type="month" id="month-pick" class="input w-full" max="{{ today|date:'Y-m' }}" aria-label="Pick a month">
+    </div>
+    <div class="flex items-end">
+      <button class="btn btn-primary w-full lg:w-auto" type="submit">Apply Period</button>
+    </div>
+    <div id="custom-period-fields" class="hidden lg:col-span-4 grid grid-cols-1 sm:grid-cols-2 gap-4 rounded-xl border border-ink-200 bg-ink-50/30 p-4">
+      <div>
+        <label class="block text-xs font-medium text-ink-600 mb-1">From date</label>
+        <input type="date" id="custom-start" value="{{ form_start|date:'Y-m-d' }}" class="input w-full" required>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-ink-600 mb-1">To date</label>
+        <input type="date" id="custom-end" value="{{ form_end|date:'Y-m-d' }}" class="input w-full" required>
+      </div>
+    </div>
+    <input type="hidden" name="start" id="period-start" value="{{ form_start|date:'Y-m-d' }}">
+    <input type="hidden" name="end" id="period-end" value="{{ form_end|date:'Y-m-d' }}">
+  </form>
+  <p id="period-summary" class="text-xs text-ink-500 mt-3"></p>
+</div>
+
+<div class="card mb-6" id="cash-reconciliation">
+  <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 mb-4">
+    <div><div class="text-xs font-semibold uppercase tracking-wider text-brand-700 mb-1">Physical Cash Control</div><h2 class="text-lg font-bold text-ink-900">Expected Cash for Selected Period</h2><p class="text-sm text-ink-500 mt-1">{{ summary.start|date:'d M Y' }} – {{ summary.end|date:'d M Y' }} · Cash drawer reconciliation, not accounting profit.</p></div>
+    {% if cash_control.provisional_opening %}<span class="text-xs rounded-lg bg-amber-50 text-amber-800 px-3 py-2">Historical estimate · no verified opening cash was found. Earlier recorded cash movements are reconstructed automatically, assuming TZS 0 at the earliest known cash activity.</span>{% elif not cash_control.has_opening_day %}<span class="text-xs rounded-lg bg-blue-50 text-blue-800 px-3 py-2">Opening cash carried forward from the latest physical closing count and adjusted for recorded cash movements before this period.</span>{% endif %}
+  </div>
+  <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 mb-4">
+    <div class="rounded-xl border border-ink-200 p-4"><div class="text-xs text-ink-500">Opening cash</div><div class="text-xl font-bold text-ink-900 mt-1">TZS {{ cash_control.opening|smart_number }}</div></div>
+    <div class="rounded-xl border border-ink-200 p-4"><div class="text-xs text-ink-500">Cash sales received</div><div class="text-xl font-bold text-emerald-700 mt-1">+ TZS {{ cash_control.cash_sales|smart_number }}</div></div>
+    <div class="rounded-xl border border-ink-200 p-4"><div class="text-xs text-ink-500">Cash refunds paid</div><div class="text-xl font-bold text-ink-900 mt-1">− TZS {{ cash_control.refunds|smart_number }}</div></div>
+    <div class="rounded-xl border border-ink-200 p-4"><div class="text-xs text-ink-500">Approved expenses paid from the drawer</div><div class="text-xl font-bold text-ink-900 mt-1">− TZS {{ cash_control.expenses|smart_number }}</div></div>
+    <div class="rounded-xl border border-ink-200 p-4"><div class="text-xs text-ink-500">Staff meals paid from drawer (automatic)</div><div class="text-xl font-bold text-ink-900 mt-1">− TZS {{ cash_control.meals|smart_number }}</div></div>
+    <div class="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4"><div class="text-xs text-ink-500">Net cash sales after meals</div><div class="text-xl font-bold text-emerald-700 mt-1">TZS {{ cash_control.cash_after_meals|smart_number }}</div><div class="text-xs text-ink-500 mt-1">Cash sales {{ cash_control.cash_sales|smart_number }} − staff meals {{ cash_control.meals|smart_number }}</div></div>
+    <div class="rounded-xl border-2 border-brand-300 bg-brand-50/40 p-4"><div class="text-xs text-ink-600">Expected cash balance</div><div class="text-2xl font-bold text-brand-700 mt-1">TZS {{ cash_control.expected|smart_number }}</div><div class="text-xs text-ink-500 mt-1">Opening + cash sales − refunds − cash expenses − staff meals</div></div>
+    <div class="rounded-xl border border-ink-200 p-4"><div class="text-xs text-ink-500">Actual counted closing cash</div>{% if cash_control.has_ending_count %}<div class="text-xl font-bold text-ink-900 mt-1">TZS {{ cash_control.actual|smart_number }}</div><div class="text-xs mt-1 {% if cash_control.variance < 0 %}text-red-700{% elif cash_control.variance > 0 %}text-amber-700{% else %}text-emerald-700{% endif %}">Difference: TZS {{ cash_control.variance|smart_number }}</div>{% else %}<div class="text-base font-semibold text-ink-700 mt-2">Not counted / not closed</div><div class="text-xs text-ink-500 mt-1">Close and physically count cash on the To Date to compare.</div>{% endif %}</div>
+  </div>
+  <p class="text-xs text-ink-500">Earned staff meals are deducted from the drawer automatically (do not also record them as expenses). Only expenses paid from “Sales cash / petty cash” reduce the drawer; bank and mobile-money expenses reduce profit only. Mobile money, bank payments, credit sales and uncollected debts never enter the physical drawer.</p>
+  {% if cash_control.provisional_opening %}<div class="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"><strong>First-time historical detection:</strong> The system has automatically searched previous cash sales, approved cash refunds and approved cash expenses, including activity from previous months. This is a movement-based estimate, not proof of the physical cash balance that existed before the earliest recorded transaction. To make the report fully verified, physically count cash and record a manager-approved opening balance in Cash Control.</div>{% elif cash_control.baseline_source == 'previous_physical_close' %}<div class="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">Opening balance is anchored to a previous physical cash count, then adjusted for recorded cash activity up to the selected start date.</div>{% endif %}
+  {% if cash_control.days_recorded < cash_control.days_expected %}<p class="mt-3 text-xs text-amber-800 bg-amber-50 rounded-lg p-3">Cash control records exist for {{ cash_control.days_recorded }} of {{ cash_control.days_expected }} dates in this interval. Review missing cash-day openings/records before relying on the expected balance.</p>{% endif %}
+</div>
+
+<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 mb-6">
+  <div class="card"><div class="text-xs text-ink-500">Total Sales / Revenue</div><div class="text-xl font-bold text-ink-900 mt-1">TZS {{ summary.sales|smart_number }}</div><div class="text-xs text-ink-400 mt-1">{{ summary.transactions|smart_number }} transactions · {{ summary.units|smart_number }} units</div></div>
+  <div class="card"><div class="text-xs text-ink-500">Actual Receipts</div><div class="text-xl font-bold text-ink-900 mt-1">TZS {{ summary.cash_received|smart_number }}</div><div class="text-xs text-ink-400 mt-1">Money received (including sales later returned or voided) + debt collections, less refunds actually paid</div></div>
+  <div class="card"><div class="text-xs text-ink-500">Cost of Goods Sold</div><div class="text-xl font-bold text-ink-900 mt-1">TZS {{ summary.cost|smart_number }}</div><div class="text-xs text-ink-400 mt-1">Cost of items actually sold</div></div>
+  <div class="card" style="border-color:#99f6e4"><div class="text-xs text-ink-500">Gross Profit</div><div class="text-xl font-bold text-brand-700 mt-1">TZS {{ summary.gross_profit|smart_number }}</div><div class="text-xs text-ink-400 mt-1">Gross margin {{ summary.margin|floatformat:1 }}%</div></div>
+  <div class="card"><div class="text-xs text-ink-500">Meals + Approved Expenses</div><div class="text-xl font-bold text-ink-900 mt-1">TZS {{ summary.meals|add:summary.expenses|smart_number }}</div><div class="text-xs text-ink-400 mt-1">Meals: TZS {{ summary.meals|smart_number }} · Expenses: TZS {{ summary.expenses|smart_number }}</div></div>
+  <div class="card" style="border-color:#86efac;background:#f0fdf4"><div class="text-xs text-ink-500">Estimated Net Profit</div><div class="text-xl font-bold text-emerald-700 mt-1">TZS {{ summary.net_profit|smart_number }}</div><div class="text-xs text-ink-400 mt-1">Gross profit − recorded meals − approved expenses; excludes unrecorded overheads and salaries</div></div>
+</div>
+
+<div class="card mb-6">
+  <div class="mb-3"><h2 class="font-semibold text-ink-900">Daily Financial Breakdown</h2><p class="text-xs text-ink-500 mt-1">Each row represents one business date for the selected branch. Credit sales are not counted as cash received until a debt payment is recorded. Meal totals include earned meals and meal-debt obligations; meal debt is shown separately for visibility.</p></div>
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm min-w-[1400px]">
+      <thead><tr class="text-left text-ink-500 border-b border-ink-200"><th class="py-3 pr-3">Business Date</th><th class="py-3 pr-3 text-right">Sales</th><th class="py-3 pr-3 text-right">Cash sales</th><th class="py-3 pr-3 text-right">− Meals (drawer)</th><th class="py-3 pr-3 text-right">Net cash</th><th class="py-3 pr-3 text-right">Mobile</th><th class="py-3 pr-3 text-right">Credit lent (unpaid)</th><th class="py-3 pr-3 text-right">Credit paid at sale</th><th class="py-3 pr-3 text-right">Debt repayments</th><th class="py-3 pr-3 text-right">Actual receipts</th><th class="py-3 pr-3 text-right">Product cost</th><th class="py-3 pr-3 text-right">Gross profit</th><th class="py-3 pr-3 text-right">Meals total</th><th class="py-3 pr-3 text-right">Meal debt</th><th class="py-3 pr-3 text-right">Expenses</th><th class="py-3 pr-3 text-right">Net profit</th></tr></thead>
+      <tbody>
+        {% for day in daily_rows %}
+        <tr class="border-b border-ink-100 {% if day.net_profit < 0 %}bg-red-50/60{% endif %}">
+          <td class="py-3 pr-3 font-medium whitespace-nowrap">{{ day.date|date:'D, d M Y' }}<div class="text-xs text-ink-400">{{ day.transactions|smart_number }} transactions</div></td>
+          <td class="py-3 pr-3 text-right whitespace-nowrap">{{ day.sales|smart_number }}</td><td class="py-3 pr-3 text-right whitespace-nowrap">{{ day.cash_sales|smart_number }}</td><td class="py-3 pr-3 text-right whitespace-nowrap text-red-700">{% if day.cash_meals %}− {{ day.cash_meals|smart_number }}{% else %}0{% endif %}</td><td class="py-3 pr-3 text-right font-semibold whitespace-nowrap text-emerald-700">{{ day.cash_after_meals|smart_number }}</td><td class="py-3 pr-3 text-right whitespace-nowrap">{{ day.mobile_sales|smart_number }}</td><td class="py-3 pr-3 text-right whitespace-nowrap">{{ day.credit_sales|smart_number }}</td><td class="py-3 pr-3 text-right whitespace-nowrap">{{ day.credit_deposits|smart_number }}</td><td class="py-3 pr-3 text-right whitespace-nowrap">{{ day.debt_collected|smart_number }}</td><td class="py-3 pr-3 text-right font-semibold whitespace-nowrap">{{ day.cash_received|smart_number }}</td><td class="py-3 pr-3 text-right whitespace-nowrap">{{ day.cost|smart_number }}</td><td class="py-3 pr-3 text-right whitespace-nowrap">{{ day.gross_profit|smart_number }}</td><td class="py-3 pr-3 text-right whitespace-nowrap">{{ day.meals|smart_number }}</td><td class="py-3 pr-3 text-right whitespace-nowrap">{{ day.meal_debt|smart_number }}</td><td class="py-3 pr-3 text-right whitespace-nowrap">{{ day.expenses|smart_number }}</td><td class="py-3 pr-3 text-right font-bold whitespace-nowrap {% if day.net_profit < 0 %}text-red-700{% else %}text-emerald-700{% endif %}">{{ day.net_profit|smart_number }}</td>
+        </tr>
+        {% empty %}<tr><td colspan="16" class="py-8 text-center text-ink-400">No financial records for this period.</td></tr>{% endfor %}
+      </tbody>
+      <tfoot><tr class="font-bold bg-ink-50 border-t-2 border-ink-200"><td class="py-3 pr-3">PERIOD TOTAL</td><td class="py-3 pr-3 text-right">{{ summary.sales|smart_number }}</td><td class="py-3 pr-3 text-right">{{ summary.cash_sales|smart_number }}</td><td class="py-3 pr-3 text-right text-red-700">{% if cash_control.meals %}− {{ cash_control.meals|smart_number }}{% else %}0{% endif %}</td><td class="py-3 pr-3 text-right text-emerald-700">{{ cash_control.cash_after_meals|smart_number }}</td><td class="py-3 pr-3 text-right">{{ summary.mobile_sales|smart_number }}</td><td class="py-3 pr-3 text-right">{{ summary.credit_sales|smart_number }}</td><td class="py-3 pr-3 text-right">{{ summary.credit_deposits|smart_number }}</td><td class="py-3 pr-3 text-right">{{ summary.debt_collected|smart_number }}</td><td class="py-3 pr-3 text-right">{{ summary.cash_received|smart_number }}</td><td class="py-3 pr-3 text-right">{{ summary.cost|smart_number }}</td><td class="py-3 pr-3 text-right">{{ summary.gross_profit|smart_number }}</td><td class="py-3 pr-3 text-right">{{ summary.meals|smart_number }}</td><td class="py-3 pr-3 text-right">{{ summary.meal_debt|smart_number }}</td><td class="py-3 pr-3 text-right">{{ summary.expenses|smart_number }}</td><td class="py-3 pr-3 text-right">{{ summary.net_profit|smart_number }}</td></tr></tfoot>
+    </table>
+  </div>
+</div>
+<div class="card mb-6" id="layaway-reconciliation">
+  <div class="mb-4"><h2 class="font-semibold text-ink-900">Layaway Reconciliation</h2><p class="text-xs text-ink-500 mt-1">Payments are reported on the date received. A handover completes the plan and recognises fulfilment; it is not a second cash receipt.</p></div>
+  <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 mb-4">
+    <div class="rounded-xl border border-ink-200 p-4"><div class="text-xs text-ink-500">Cash instalments received</div><div class="text-lg font-bold text-ink-900 mt-1">TZS {{ layaway.cash_received|smart_number }}</div></div>
+    <div class="rounded-xl border border-ink-200 p-4"><div class="text-xs text-ink-500">Mobile-money instalments</div><div class="text-lg font-bold text-ink-900 mt-1">TZS {{ layaway.mobile_received|smart_number }}</div></div>
+    <div class="rounded-xl border border-ink-200 p-4"><div class="text-xs text-ink-500">Total layaway payments</div><div class="text-lg font-bold text-ink-900 mt-1">TZS {{ layaway.total_received|smart_number }}</div></div>
+    <div class="rounded-xl border border-ink-200 p-4"><div class="text-xs text-ink-500">Total layaway refunds</div><div class="text-lg font-bold text-ink-900 mt-1">TZS {{ layaway.total_refunded|smart_number }}</div></div>
+  </div>
+  <div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="text-left text-ink-500 border-b border-ink-200"><th class="py-2 pr-3">Breakdown</th><th class="py-2 text-right">Amount / count</th></tr></thead><tbody>
+    <tr class="border-b border-ink-100"><td class="py-2 pr-3">Bank transfers received</td><td class="py-2 text-right">{{ layaway.bank_received|smart_number }}</td></tr>
+    <tr class="border-b border-ink-100"><td class="py-2 pr-3">Other payment methods</td><td class="py-2 text-right">{{ layaway.other_received|smart_number }}</td></tr>
+    <tr class="border-b border-ink-100"><td class="py-2 pr-3">Cash refunds paid</td><td class="py-2 text-right">{{ layaway.cash_refunds|smart_number }}</td></tr>
+    <tr class="border-b border-ink-100"><td class="py-2 pr-3">Mobile-money refunds paid</td><td class="py-2 text-right">{{ layaway.mobile_refunds|smart_number }}</td></tr>
+    <tr class="border-b border-ink-100"><td class="py-2 pr-3">Plans created in period</td><td class="py-2 text-right">{{ layaway.plans_created|smart_number }}</td></tr>
+    <tr><td class="py-2 pr-3">Plans handed over (fulfilment only)</td><td class="py-2 text-right">{{ layaway.handovers|smart_number }}</td></tr>
+  </tbody></table></div>
+</div>
+
+<div class="card mb-6" id="expenses-meals">
+  <div class="mb-3"><h2 class="font-semibold text-ink-900">Expenses deducted in this period</h2><p class="text-xs text-ink-500 mt-1">Every approved expense. “From drawer” means it also reduced expected cash.</p></div>
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm min-w-[640px]">
+      <thead><tr class="text-left text-ink-500 border-b border-ink-200"><th class="py-2 pr-3">Date</th><th class="py-2 pr-3">Category</th><th class="py-2 pr-3">Description</th><th class="py-2 pr-3">Paid from</th><th class="py-2 pr-3 text-right">Amount</th><th class="py-2 text-center">From drawer</th></tr></thead>
+      <tbody>
+        {% for e in expense_list %}<tr class="border-b border-ink-100"><td class="py-2 pr-3 whitespace-nowrap">{{ e.date|date:'d M Y' }}</td><td class="py-2 pr-3">{{ e.category }}</td><td class="py-2 pr-3">{{ e.title }}{% if e.description %}<div class="text-xs text-ink-400">{{ e.description|truncatechars:80 }}</div>{% endif %}</td><td class="py-2 pr-3">{{ e.paid_from }}</td><td class="py-2 pr-3 text-right font-medium whitespace-nowrap">{{ e.amount|smart_number }}</td><td class="py-2 text-center">{% if e.drawer %}Yes{% else %}No{% endif %}</td></tr>
+        {% empty %}<tr><td colspan="6" class="py-6 text-center text-ink-400">No approved expenses in this period.</td></tr>{% endfor %}
+      </tbody>
+      {% if expense_list %}<tfoot><tr class="font-bold bg-ink-50 border-t-2 border-ink-200"><td class="py-2 pr-3" colspan="4">TOTAL EXPENSES</td><td class="py-2 pr-3 text-right">{{ summary.expenses|smart_number }}</td><td></td></tr></tfoot>{% endif %}
+    </table>
+  </div>
+  {% if expense_categories %}<div class="mt-4 flex flex-wrap gap-2">{% for c in expense_categories %}<span class="text-xs rounded-lg bg-ink-50 border border-ink-200 px-3 py-1.5">{{ c.category }} · <strong>{{ c.total|smart_number }}</strong> ({{ c.count }})</span>{% endfor %}</div>{% endif %}
+</div>
+
+<div class="card mb-6">
+  <div class="mb-3"><h2 class="font-semibold text-ink-900">Staff meals in this period</h2><p class="text-xs text-ink-500 mt-1">Earned meals are deducted from sales and expected cash. Meal debt is waiting for the employee's sales and is not deducted yet.</p></div>
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm min-w-[560px]">
+      <thead><tr class="text-left text-ink-500 border-b border-ink-200"><th class="py-2 pr-3">Date</th><th class="py-2 pr-3">Employee</th><th class="py-2 pr-3">Meal</th><th class="py-2 pr-3 text-right">Amount</th><th class="py-2">Treatment</th></tr></thead>
+      <tbody>
+        {% for m in meal_list %}<tr class="border-b border-ink-100"><td class="py-2 pr-3 whitespace-nowrap">{{ m.date|date:'d M Y' }}</td><td class="py-2 pr-3">{{ m.employee }}</td><td class="py-2 pr-3">{{ m.meal }}</td><td class="py-2 pr-3 text-right whitespace-nowrap">{{ m.amount|smart_number }}</td><td class="py-2 {% if m.deducted %}text-emerald-700{% else %}text-amber-700{% endif %}">{{ m.treatment }}</td></tr>
+        {% empty %}<tr><td colspan="5" class="py-6 text-center text-ink-400">No staff meals in this period.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card mb-6">
+  <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+    <div><h2 class="font-semibold text-ink-900">Export Report</h2><p class="text-xs text-ink-500">{{ summary.start|date:'d M Y' }} – {{ summary.end|date:'d M Y' }} · sales, profit, expenses deducted, staff meals, items sold and expected cash after all deductions.</p></div>
+    <div class="flex flex-wrap gap-2">
+      <a class="btn btn-primary" href="{% url 'dashboard:export_custom_report_pdf' %}?start={{ summary.start|date:'Y-m-d' }}&end={{ summary.end|date:'Y-m-d' }}">Export PDF</a>
+      <a class="btn btn-secondary" href="{% url 'dashboard:export_custom_report_excel' %}?start={{ summary.start|date:'Y-m-d' }}&end={{ summary.end|date:'Y-m-d' }}">Export Excel</a>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="mb-4">
+    <h2 class="font-semibold text-ink-900">2. Profit Comparison</h2>
+    <p class="text-xs text-ink-500 mt-1">Compare any two days, weeks, months, multiple months, or custom date ranges side-by-side.</p>
+  </div>
+  <form method="get" class="grid grid-cols-1 md:grid-cols-2 gap-5">
+    <div class="rounded-xl border border-ink-200 p-4 bg-ink-50/30">
+      <div class="font-semibold text-ink-900 mb-3">Period A</div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="block text-xs text-ink-600 mb-1">From</label><input type="date" name="start" value="{{ form_start|date:'Y-m-d' }}" class="input w-full"></div>
+        <div><label class="block text-xs text-ink-600 mb-1">To</label><input type="date" name="end" value="{{ form_end|date:'Y-m-d' }}" class="input w-full"></div>
+      </div>
+    </div>
+    <div class="rounded-xl border border-ink-200 p-4 bg-ink-50/30">
+      <div class="font-semibold text-ink-900 mb-3">Period B</div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="block text-xs text-ink-600 mb-1">From</label><input type="date" name="compare_start" value="{% if compare_start %}{{ compare_start|date:'Y-m-d' }}{% endif %}" class="input w-full"></div>
+        <div><label class="block text-xs text-ink-600 mb-1">To</label><input type="date" name="compare_end" value="{% if compare_end %}{{ compare_end|date:'Y-m-d' }}{% endif %}" class="input w-full"></div>
+      </div>
+    </div>
+    <div class="md:col-span-2 flex flex-wrap gap-2">
+      <button class="btn btn-primary" type="submit">Compare Periods</button>
+      {% if comparison %}
+      <a class="btn btn-secondary" href="{% url 'dashboard:export_profit_comparison_pdf' %}?a_start={{ summary.start|date:'Y-m-d' }}&a_end={{ summary.end|date:'Y-m-d' }}&b_start={{ comparison.start|date:'Y-m-d' }}&b_end={{ comparison.end|date:'Y-m-d' }}">Export Comparison PDF</a>
+      {% endif %}
+    </div>
+  </form>
+
+  {% if comparison %}
+  <div class="overflow-x-auto mt-6">
+    <table class="w-full text-sm">
+      <thead><tr class="text-left border-b border-ink-200 text-ink-500"><th class="py-3 pr-4">Metric</th><th class="py-3 pr-4">Period A</th><th class="py-3 pr-4">Period B</th><th class="py-3 pr-4">Difference</th><th class="py-3">Change</th></tr></thead>
+      <tbody>
+        <tr class="border-b border-ink-100"><td class="py-3 font-medium">Sales</td><td>TZS {{ summary.sales|smart_number }}</td><td>TZS {{ comparison.sales|smart_number }}</td><td>TZS {{ comparison.sales_change|smart_number }}</td><td>—</td></tr>
+        <tr class="border-b border-ink-100"><td class="py-3 font-medium">Cost</td><td>TZS {{ summary.cost|smart_number }}</td><td>TZS {{ comparison.cost|smart_number }}</td><td>TZS {{ comparison.cost_change|smart_number }}</td><td>—</td></tr>
+        <tr class="border-b border-ink-100"><td class="py-3 font-medium">Gross Profit</td><td class="font-semibold">TZS {{ summary.profit|smart_number }}</td><td class="font-semibold text-brand-700">TZS {{ comparison.profit|smart_number }}</td><td class="font-semibold">TZS {{ comparison.profit_change|smart_number }}</td><td>{% if comparison.profit_change_pct != None %}{{ comparison.profit_change_pct|floatformat:1 }}%{% else %}—{% endif %}</td></tr>
+        <tr class="border-b border-ink-100"><td class="py-3 font-medium">Actual Receipts</td><td>TZS {{ summary.cash_received|smart_number }}</td><td>TZS {{ comparison.cash_received|smart_number }}</td><td>TZS {{ comparison.cash_received_change|smart_number }}</td><td>—</td></tr>
+        <tr class="border-b border-ink-100"><td class="py-3 font-medium">Meals deducted (earned only)</td><td>TZS {{ summary.meals|smart_number }}</td><td>TZS {{ comparison.meals|smart_number }}</td><td>TZS {{ comparison.meals_change|smart_number }}</td><td>—</td></tr>
+        <tr class="border-b border-ink-100"><td class="py-3 font-medium">Meal Debt Portion</td><td>TZS {{ summary.meal_debt|smart_number }}</td><td>TZS {{ comparison.meal_debt|smart_number }}</td><td>—</td><td>—</td></tr>
+        <tr class="border-b border-ink-100"><td class="py-3 font-medium">Approved Expenses</td><td>TZS {{ summary.expenses|smart_number }}</td><td>TZS {{ comparison.expenses|smart_number }}</td><td>TZS {{ comparison.expenses_change|smart_number }}</td><td>—</td></tr>
+        <tr class="border-b border-ink-100"><td class="py-3 font-medium">Estimated Net Profit</td><td class="font-semibold">TZS {{ summary.net_profit|smart_number }}</td><td class="font-semibold text-emerald-700">TZS {{ comparison.net_profit|smart_number }}</td><td class="font-semibold">TZS {{ comparison.net_profit_change|smart_number }}</td><td>—</td></tr>
+        <tr><td class="py-3 font-medium">Gross Margin</td><td>{{ summary.margin|floatformat:1 }}%</td><td>{{ comparison.margin|floatformat:1 }}%</td><td>{{ comparison.margin_change|floatformat:1 }} pp</td><td>—</td></tr>
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+(function(){
+  const preset=document.getElementById('period-preset');
+  const form=document.getElementById('report-period-form');
+  const startHidden=document.getElementById('period-start');
+  const endHidden=document.getElementById('period-end');
+  const custom=document.getElementById('custom-period-fields');
+  const customStart=document.getElementById('custom-start');
+  const customEnd=document.getElementById('custom-end');
+  const summary=document.getElementById('period-summary');
+  function iso(d){const p=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())}
+  function label(d){return d.toLocaleDateString(undefined,{day:'2-digit',month:'short',year:'numeric'});}
+  function apply(a,b){startHidden.value=iso(a);endHidden.value=iso(b);summary.textContent='Selected: '+label(a)+' — '+label(b);}
+  function setPreset(value){
+    const now=new Date(); now.setHours(0,0,0,0);
+    let a=new Date(now), b=new Date(now);
+    if(value==='yesterday'){a.setDate(a.getDate()-1);b=new Date(a);}
+    else if(value==='week'){a=new Date(now); a.setDate(now.getDate()-((now.getDay()+6)%7));}
+    else if(value==='last_week'){a=new Date(now); a.setDate(now.getDate()-((now.getDay()+6)%7)-7); b=new Date(a); b.setDate(a.getDate()+6);}
+    else if(value==='7'){a.setDate(a.getDate()-6);}
+    else if(value==='30'){a.setDate(a.getDate()-29);}
+    else if(value==='month'){a=new Date(now.getFullYear(),now.getMonth(),1);}
+    else if(value==='last_month'){a=new Date(now.getFullYear(),now.getMonth()-1,1);b=new Date(now.getFullYear(),now.getMonth(),0);}
+    else if(value==='year'){a=new Date(now.getFullYear(),0,1);}
+    else if(value==='custom'){
+      custom.classList.remove('hidden');
+      apply(new Date(customStart.value+'T00:00:00'),new Date(customEnd.value+'T00:00:00'));
+      return;
+    }
+    custom.classList.add('hidden'); apply(a,b);
+  }
+  const monthPick=document.getElementById('month-pick');
+  if(monthPick){
+    const s0=new Date(startHidden.value+'T00:00:00'), e0=new Date(endHidden.value+'T00:00:00');
+    if(s0.getDate()===1 && e0.getTime()===new Date(s0.getFullYear(),s0.getMonth()+1,0).getTime()){monthPick.value=s0.getFullYear()+'-'+String(s0.getMonth()+1).padStart(2,'0');}
+    monthPick.addEventListener('change',function(){
+      if(!monthPick.value){return;}
+      const y=parseInt(monthPick.value.slice(0,4),10), m=parseInt(monthPick.value.slice(5,7),10)-1;
+      apply(new Date(y,m,1),new Date(y,m+1,0)); form.submit();
+    });
+  }
+  const initialStart=startHidden.value, initialEnd=endHidden.value, today=iso(new Date());
+  preset.value=(initialStart===today && initialEnd===today)?'today':'custom';
+  setPreset(preset.value);
+  preset.addEventListener('change',()=>setPreset(preset.value));
+  [customStart,customEnd].forEach(el=>el.addEventListener('change',()=>{if(preset.value==='custom')apply(new Date(customStart.value+'T00:00:00'),new Date(customEnd.value+'T00:00:00'));}));
+  form.addEventListener('submit',function(){if(preset.value==='custom'){startHidden.value=customStart.value;endHidden.value=customEnd.value;}});
+})();
+</script>
+{% endblock %}

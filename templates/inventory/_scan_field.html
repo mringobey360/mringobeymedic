@@ -1,0 +1,9 @@
+<div class="pqs-field{% if field.errors %} has-error{% endif %}{% if wide %} is-wide{% endif %}">
+    {% if field.field.widget.input_type == 'checkbox' %}
+    <label class="pqs-check">{{ field }}<span>{{ field.label }}</span></label>
+    {% else %}
+    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+    {{ field }}
+    {% endif %}
+    {% if field.errors %}<p class="pqs-err">{{ field.errors.0 }}</p>{% elif hint %}<p class="pqs-help">{{ hint }}</p>{% endif %}
+</div>

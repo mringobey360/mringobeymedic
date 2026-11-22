@@ -1,0 +1,58 @@
+{% extends "base.html" %}{% load humanize %}
+{% block title %}Online Selling Requests · SmartPOS HQ{% endblock %}
+{% block extra_head %}{% include 'marketplace/_mk_styles.html' %}{% endblock %}
+{% block content %}
+<div class="mk-page">
+ <header class="mk-head">
+  <div>
+   <p class="mk-eyebrow">SmartPOS · Service operations</p>
+   <h1 class="mk-title">Online Selling requests</h1>
+   <p class="mk-sub">Review seller requests, verify payment state and approve eligible services.</p>
+  </div>
+ </header>
+
+ {% include 'marketplace/_mk_nav.html' with active='requests' %}
+
+ <section class="mk-stats" aria-label="Review summary">
+  <div class="mk-card mk-stat"><div class="mk-stat-label">Requests shown</div><div class="mk-stat-value">{{ service_requests|length }}</div></div>
+  <div class="mk-card mk-stat"><div class="mk-stat-label">Review standard</div><div class="mk-stat-value" style="font-size:1.05rem">Payment verified</div></div>
+  <div class="mk-card mk-stat"><div class="mk-stat-label">Access policy</div><div class="mk-stat-value" style="font-size:1.05rem">Paid or approved</div></div>
+ </section>
+
+ <section class="mk-card mk-pad">
+  <form class="mk-filter" method="get">
+   <label>Filter by status<select id="status" name="status"><option value="">All requests</option>{% for value,label in status_choices %}<option value="{{ value }}" {% if selected_status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+   <div class="mk-actions"><button class="btn btn-primary" type="submit">Apply filter</button>{% if selected_status %}<a class="btn btn-ghost" href="{% url 'marketplace:admin_service_requests' %}">Reset</a>{% endif %}</div>
+  </form>
+ </section>
+
+ {% for item in service_requests %}
+ <article class="mk-card mk-pad">
+  <div class="mk-head">
+   <div>
+    <h2 style="font-size:1.05rem;font-weight:700;margin:0">{{ item.store.public_name }} <span class="mk-muted" style="font-weight:500">· {{ item.store.pharmacy.name }}</span></h2>
+    <div class="mk-muted" style="margin-top:.25rem">Request #{{ item.pk }} · {{ item.created_at|date:'d M Y, H:i' }} · Submitted by {{ item.requested_by|default:'Account unavailable' }}</div>
+   </div>
+   <span class="mk-badge mk-b-{{ item.status|lower }}">{{ item.get_status_display }}</span>
+  </div>
+  <div class="mk-kv" style="margin-top:1rem">
+   <div><small>Service</small><strong>{{ item.get_service_display }}</strong></div>
+   <div><small>Monthly fee</small><strong>TSh {{ item.amount|floatformat:0|intcomma }}</strong></div>
+   <div><small>Payment state</small><strong>{% if item.subscription %}{{ item.subscription.get_status_display }}{% if item.subscription.last_payment_reference %}<span class="mk-muted" style="display:block;font-weight:500">Ref: {{ item.subscription.last_payment_reference }}</span>{% endif %}{% else %}Subscription missing{% endif %}</strong></div>
+  </div>
+  {% if item.admin_note %}<p class="mk-muted" style="margin:.85rem 0 0"><strong>Previous review:</strong> {{ item.admin_note }}</p>{% endif %}
+  {% if item.status != 'ACTIVE' and item.status != 'REJECTED' and item.status != 'CANCELLED' %}
+  <form class="mk-review" method="post" action="{% url 'marketplace:admin_review_service_request' item.pk %}">{% csrf_token %}
+   <input class="mk-input" name="admin_note" maxlength="500" placeholder="Approval/rejection note (recommended)" aria-label="Review note">
+   <button class="btn btn-primary" name="action" value="approve" type="submit" data-mk-confirm="Approve and activate this service?" data-mk-detail="The service will be active for 30 days. Use this only for an authorized complimentary/trial approval or after confirming payment." data-mk-accept="Yes, approve" data-mk-cancel="Review again" data-mk-tone="warn">Approve &amp; activate</button>
+   <button class="btn btn-secondary mk-btn-danger-soft" name="action" value="reject" type="submit" data-mk-confirm="Reject this service request?" data-mk-detail="The seller will be notified that the request was not approved." data-mk-accept="Yes, reject" data-mk-cancel="Go back" data-mk-tone="danger">Reject</button>
+  </form>
+  {% else %}
+  <div class="mk-muted" style="margin-top:.85rem">Reviewed by {{ item.reviewed_by|default:'System' }}{% if item.reviewed_at %} · {{ item.reviewed_at|date:'d M Y, H:i' }}{% endif %}</div>
+  {% endif %}
+ </article>
+ {% empty %}
+ <section class="mk-card"><div class="mk-empty" style="padding:3rem 1rem"><b>No service requests found</b>New customer requests will appear here and generate an in-app notification.</div></section>
+ {% endfor %}
+</div>
+{% endblock %}

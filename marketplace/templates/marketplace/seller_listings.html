@@ -1,0 +1,42 @@
+{% extends "base.html" %}{% load humanize cart_tags %}
+{% block title %}My listings · {{ store.public_name }}{% endblock %}
+{% block extra_head %}{% include 'marketplace/_mk_styles.html' %}{% endblock %}
+{% block content %}
+<div class="mk-page">
+ <nav class="mk-crumbs" aria-label="Breadcrumb"><a href="{% url 'marketplace:seller_dashboard' %}">Seller Centre</a><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg><b>Rooms &amp; property</b></nav>
+ <header class="mk-hero">
+  <div class="mk-hero-main">
+   <span class="mk-hero-icon"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg></span>
+   <div><h1>Rooms &amp; property</h1><p>{{ store.public_name }} · rentals, houses, plots and other adverts. Customers reach you by WhatsApp, phone or the enquiry form.</p></div>
+  </div>
+  <div class="mk-actions"><a class="btn btn-secondary" href="{% url 'marketplace:seller_store_inquiries' store.id %}">Enquiries{% if new_inquiry_total %} ({{ new_inquiry_total }} new){% endif %}</a><a class="btn btn-primary" href="{% url 'marketplace:seller_listing_add' store.id %}">+ New listing</a></div>
+ </header>
+
+ <div class="mk-note{% if live_count >= limit %} warn{% endif %}"><span>Live listings: <strong>{{ live_count }} / {{ limit }}</strong>.{% if not subscribed %} Free accounts can publish {{ free_limit }}. <a href="{% url 'marketplace:seller_service_requests' %}">Activate Online Selling</a> for more.{% endif %} New listings are checked before they go public to keep buyers safe.</span></div>
+
+ <div class="mk-segment" style="justify-self:start"><a class="{% if not selected_status %}is-active{% endif %}" href="?">All<span>{{ all_count }}</span></a>{% for v, label in statuses %}<a class="{% if selected_status == v %}is-active{% endif %}" href="?status={{ v }}">{{ label }}<span>{{ counts|get_item:v }}</span></a>{% endfor %}</div>
+
+ <section class="mk-card">
+  {% if listings %}<div class="mk-table-wrap"><table class="mk-table"><thead><tr><th>Listing</th><th>Price</th><th>Status</th><th>Views</th><th>Enquiries</th><th></th></tr></thead><tbody>
+  {% for l in listings %}<tr>
+   <td><div class="mk-prod">{% with c=l.cover %}{% if c %}<img class="mk-thumb" src="{{ c.image.url }}" alt="">{% else %}<span class="mk-thumb mk-thumb-empty">No photo</span>{% endif %}{% endwith %}<div><div class="mk-strong">{{ l.title }}</div><div class="mk-muted">{{ l.get_purpose_display }} · {{ l.get_property_type_display }} · {{ l.location_line }}</div></div></div></td>
+   <td class="mk-num">TSh {{ l.price|floatformat:0|intcomma }} <span class="mk-muted">{{ l.price_suffix }}</span></td>
+   <td><span class="mk-badge mk-b-{{ l.status|lower }}">{{ l.get_status_display }}</span>{% if l.review_note %}<div class="mk-muted">{{ l.review_note }}</div>{% endif %}</td>
+   <td class="mk-num">{{ l.views_count }}</td>
+   <td class="mk-num">{{ l.inquiry_total }}{% if l.new_inquiries %} <span class="mk-badge mk-b-new">{{ l.new_inquiries }} new</span>{% endif %}</td>
+   <td><div class="mk-cell-actions">
+    <a class="btn btn-secondary" href="{% url 'marketplace:seller_listing_edit' store.id l.pk %}">Edit</a>
+    {% if l.status == 'PUBLISHED' or l.status == 'RESERVED' %}<a class="btn btn-secondary" href="{% url 'marketplace:listing_flyer' l.slug %}" target="_blank" rel="noopener">Flyer / QR</a>{% endif %}
+    {% if l.status == 'DRAFT' or l.status == 'REJECTED' or l.status == 'ARCHIVED' or l.status == 'PENDING' and auto_approve %}<form method="post" action="{% url 'marketplace:seller_listing_action' store.id l.pk %}">{% csrf_token %}<input type="hidden" name="action" value="submit"><button class="btn btn-primary" type="submit">Publish</button></form>{% endif %}
+    {% if l.status == 'PENDING' and request.user.is_superuser %}<form method="post" action="{% url 'marketplace:seller_listing_action' store.id l.pk %}">{% csrf_token %}<input type="hidden" name="action" value="approve"><button class="btn btn-primary" type="submit">Approve</button></form><form method="post" action="{% url 'marketplace:seller_listing_action' store.id l.pk %}">{% csrf_token %}<input type="hidden" name="action" value="reject"><button class="btn btn-secondary" type="submit">Needs changes</button></form>{% endif %}
+    {% if l.status == 'PUBLISHED' %}<form method="post" action="{% url 'marketplace:seller_listing_action' store.id l.pk %}">{% csrf_token %}<input type="hidden" name="action" value="reserve"><button class="btn btn-secondary" type="submit">Reserve</button></form>{% endif %}
+    {% if l.status == 'PUBLISHED' or l.status == 'RESERVED' %}<form method="post" action="{% url 'marketplace:seller_listing_action' store.id l.pk %}" onsubmit="return confirm('Mark as {% if l.purpose == 'SALE' %}sold{% else %}rented{% endif %}?')">{% csrf_token %}<input type="hidden" name="action" value="close"><button class="btn btn-secondary" type="submit">{% if l.purpose == 'SALE' %}Sold{% else %}Rented{% endif %}</button></form>{% endif %}
+    {% if l.status == 'RESERVED' or l.status == 'CLOSED' %}<form method="post" action="{% url 'marketplace:seller_listing_action' store.id l.pk %}">{% csrf_token %}<input type="hidden" name="action" value="reopen"><button class="btn btn-secondary" type="submit">Reopen</button></form>{% endif %}
+    {% if l.status != 'ARCHIVED' %}<form method="post" action="{% url 'marketplace:seller_listing_action' store.id l.pk %}">{% csrf_token %}<input type="hidden" name="action" value="archive"><button class="btn btn-secondary" type="submit">Archive</button></form>{% endif %}
+    <form method="post" action="{% url 'marketplace:seller_listing_action' store.id l.pk %}" onsubmit="return confirm('Delete this listing permanently?')">{% csrf_token %}<input type="hidden" name="action" value="delete"><button class="btn btn-secondary mk-btn-danger-soft" type="submit">Delete</button></form>
+   </div></td></tr>{% endfor %}
+  </tbody></table></div>
+  {% else %}<div class="mk-empty"><b>No listings yet</b>Create your first listing with photos, price and exact location.<br><br><a class="btn btn-primary" href="{% url 'marketplace:seller_listing_add' store.id %}">+ New listing</a></div>{% endif %}
+ </section>
+</div>
+{% endblock %}
