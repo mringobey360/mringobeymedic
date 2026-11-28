@@ -4,7 +4,7 @@ from decimal import Decimal
 from io import BytesIO
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import SimpleTestCase, TestCase
 from django.utils import timezone
 
 from expenses.models import CashDay, Expense, ExpenseCategory
@@ -52,3 +52,12 @@ class RangeReportTests(TestCase):
         from openpyxl import load_workbook
         wb = load_workbook(BytesIO(xlsx.content))
         self.assertEqual(wb.sheetnames[:3], ['Summary', 'Daily', 'Expenses'])
+
+
+class MonitorDrawerTemplateTests(SimpleTestCase):
+    def test_monitor_shows_drawer_statement_and_expected_column(self):
+        from pathlib import Path
+        from django.conf import settings
+        html = (Path(settings.BASE_DIR) / 'templates' / 'dashboard' / 'performance_monitor.html').read_text(encoding='utf-8')
+        for needle in ('id="drawer-statement"', '= Expected cash', 'Staff meals', 'Cash refunds paid', 'Expected cash</th>'):
+            self.assertIn(needle, html)

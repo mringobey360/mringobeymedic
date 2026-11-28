@@ -90,6 +90,57 @@ def period_totals(pharmacy, start, end):
     return {'sales': agg['sales'], 'cost': agg['cost'], 'profit': agg['sales'] - agg['cost'], 'transactions': tx}
 
 
+def deductions_by_day(pharmacy, start, end):
+    """{date: {'meals','refunds'}}: money that left the drawer for staff meals and cash refunds, from the SAME
+    ledger Cash Control uses, so this page can never disagree with it. Never breaks the page."""
+    try:
+        from expenses.ledger import CashLedgerService
+        totals = CashLedgerService.daily_totals(pharmacy.pk, start, end)
+        return {d: {'meals': t.cash_meals, 'refunds': t.cash_refunds} for d, t in totals.items()}
+    except Exception:  # noqa: BLE001
+        logger.exception('Could not load meal / refund deductions for the performance monitor.')
+        return {}
+
+
+def _attach_deductions(rows, ded):
+    for b in rows:
+        meals = refunds = Decimal('0')
+        d = b['start']
+        while d <= b['end']:
+            r = ded.get(d)
+            if r:
+                meals += r['meals']
+                refunds += r['refunds']
+            d += timedelta(days=1)
+        b['meals'], b['refunds'], b['deducted'] = meals, refunds, meals + refunds
+
+
+def drawer_statement(pharmacy, start, end):
+    """Opening -> movements -> expected cash for the period, plus the running expected cash at the end of every day.
+
+    Same two functions Cash Control, the Report Builder and the PDF/Excel exports use, so every screen agrees.
+    Returns None (and logs) if the ledger cannot be read, so the monitor page itself never breaks."""
+    try:
+        from .range_report import expected_cash_by_day, period_cash_control
+        cash = period_cash_control(pharmacy, start, end)
+        rows = expected_cash_by_day(pharmacy, start, end, cash['opening'])
+        last = rows[-1]['expected'] if rows else cash['opening']
+        cash['consistent'] = abs(last - cash['expected']) < Decimal('1')
+        cash['cash_in_other'] = cash['debt_cash'] + cash['transfer_in']
+        return cash, {r['date']: r for r in rows}
+    except Exception:  # noqa: BLE001
+        logger.exception('Could not build the drawer statement for the performance monitor.')
+        return None
+
+
+def _attach_drawer(rows, by_day):
+    for b in rows:
+        end_row = by_day.get(b['end'])
+        b['expected'] = end_row['expected'] if end_row else None
+        b['counted'] = end_row['actual'] if end_row else None
+        b['variance'] = end_row['variance'] if end_row else None
+
+
 def card_summary(user, pharmacy, today=None):
     """Data for the dashboard Sales / Profit cards."""
     today = today or timezone.localdate()
@@ -115,6 +166,21 @@ def build_report(pharmacy, pref, today=None):
     buckets = pc.build_buckets(start, end, interval, daily)
     day_rows = buckets if interval == pc.INTERVAL_DAY else pc.build_buckets(start, end, pc.INTERVAL_DAY, daily)
 
+    ded = deductions_by_day(pharmacy, start, end)
+    _attach_deductions(buckets, ded)
+    if day_rows is not buckets:
+        _attach_deductions(day_rows, ded)
+    totals['meals'] = sum((b['meals'] for b in buckets), Decimal('0'))
+    totals['refunds'] = sum((b['refunds'] for b in buckets), Decimal('0'))
+    totals['deducted'] = totals['meals'] + totals['refunds']
+
+    drawer = drawer_statement(pharmacy, start, end)
+    cash = drawer[0] if drawer else None
+    if drawer:
+        _attach_drawer(buckets, drawer[1])
+        if day_rows is not buckets:
+            _attach_drawer(day_rows, drawer[1])
+
     p_start, p_end = pc.previous_window(pref.mode, start, end)
     prev = period_totals(pharmacy, p_start, p_end)
     previous = {
@@ -131,5 +197,5 @@ def build_report(pharmacy, pref, today=None):
         'best': max(trading, key=lambda b: b['sales'], default=None),
         'worst': min(trading, key=lambda b: b['sales'], default=None),
         'busiest': max(trading, key=lambda b: b['tx'], default=None),
-        'previous': previous,
+        'previous': previous, 'cash': cash,
     }
