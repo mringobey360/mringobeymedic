@@ -19,7 +19,7 @@ from .forms import ExpenseForm, CashOpenForm, CashCloseForm, CashCountForm, Cash
 from .cash_rules import clean_variance, reconstruct_closing_cash
 from .ledger import CashLedgerService, employee_cash_reference
 from .models import Expense, CashDay, ExpenseCategory, CashDayReopenAudit, CashAuditEvent, CashTransfer
-from .services import refresh_provisional_opening, record_audit, create_closing_snapshot, approve_expense, reject_expense, seed_categories, notify_managers, ensure_cash_day_for_date, rollover_business_day, get_cash_activity_history, record_cash_count, reconcile_provisional_openings, repair_provisional_opening_chain, heal_stale_provisional_closed_days
+from .services import refresh_provisional_opening, record_audit, create_closing_snapshot, approve_expense, reject_expense, confirm_expense, record_auto_expense, seed_categories, notify_managers, ensure_cash_day_for_date, rollover_business_day, get_cash_activity_history, record_cash_count, reconcile_provisional_openings, repair_provisional_opening_chain, heal_stale_provisional_closed_days
 
 
 def _pharmacy(request):
@@ -69,6 +69,10 @@ def expense_list(request):
     if not request.user.is_management_user():
         pending_qs = pending_qs.filter(submitted_by=request.user)
     pending = pending_qs.count()
+    review_qs = Expense.objects.filter(pharmacy=pharmacy, auto_recorded=True, status=Expense.Status.APPROVED, reviewed_at__isnull=True)
+    if not request.user.is_management_user():
+        review_qs = review_qs.filter(submitted_by=request.user)
+    review_count = review_qs.count()
     try:
         per_page = int(request.GET.get('per_page', 20))
     except (TypeError, ValueError):
@@ -81,6 +85,7 @@ def expense_list(request):
         'categories': ExpenseCategory.objects.filter(Q(pharmacy=pharmacy) | Q(pharmacy__isnull=True), is_active=True),
         'total_approved': total,
         'pending_count': pending,
+        'review_count': review_count,
         'status_choices': Expense.Status.choices,
         'f_status': status, 'f_category': category, 'f_q': q, 'f_per_page': per_page,
         'f_from': date_from, 'f_to': date_to,
@@ -107,7 +112,8 @@ def expense_create(request):
             for message in exc.messages:
                 form.add_error(None, message)
             return render(request, 'expenses/form.html', ctx)
-        if expense.payment_source == Expense.PaymentSource.CASH_SALES:
+        auto = (not request.user.is_management_user()) and expense.payment_source == Expense.PaymentSource.CASH_SALES
+        if request.user.is_management_user() and expense.payment_source == Expense.PaymentSource.CASH_SALES:
             day = CashDay.objects.filter(pharmacy=pharmacy, date=expense.expense_date).first()
             if day is not None and day.status in [CashDay.Status.DAY_ENDED, CashDay.Status.CLOSED]:
                 form.add_error('payment_source', 'The cash day for this date has ended. Record the expense on the active business date or use the authorized correction workflow.')
@@ -124,10 +130,18 @@ def expense_create(request):
             expense.decided_at = timezone.now()
             expense.decision_note = 'Owner/supervisor recorded and authorized this expense.'
             expense.cash_date = expense.expense_date
-        expense.save()
-        if request.user.is_management_user():
+            expense.save()
             messages.success(request, 'Expense recorded and authorized. It is included in cash control where applicable.')
+        elif auto:
+            # Employee, sales cash: deducted from the drawer right now; the boss is notified and can reject at any time.
+            try:
+                record_auto_expense(expense, request.user)
+            except ValueError as exc:
+                form.add_error('payment_source', str(exc))
+                return render(request, 'expenses/form.html', ctx)
+            messages.success(request, 'Expense recorded and deducted from the drawer. The manager has been notified and may review it.')
         else:
+            expense.save()
             notify_managers(
                 pharmacy, 'New expense awaiting approval',
                 f'{expense.title} — TZS {expense.amount:,.0f} submitted by {request.user.get_full_name() or request.user.username}.',
@@ -177,7 +191,23 @@ def expense_reject(request, pk):
     except ValueError as exc:
         messages.error(request, str(exc))
     else:
-        messages.success(request, 'Expense rejected. No cash is deducted.')
+        messages.success(request, 'Expense rejected. If it had already been deducted, the amount has been returned to the cash books today and the original day was left untouched.')
+    return redirect('expenses:detail', pk)
+
+
+@admin_required
+@require_http_methods(['POST'])
+def expense_confirm(request, pk):
+    pharmacy = _pharmacy(request)
+    if not pharmacy:
+        return redirect('dashboard:home')
+    expense = get_object_or_404(Expense, pk=pk, pharmacy=pharmacy)
+    try:
+        confirm_expense(expense, request.user, request.POST.get('note', ''))
+    except ValueError as exc:
+        messages.error(request, str(exc))
+    else:
+        messages.success(request, 'Expense confirmed. You can still reject it later if something is wrong.')
     return redirect('expenses:detail', pk)
 
 

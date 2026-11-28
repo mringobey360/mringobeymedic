@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Edit History · SmartPOS{% endblock %}
+{% block content %}
+{% include "partials/_report_ui.html" %}
+<div class="rp">
+  <div class="rp-head">
+    <div>
+      <p class="rp-eyebrow">Inventory control</p>
+      <h1 class="rp-title">Edit History{% if product %} &mdash; {{ product.name }}{% endif %}</h1>
+      <p class="rp-sub">A permanent record of every product and batch change at {{ request.pharmacy.name }}: who did it, when, the reason given, and the old and new values. Records cannot be edited or deleted.</p>
+    </div>
+    <div class="rp-actions">
+      {% if product %}<a class="btn btn-secondary" href="{% url 'inventory:product_batches' product.pk %}">Back to batches</a><a class="btn btn-secondary" href="{% url 'inventory:change_history' %}">All products</a>
+      {% else %}<a class="btn btn-secondary" href="{% url 'inventory:restock_history' %}">Restock History</a>{% endif %}
+    </div>
+  </div>
+
+  <div class="rp-panel">
+    <form method="get" class="rp-filters">
+      <div class="rp-fgrid">
+        <div class="wide"><label for="eh-q">Search</label><input id="eh-q" class="form-input" type="search" name="q" value="{{ f.q }}" placeholder="Product, batch number or reason"></div>
+        <div><label for="eh-from">From</label><input id="eh-from" class="form-input" type="date" name="from" value="{{ f.from }}"></div>
+        <div><label for="eh-to">To</label><input id="eh-to" class="form-input" type="date" name="to" value="{{ f.to }}"></div>
+        <div><label for="eh-action">What happened</label>
+          <select id="eh-action" class="form-input" name="action"><option value="">Everything</option>{% for value, label in actions %}<option value="{{ value }}" {% if f.action == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+        <div><label for="eh-user">Changed by</label>
+          <select id="eh-user" class="form-input" name="user"><option value="">Anyone</option>{% for u in people %}<option value="{{ u.pk }}" {% if f.user == u.pk|stringformat:"s" %}selected{% endif %}>{{ u.get_full_name|default:u.username }}</option>{% endfor %}</select></div>
+        <div class="rp-fbtns"><button class="btn btn-primary" type="submit">Apply</button>{% if filtered %}<a class="btn btn-ghost" href="{% if product %}{% url 'inventory:product_history' product.pk %}{% else %}{% url 'inventory:change_history' %}{% endif %}">Reset</a>{% endif %}</div>
+      </div>
+    </form>
+  </div>
+
+  <div class="rp-panel">
+    <div class="rp-panel-h"><h2>{{ total|intcomma }} record{{ total|pluralize }}{% if filtered %} &middot; filtered{% endif %}</h2><span>Newest first &middot; times in branch local time</span></div>
+    <div class="rp-scroll"><table class="rp-table">
+      <thead><tr><th>Date &amp; time</th><th>What happened</th><th>Product / batch</th><th>What changed (old &rarr; new)</th><th class="rp-hide-sm">Changed by</th></tr></thead>
+      <tbody>
+      {% for log in page_obj %}
+        <tr>
+          <td><div class="rp-date">{{ log.created_at|date:"d M Y" }}</div><div class="rp-time">{{ log.created_at|time:"H:i:s" }}</div></td>
+          <td><span class="rp-pill {% if log.action == 'PRODUCT_PURGED' or log.action == 'PRODUCT_ARCHIVED' %}amber{% elif log.action == 'BATCH_ADDED' or log.action == 'PRODUCT_CREATED' %}green{% elif log.action == 'PRODUCT_MERGED' %}slate{% else %}blue{% endif %}">{{ log.get_action_display }}</span></td>
+          <td class="rp-name">{% if log.product_id %}<a href="{% url 'inventory:product_history' log.product_id %}">{{ log.product_name }}</a>{% else %}{{ log.product_name|default:"—" }}{% endif %}{% if log.batch_number %}<div class="rp-time">Batch {{ log.batch_number }}</div>{% endif %}</td>
+          <td>
+            {% if log.changes %}
+              {% for c in log.changes %}<div style="font-size:13px;line-height:1.5"><strong>{{ c.label }}:</strong> <span style="text-decoration:line-through;opacity:.65">{{ c.old }}</span> &rarr; <strong>{{ c.new }}</strong></div>{% endfor %}
+            {% else %}<span>{{ log.summary|default:"—" }}</span>{% endif %}
+            {% if log.reason %}<div class="rp-time" style="margin-top:4px">Reason: {{ log.reason }}</div>{% endif %}
+            <div class="rp-time rp-show-sm" style="margin-top:4px">By {{ log.performed_by_name|default:"Unknown" }}</div>
+          </td>
+          <td class="rp-hide-sm">{{ log.performed_by_name|default:"System" }}{% if log.ip_address %}<div class="rp-time">{{ log.ip_address }}</div>{% endif %}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="5" style="text-align:center;padding:32px 14px">No changes recorded{% if filtered %} for these filters{% endif %} yet. Every product or batch edit from now on will appear here.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+    {% include "partials/pagination.html" with page_obj=page_obj %}
+  </div>
+</div>
+{% endblock %}

@@ -1025,6 +1025,27 @@ def custom_reports_view(request):
         row['cash_after_meals'] = row['cash_sales'] - meals_out
     cash_control['cash_after_meals'] = cash_control['cash_sales'] - cash_control['meals']
 
+    # V97.39 drawer statement: every day, opening to expected, plus a proof that the screen agrees with itself.
+    from .range_report import expected_cash_by_day
+    drawer_rows = expected_cash_by_day(pharmacy, start, end, cash_control['opening'])
+    sales_by_day = {r['date']: r['sales'] for r in daily_rows}
+    for r in drawer_rows:
+        r['total_sales'] = sales_by_day.get(r['date'], Decimal('0'))
+    def _sum(key):
+        return sum((r[key] for r in drawer_rows), Decimal('0'))
+    drawer_totals = {k: _sum(k) for k in ('sales', 'meals', 'cash_after_meals', 'debt_cash', 'transfer_in', 'refunds',
+                                          'expense_paid', 'expense_reversed', 'expenses', 'transfer_out', 'net_move', 'total_sales')}
+    last_expected = drawer_rows[-1]['expected'] if drawer_rows else cash_control['opening']
+    tol = Decimal('0.5')
+    drawer_checks = [
+        ('Opening + all daily movements = expected cash for the period', abs(cash_control['opening'] + drawer_totals['net_move'] - cash_control['expected']) <= tol),
+        ('Last day expected cash = period expected cash', abs(last_expected - cash_control['expected']) <= tol),
+        ('Daily cash sales add up to the period cash sales', abs(drawer_totals['sales'] - cash_control['cash_sales']) <= tol),
+        ('Daily meals add up to the period meals', abs(drawer_totals['meals'] - cash_control['meals']) <= tol),
+        ('Daily expenses add up to the period expenses', abs(drawer_totals['expenses'] - cash_control['expenses']) <= tol),
+    ]
+    drawer_ok = all(ok for _l, ok in drawer_checks)
+
     compare_start = _parse_report_date(request.GET.get('compare_start'), None)
     compare_end = _parse_report_date(request.GET.get('compare_end'), None)
     comparison = None
@@ -1048,6 +1069,7 @@ def custom_reports_view(request):
         'daily_rows': daily_rows,
         'compare_start': compare_start, 'compare_end': compare_end,
         'cash_control': cash_control,
+        'drawer_rows': drawer_rows, 'drawer_totals': drawer_totals, 'drawer_checks': drawer_checks, 'drawer_ok': drawer_ok,
         'expense_list': expense_list, 'expense_categories': expense_by_category(expense_list),
         'layaway': layaway_period_summary(pharmacy, start, end),
         'meal_list': meal_list, 'selected_month': request.GET.get('month', ''),
@@ -1305,10 +1327,12 @@ def my_cash_history_view(request):
     totals = {
         'cash_sales': sum((r['cash_sales'] for r in rows), Decimal('0')),
         'cash_refunds': sum((r['cash_refunds'] for r in rows), Decimal('0')),
+        'expenses': sum((r['expenses'] for r in rows), Decimal('0')),
+        'total_sales': sum((r['total_sales'] for r in rows), Decimal('0')),
         'meal_earned': sum((r['meal_earned'] for r in rows), Decimal('0')),
         'meal_not_deducted': sum((r['meal_not_deducted'] for r in rows), Decimal('0')),
     }
-    totals['expected'] = totals['cash_sales'] - totals['cash_refunds'] - totals['meal_earned']
+    totals['expected'] = totals['cash_sales'] - totals['cash_refunds'] - totals['meal_earned'] - totals['expenses']
     name = employee.get_full_name() or employee.get_username()
 
     export = (request.GET.get('export') or '').strip().lower()

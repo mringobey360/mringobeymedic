@@ -7,6 +7,7 @@ urlpatterns=[
     path('<int:pk>/', views.expense_detail, name='detail'),
     path('<int:pk>/approve/', views.expense_approve, name='approve'),
     path('<int:pk>/reject/', views.expense_reject, name='reject'),
+    path('<int:pk>/confirm/', views.expense_confirm, name='confirm'),
     path('report/', views.expense_report, name='report'),
     path('report/pdf/', views.expense_report_pdf, name='report_pdf'),
     path('report/excel/', views.expense_report_excel, name='report_excel'),

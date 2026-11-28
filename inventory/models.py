@@ -599,3 +599,46 @@ def _delete_product_image_file(sender, instance, **kwargs):
             instance.image.storage.delete(name)
         except Exception:  # pragma: no cover - storage hiccups must not break deletion
             pass
+
+
+class InventoryChangeLog(models.Model):
+    """Append-only audit trail of who changed a product or batch, when, and exactly what changed.
+
+    Each row keeps the old and new value of every changed field. Names are stored as a snapshot,
+    so the record stays readable even after the product, batch or user is later removed.
+    Rows can be created but never edited or deleted from the application.
+    """
+    class Action(models.TextChoices):
+        PRODUCT_CREATED = 'PRODUCT_CREATED', 'Product registered'
+        PRODUCT_EDITED = 'PRODUCT_EDITED', 'Product edited'
+        PRODUCT_ARCHIVED = 'PRODUCT_ARCHIVED', 'Product removed from catalog'
+        PRODUCT_PURGED = 'PRODUCT_PURGED', 'Product permanently deleted'
+        PRODUCT_MERGED = 'PRODUCT_MERGED', 'Products merged'
+        BATCH_ADDED = 'BATCH_ADDED', 'Batch added'
+        BATCH_EDITED = 'BATCH_EDITED', 'Batch edited'
+
+    pharmacy = models.ForeignKey('pharmacies.Pharmacy', on_delete=models.CASCADE, related_name='inventory_change_logs')
+    product = models.ForeignKey(Product, on_delete=models.SET_NULL, null=True, blank=True, related_name='change_logs')
+    product_name = models.CharField(max_length=200, blank=True, help_text='Name at the time of the change.')
+    batch = models.ForeignKey(ProductBatch, on_delete=models.SET_NULL, null=True, blank=True, related_name='change_logs')
+    batch_number = models.CharField(max_length=100, blank=True)
+    action = models.CharField(max_length=20, choices=Action.choices, db_index=True)
+    summary = models.CharField(max_length=255, blank=True)
+    changes = models.JSONField(default=list, blank=True, help_text='List of {field, label, old, new}.')
+    reason = models.CharField(max_length=255, blank=True, help_text='Reason given by the person who made the change.')
+    performed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='inventory_changes')
+    performed_by_name = models.CharField(max_length=150, blank=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ['-created_at', '-pk']
+        indexes = [models.Index(fields=['pharmacy', '-created_at'], name='inventory_i_pharmac_chg_idx'), models.Index(fields=['product', '-created_at'], name='inventory_i_product_chg_idx')]
+
+    def __str__(self):
+        return f'{self.get_action_display()} — {self.product_name} — {self.created_at:%Y-%m-%d %H:%M}'
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            raise ValidationError('Audit records cannot be changed.')
+        super().save(*args, **kwargs)

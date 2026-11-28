@@ -421,3 +421,130 @@ class CashRulesTests(__import__('django.test', fromlist=['SimpleTestCase']).Simp
         self.assertEqual(clean_variance(Decimal('-0.50')), Decimal('-1'))
         self.assertEqual(clean_variance(Decimal('35000.00')), Decimal('35000'))
         self.assertIsNone(clean_variance(None))
+
+
+class AutoRecordedExpenseTests(_Base):
+    """V97.36 - employee cash expenses leave the drawer at once; the boss can reject at ANY time."""
+
+    def _expense(self, amount='300'):
+        from .models import Expense, ExpenseCategory
+        cat = ExpenseCategory.objects.create(pharmacy=self.pharmacy, name='Transport')
+        return Expense(pharmacy=self.pharmacy, category=cat, title='Taxi', amount=Decimal(amount),
+                       expense_date=timezone.localdate(), submitted_by=self.user)
+
+    def test_auto_record_deducts_immediately_and_is_awaiting_review(self):
+        from .services import record_auto_expense
+        x = record_auto_expense(self._expense(), self.user)
+        self.assertTrue(x.awaiting_review)
+        self.assertEqual(CashLedgerService.expected_cash(self.day), Decimal('700'))
+
+    def test_reject_returns_cash_today_and_keeps_net_correct(self):
+        from .models import Expense
+        from .services import record_auto_expense, reject_expense
+        x = record_auto_expense(self._expense(), self.user)
+        reject_expense(x, self.user, 'Not a business cost')
+        x.refresh_from_db()
+        self.assertEqual(x.status, Expense.Status.REJECTED)
+        self.assertIsNotNone(x.reversed_at)
+        self.assertEqual(CashLedgerService.expected_cash(self.day), Decimal('1000'))
+        t = CashLedgerService.totals(self.day)
+        self.assertEqual((t.expense_paid, t.expense_reversed, t.cash_expenses), (Decimal('300'), Decimal('300'), Decimal('0')))
+
+    def test_old_expense_rejected_later_does_not_rewrite_its_own_day(self):
+        """Cash left 5 days ago; rejecting today restores cash TODAY, the old day's figures never move."""
+        from .models import Expense
+        from .services import record_auto_expense, reject_expense
+        old_day_date = timezone.localdate() - timedelta(days=5)
+        old_day = CashDay.objects.create(pharmacy=self.pharmacy, date=old_day_date, opening_cash=Decimal('1000'), opened_by=self.user)
+        x = record_auto_expense(self._expense('200'), self.user)
+        past = timezone.now() - timedelta(days=5)
+        Expense.objects.filter(pk=x.pk).update(cash_date=old_day_date, cash_out_at=past, decided_at=past)
+        before = CashLedgerService.expected_cash(old_day, timezone.now())
+        x.refresh_from_db()
+        reject_expense(x, self.user, 'Found invalid after 5 days')
+        self.assertEqual(CashLedgerService.expected_cash(old_day, timezone.now()), before)      # old day untouched
+        self.assertEqual(CashLedgerService.expected_cash(self.day), Decimal('1200'))             # today gets the cash back
+
+    def test_reject_requires_reason_and_cannot_repeat(self):
+        from .services import record_auto_expense, reject_expense
+        x = record_auto_expense(self._expense(), self.user)
+        with self.assertRaises(ValueError):
+            reject_expense(x, self.user, '')
+        reject_expense(x, self.user, 'Invalid')
+        with self.assertRaises(ValueError):
+            reject_expense(x, self.user, 'Again')
+
+    def test_confirmed_expense_can_still_be_rejected(self):
+        from .services import confirm_expense, record_auto_expense, reject_expense
+        x = record_auto_expense(self._expense(), self.user)
+        confirm_expense(x, self.user)
+        reject_expense(x, self.user, 'Changed my mind after checking receipts')
+        self.assertEqual(CashLedgerService.expected_cash(self.day), Decimal('1000'))
+
+    def test_ledger_entries_show_both_lines(self):
+        from .services import record_auto_expense, reject_expense
+        x = record_auto_expense(self._expense(), self.user)
+        reject_expense(x, self.user, 'Invalid')
+        signs = sorted(e.sign for e in CashLedgerService.entries(self.day) if e.kind == 'EXPENSE')
+        self.assertEqual(signs, [-1, 1])
+
+
+class EmployeeExpectedCashTests(AutoRecordedExpenseTests):
+    """V97.37 - the employee's expected cash includes expenses they paid from the drawer; a rejection gives it back."""
+
+    def test_employee_expected_cash_includes_expense_and_reversal(self):
+        from .ledger import employee_cash_reference, employee_expense_net
+        from .services import record_auto_expense, reject_expense
+        today = timezone.localdate()
+        x = record_auto_expense(self._expense('300'), self.user)
+        self.assertEqual(employee_expense_net(self.pharmacy.pk, today, today, self.user)[(self.user.pk, today)], Decimal('300'))
+        rows = employee_cash_reference(self.pharmacy.pk, today, self.user)
+        self.assertEqual(rows[0]['expenses'], Decimal('300'))
+        self.assertEqual(rows[0]['expected'], Decimal('-300'))
+        reject_expense(x, self.user, 'Invalid')
+        rows = employee_cash_reference(self.pharmacy.pk, today, self.user)
+        self.assertEqual(rows[0]['expected'], Decimal('0'))
+
+
+class ReportConsistencyTests(AutoRecordedExpenseTests):
+    """V97.38 - every view of the drawer must agree: totals, itemised lines, daily totals and the expense list."""
+
+    def test_itemised_lines_equal_totals_and_daily_totals(self):
+        from .ledger import CashLedgerService
+        from .services import record_auto_expense, reject_expense
+        x = record_auto_expense(self._expense('300'), self.user)
+        record_auto_expense(self._expense('120'), self.user)
+        reject_expense(x, self.user, 'Invalid')
+        today = timezone.localdate()
+        net = CashLedgerService.totals(self.day).net
+        self.assertEqual(sum((e.signed_amount for e in CashLedgerService.entries(self.day)), Decimal('0')), net)
+        self.assertEqual(CashLedgerService.daily_totals(self.pharmacy.pk, today, today)[today].net, net)
+        self.assertEqual(net, Decimal('-120'))
+
+    def test_cash_expense_list_adds_up_to_ledger_expenses(self):
+        from dashboard.perf_cash import _expense_cash_rows
+        from .ledger import CashLedgerService
+        from .services import record_auto_expense, reject_expense
+        x = record_auto_expense(self._expense('300'), self.user)
+        record_auto_expense(self._expense('120'), self.user)
+        reject_expense(x, self.user, 'Invalid')
+        today = timezone.localdate()
+        listed = sum((r['amount'] for r in _expense_cash_rows(self.pharmacy, today, today) if r['drawer']), Decimal('0'))
+        self.assertEqual(listed, CashLedgerService.totals(self.day).cash_expenses)
+
+
+class DrawerStatementTests(AutoRecordedExpenseTests):
+    """V97.39 - the day-by-day drawer statement: opening + movements = expected, per day and for the period."""
+
+    def test_daily_rows_chain_and_itemise_expenses(self):
+        from dashboard.range_report import expected_cash_by_day
+        from .services import record_auto_expense, reject_expense
+        today = timezone.localdate()
+        x = record_auto_expense(self._expense('300'), self.user)
+        record_auto_expense(self._expense('120'), self.user)
+        reject_expense(x, self.user, 'Invalid')
+        rows = expected_cash_by_day(self.pharmacy, today, today, Decimal('1000'))
+        r = rows[0]
+        self.assertEqual((r['expense_paid'], r['expense_reversed'], r['expenses']), (Decimal('420'), Decimal('300'), Decimal('120')))
+        self.assertEqual(r['opening'] + r['net_move'], r['expected'])
+        self.assertEqual(r['expected'], Decimal('880'))

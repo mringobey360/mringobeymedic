@@ -123,7 +123,13 @@ def expected_cash_by_day(pharmacy, start, end, opening):
         cd = cash_days.get(cursor)
         actual = cd.actual_closing_cash if cd and cd.actual_closing_cash is not None else None
         rows.append({'date': cursor, 'opening': day_open, 'sales': sales, 'debt_cash': debt_cash, 'refunds': refunds,
-                     'expenses': expenses, 'meals': meals, 'expected': balance, 'actual': actual})
+                     'expenses': expenses, 'meals': meals, 'expected': balance, 'actual': actual,
+                     # V97.39 itemised extras for the on-screen drawer statement
+                     'transfer_in': tin, 'transfer_out': tout,
+                     'expense_paid': t.expense_paid if t else ZERO, 'expense_reversed': t.expense_reversed if t else ZERO,
+                     'cash_after_meals': sales - meals,
+                     'net_move': balance - day_open,
+                     'variance': (actual - balance) if actual is not None else None})
         cursor += timedelta(days=1)
     return rows
 

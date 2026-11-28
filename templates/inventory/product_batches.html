@@ -11,6 +11,7 @@
     </div>
     {% if user.is_management_user %}
     <div class="flex gap-2">
+        <a href="{% url 'inventory:product_history' product.pk %}" class="btn btn-secondary">Edit History</a>
         <a href="{% url 'inventory:product_merge' product.pk %}" class="btn btn-secondary">Merge Product</a>
         <a href="{% url 'inventory:batch_add' product.pk %}" class="btn btn-primary" data-batch-modal>+ Add New Batch</a>
     </div>

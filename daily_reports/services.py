@@ -148,7 +148,11 @@ def _branch_report(pharmacy, report_date, include_salary=False):
     # Expenses (approved only)
     expenses_qs = Expense.objects.filter(pharmacy=pharmacy, expense_date=report_date, status=Expense.Status.APPROVED)
     expense_total = _sum(expenses_qs, 'amount')
-    cash_expenses = _sum(expenses_qs.filter(payment_source=Expense.PaymentSource.CASH_SALES), 'amount')
+    # Drawer expenses come from the SAME cash ledger as Cash Control and every cash report: counted on the day the
+    # cash left the drawer and net of expenses the boss rejected later. Profit (expense_total) stays on expense_date.
+    from expenses.ledger import CashLedgerService
+    _led = CashLedgerService.daily_totals(pharmacy.pk, report_date, report_date).get(report_date)
+    cash_expenses = _led.cash_expenses if _led else Decimal('0')
     by_cat = defaultdict(lambda: Decimal('0'))
     for e in expenses_qs.select_related('category'):
         by_cat[e.category.name] += e.amount
@@ -317,6 +321,72 @@ def _fmt_pct(p):
     return 'n/a' if p is None else f'{p:+.0f}%'
 
 
+def build_branch_analysis(branches, summary, prev_branches=None):
+    """Rank and diagnose each branch against the group. Returns {} when there is only one branch.
+
+    Every branch gets: share of group sales/profit/debt, margin, change vs previous day and plain-language
+    flags (loss, margin well below group average, heavy credit, high returns, heavy expenses, sales drop).
+    """
+    if len(branches) < 2:
+        return {}
+    prev_by_id = {b['branch_id']: b for b in (prev_branches or [])}
+    total_sales, total_profit = _money(summary['net_sales']), _money(summary['estimated_net_profit'])
+    total_debt = _money(summary['debt_outstanding'])
+    group_margin = float(total_profit / total_sales * 100) if total_sales > 0 else None
+    rows = []
+    for b in branches:
+        sales, profit, debt = _money(b['net_sales']), _money(b['estimated_net_profit']), _money(b['debt_outstanding'])
+        margin = float(profit / sales * 100) if sales > 0 else None
+        credit_share = float(_money(b['credit_sales']) / sales * 100) if sales > 0 else 0.0
+        gross = _money(b['gross_sales'])
+        returns_pct = float(_money(b['returns_total']) / gross * 100) if gross > 0 else 0.0
+        gp = _money(b['gross_profit'])
+        exp_ratio = float(_money(b['expenses']) / gp) if gp > 0 else 0.0
+        prev = prev_by_id.get(b['branch_id'])
+        change = _pct_change(sales, prev['net_sales']) if prev and prev.get('transactions') else None
+        flags = []
+        if not b['transactions']:
+            flags.append(('warn', 'No sales recorded today'))
+        else:
+            if profit < 0:
+                flags.append(('alert', f'Operating loss of TZS {abs(profit):,.0f}'))
+            elif margin is not None and group_margin is not None and margin < group_margin - 5:
+                flags.append(('warn', f'Margin {margin:.0f}% is below the group average of {group_margin:.0f}%'))
+            if credit_share >= 30:
+                flags.append(('warn', f'{credit_share:.0f}% of its sales were on credit'))
+            if returns_pct >= 5:
+                flags.append(('warn', f'Returns are {returns_pct:.1f}% of sales'))
+            if exp_ratio >= 0.3 and profit >= 0:
+                flags.append(('warn', f'Expenses took {exp_ratio * 100:.0f}% of gross profit'))
+            if change is not None and change <= -15:
+                flags.append(('warn', f'Sales down {abs(change):.0f}% vs previous day'))
+        status = 'alert' if any(l == 'alert' for l, _ in flags) else 'warn' if flags else 'good'
+        rows.append({
+            'branch_id': b['branch_id'], 'branch_name': b['branch_name'], 'location': b.get('location') or '',
+            'net_sales': str(sales), 'transactions': b['transactions'],
+            'sales_share': float(sales / total_sales * 100) if total_sales > 0 else 0.0,
+            'profit': str(profit), 'profit_share': float(profit / total_profit * 100) if total_profit > 0 and profit > 0 else None,
+            'margin': margin, 'debt_outstanding': str(debt),
+            'debt_share': float(debt / total_debt * 100) if total_debt > 0 else 0.0,
+            'vs_yesterday_pct': change, 'status': status,
+            'flags': [{'level': l, 'text': t} for l, t in flags],
+        })
+    rows.sort(key=lambda r: Decimal(r['net_sales']), reverse=True)
+    for i, r in enumerate(rows, 1):
+        r['rank'] = i
+    active = [r for r in rows if r['transactions']]
+    headline = ''
+    if active:
+        top = active[0]
+        headline = f"{top['branch_name']} led with {top['sales_share']:.0f}% of group sales"
+        attention = [r['branch_name'] for r in rows if r['status'] != 'good']
+        if attention:
+            headline += '. Needs attention: ' + ', '.join(attention)
+        else:
+            headline += '. All branches are healthy today'
+    return {'rows': rows, 'headline': headline, 'group_margin': group_margin}
+
+
 def build_insights(snapshot):
     """Rule-based analysis written for the business owner. Most important first."""
     s = snapshot['summary']
@@ -385,6 +455,20 @@ def build_insights(snapshot):
             for b in branches:
                 if _money(b['estimated_net_profit']) < 0 and b['transactions']:
                     add('alert', f'{b["branch_name"]} made a loss', f'Net result {money(b["estimated_net_profit"])} after expenses and meals.')
+            analysis = snapshot.get('branch_analysis') or {}
+            rows = [r for r in analysis.get('rows', []) if r['transactions']]
+            if len(rows) >= 2:
+                lead = rows[0]
+                if lead['sales_share'] >= 65:
+                    add('info', f'{lead["branch_name"]} carries the group', f'It made {lead["sales_share"]:.0f}% of all sales. The other branches together made {100 - lead["sales_share"]:.0f}%.')
+                margins = [r for r in rows if r['margin'] is not None]
+                if len(margins) >= 2:
+                    hi, lo = max(margins, key=lambda r: r['margin']), min(margins, key=lambda r: r['margin'])
+                    if hi['margin'] - lo['margin'] >= 10 and lo['profit'] and _money(lo['profit']) >= 0:
+                        add('warn', 'Big margin gap between branches', f'{hi["branch_name"]} keeps {hi["margin"]:.0f}% of sales as profit; {lo["branch_name"]} only {lo["margin"]:.0f}%. Check its prices, discounts and expenses.')
+                debt_lead = max(rows, key=lambda r: r['debt_share'])
+                if debt_lead['debt_share'] >= 60 and _money(debt_lead['debt_outstanding']) > 0:
+                    add('warn', f'{debt_lead["branch_name"]} holds most of the debt', f'{debt_lead["debt_share"]:.0f}% of customer debt ({money(debt_lead["debt_outstanding"])}) is at this branch.')
 
     debt_out = _money(s['debt_outstanding'])
     if debt_out > 0:
@@ -428,10 +512,12 @@ def build_daily_snapshot(owner, report_date, with_comparison=True):
         'summary': summary,
     }
     if with_comparison:
-        prev = build_daily_snapshot(owner, report_date - timedelta(days=1), with_comparison=False)['summary']
+        prev_snap = build_daily_snapshot(owner, report_date - timedelta(days=1), with_comparison=False)
+        prev = prev_snap['summary']
         week = build_daily_snapshot(owner, report_date - timedelta(days=7), with_comparison=False)['summary']
         snapshot['vs_yesterday'] = _comparison(summary, prev)
         snapshot['vs_last_week'] = _comparison(summary, week)
+        snapshot['branch_analysis'] = build_branch_analysis(branch_data, summary, prev_snap['branches'])
         snapshot['insights'] = build_insights(snapshot)
     return snapshot
 

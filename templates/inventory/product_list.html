@@ -20,6 +20,10 @@
             <svg class="icon shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M4 21h16"/></svg>
             <span>Bulk Upload</span>
         </a>
+        {% if user.is_management_user %}<a href="{% url 'inventory:change_history' %}" class="btn btn-secondary product-action-btn" title="Who edited which product or batch, and what changed">
+            <svg class="icon shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h12l4 4v12H4z"/><path d="M8 12h8M8 16h5"/></svg>
+            <span>Edit History</span>
+        </a>{% endif %}
         {% if user.is_management_user %}<a href="{% url 'inventory:restock_history' %}" class="btn btn-secondary product-action-btn" title="Every restock with date, time and download">
             <svg class="icon shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
             <span>Restock History</span>

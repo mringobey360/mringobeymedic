@@ -27,6 +27,11 @@
             <div class="text-xs text-ink-500">Enabled: allow seller discount • Type: percentage or fixed TZS amount per unit • Minimum / Maximum: the range the seller can choose from</div>
         </div>
         <p class="text-xs text-ink-400">To change price, quantity, or expiry, use "Batches" from the product list instead — those are tracked per delivery.</p>
+        <div>
+            <label for="id_change_reason" class="block text-sm font-medium mb-1">Reason for change (recommended)</label>
+            <input type="text" name="change_reason" id="id_change_reason" maxlength="255" class="form-input" placeholder="e.g. Corrected spelling; supplier changed the barcode">
+            <p class="text-xs text-ink-400 mt-1">Saved in the edit history with your name, the time, and the old and new values.</p>
+        </div>
         <div class="flex gap-3">
             <button type="submit" class="btn btn-primary">Save Changes</button>
             <a href="{% url 'inventory:product_list' %}" class="btn btn-secondary">Cancel</a>

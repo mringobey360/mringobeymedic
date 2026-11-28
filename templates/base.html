@@ -1169,6 +1169,7 @@ html:has(body.sp-batch-open) { overflow: hidden !important; }
                 <a href="{% url 'inventory:product_list' %}?stock=low" class="nav-sublink">Low Stock</a>
                 <a href="{% url 'inventory:product_list' %}?stock=expiring" class="nav-sublink">Expiring Soon</a>
                 {% if user.is_management_user %}<a href="{% url 'inventory:restock_history' %}" class="nav-sublink {% if request.resolver_match.url_name == 'restock_history' %}active{% endif %}">Restock History</a>{% endif %}
+                {% if user.is_management_user %}<a href="{% url 'inventory:change_history' %}" class="nav-sublink {% if request.resolver_match.url_name == 'change_history' or request.resolver_match.url_name == 'product_history' %}active{% endif %}">Edit History</a>{% endif %}
                 {% if user.is_management_user or user.is_assistant_role %}<a href="{% url 'inventory:stock_transfer_list' %}" class="nav-sublink {% if 'stock_transfer' in request.resolver_match.url_name %}active{% endif %}">Branch Stock Transfers</a>{% endif %}
             </div>
         </div>

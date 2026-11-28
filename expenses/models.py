@@ -324,6 +324,16 @@ class Expense(models.Model):
     decided_at = models.DateTimeField(null=True, blank=True)
     decision_note = models.TextField(blank=True)
     updated_at = models.DateTimeField(auto_now=True)
+    # V97.36 - auto-recorded employee expenses. A sales-cash expense entered by an employee leaves the
+    # drawer immediately (status APPROVED, auto_recorded=True) and the boss is notified. The boss may
+    # confirm it or REJECT it at any time, however old. A rejection never rewrites the day the money
+    # left: it adds a reversal on the day of the rejection (reversed_at), exactly like a meal reversal.
+    auto_recorded = models.BooleanField(default=False, db_index=True)
+    cash_out_at = models.DateTimeField(null=True, blank=True)   # exact moment the cash left the drawer
+    reviewed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='reviewed_expenses')
+    reviewed_at = models.DateTimeField(null=True, blank=True)    # boss confirmed the auto-recorded expense
+    reversed_at = models.DateTimeField(null=True, blank=True, db_index=True)  # rejected after the cash had left: cash returns to the books now
+    reversed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='reversed_expenses')
 
     class Meta:
         ordering = ['-expense_date', '-submitted_at']
@@ -344,6 +354,15 @@ class Expense(models.Model):
     @property
     def affects_cash(self):
         return self.status == self.Status.APPROVED and self.payment_source == self.PaymentSource.CASH_SALES
+
+    @property
+    def awaiting_review(self):
+        """Auto-recorded, deducted already, and the boss has not yet confirmed or rejected it."""
+        return self.auto_recorded and self.status == self.Status.APPROVED and self.reviewed_at is None
+
+    @property
+    def was_reversed(self):
+        return self.reversed_at is not None
 
     def __str__(self):
         return f'{self.title} — TZS {self.amount:,.2f}'

@@ -8,6 +8,8 @@ from decimal import Decimal
 
 from django.db.models import Q
 
+from django.utils import timezone
+
 from expenses.ledger import CashLedgerService
 from expenses.models import Expense
 
@@ -15,22 +17,39 @@ from .range_report import ZERO, expected_cash_by_day, meal_rows, period_cash_con
 
 
 def _expense_cash_rows(pharmacy, start, end):
-    """Approved expenses that either belong to the period by date or left the drawer inside it."""
-    qs = (Expense.objects.filter(pharmacy=pharmacy, status=Expense.Status.APPROVED)
+    """Expenses that belong to the period by date or moved drawer cash inside it.
+
+    A rejected-after-paid expense appears as TWO drawer lines, exactly like the ledger: the original cash-out on the
+    day it left, and a negative 'Reversal' on the day of the rejection. So this list always adds up to the Expenses
+    column of the expected-cash table (CashLedgerService)."""
+    from django.db.models import Q
+    qs = (Expense.objects.filter(pharmacy=pharmacy)
+          .filter(Q(status=Expense.Status.APPROVED) | Q(reversed_at__isnull=False))
           .select_related('category', 'submitted_by').order_by('expense_date', 'submitted_at'))
     rows = []
     for e in qs:
         drawer = e.payment_source == Expense.PaymentSource.CASH_SALES
         cash_day = (e.cash_date or e.expense_date) if drawer else None
+        by = e.submitted_by.get_full_name() or e.submitted_by.get_username()
+        reversed_ = e.reversed_at is not None
+        reversed_day = timezone.localtime(e.reversed_at).date() if reversed_ else None
         in_period = start <= e.expense_date <= end or (cash_day is not None and start <= cash_day <= end)
-        if not in_period:
-            continue
-        rows.append({
-            'date': e.expense_date, 'cash_day': cash_day, 'category': e.category.name, 'title': e.title,
-            'paid_from': e.get_payment_source_display(), 'amount': e.amount, 'drawer': drawer,
-            'late': bool(cash_day and cash_day != e.expense_date),
-            'by': e.submitted_by.get_full_name() or e.submitted_by.get_username(),
-        })
+        # A rejected expense is not a business cost: it only shows because its cash moved inside the period.
+        if reversed_:
+            in_period = cash_day is not None and start <= cash_day <= end
+        if in_period:
+            rows.append({
+                'date': e.expense_date, 'cash_day': cash_day, 'category': e.category.name,
+                'title': e.title + (' (rejected later)' if reversed_ else ''),
+                'paid_from': e.get_payment_source_display(), 'amount': e.amount, 'drawer': drawer,
+                'late': bool(cash_day and cash_day != e.expense_date and not e.auto_recorded), 'by': by,
+            })
+        if reversed_ and drawer and start <= reversed_day <= end:
+            rows.append({
+                'date': reversed_day, 'cash_day': reversed_day, 'category': e.category.name,
+                'title': f'Reversal - {e.title}', 'paid_from': e.get_payment_source_display(),
+                'amount': -e.amount, 'drawer': True, 'late': False, 'by': by,
+            })
     return rows
 
 

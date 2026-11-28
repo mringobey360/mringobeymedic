@@ -23,6 +23,11 @@
                 {% if field.help_text %}<p class="bf-help">{{ field.help_text }}</p>{% endif %}
             </div>
         {% endfor %}
+            <div class="bf-field is-wide">
+                <label for="id_change_reason">Reason for change (recommended)</label>
+                <input type="text" name="change_reason" id="id_change_reason" maxlength="255" class="form-input" placeholder="e.g. Physical stock count found 3 less; wrong price typed">
+                <p class="bf-help">Saved in the edit history together with your name, the time, and the old and new values.</p>
+            </div>
         </div>
         <div class="bf-actions">
             <a href="{% url 'inventory:product_batches' product.pk %}" class="btn btn-secondary">Cancel</a>

@@ -33,7 +33,8 @@ from .barcode_lookup import lookup_barcode, is_lookup_candidate, is_lookup_enabl
 from .forms import ProductForm, ProductQuickForm, ProductBatchForm, ProductBatchEditForm, BulkUploadForm
 from .services import register_product, receive_batch
 from .mistake_detection import flag_batch_if_suspicious, check_batch_for_issues, flag_if_similar_product_exists
-from .models import Product, Category, UnitCatalog, ProductBatch, StockMovement, StockImport, BranchStockTransfer, BranchStockTransferItem, FEFO_ORDER
+from . import audit
+from .models import InventoryChangeLog, Product, Category, UnitCatalog, ProductBatch, StockMovement, StockImport, BranchStockTransfer, BranchStockTransferItem, FEFO_ORDER
 from .transfer_service import TransferError, execute_bulk_transfer, parse_lines
 from notifications.models import Notification
 from notifications.utils import notify_many, notify
@@ -456,9 +457,11 @@ def product_create_view(request):
 @admin_required
 def product_edit_view(request, pk):
     product = get_object_or_404(Product, pk=pk, pharmacy=request.pharmacy)
+    before = audit.snapshot_product(product)   # taken BEFORE the form touches the instance
     form = ProductForm(request.POST or None, request.FILES or None, instance=product, pharmacy=request.pharmacy)
     if request.method == 'POST' and form.is_valid():
         form.save()
+        audit.log_product_edit(request, product, before, reason=(request.POST.get('change_reason') or '').strip())
         messages.success(request, f"Product '{product.name}' updated successfully.")
         return redirect('inventory:product_list')
 
@@ -703,8 +706,12 @@ def _handle_delete(request, ids):
         ok, message = _check_purge_password(request, request.POST.get('current_password', ''))
         if not ok:
             return _render_delete_review(request, products, error=f"{message} Nothing was deleted.")
+        purged = [(p.pharmacy, p.name) for p in products]
         try:
             count = _purge_products(products)
+            for ph, nm in purged:
+                audit.record(request, pharmacy=ph, action=InventoryChangeLog.Action.PRODUCT_PURGED, product_name=nm,
+                             summary='Product and all related records permanently deleted')
         except ProtectedError:
             messages.error(request, "Some records are still linked to these products, so nothing was deleted. Please contact support.")
             return redirect('inventory:product_list')
@@ -718,7 +725,12 @@ def _handle_delete(request, ids):
     if count == 0:
         messages.warning(request, "These products are already removed from the catalog.")
         return redirect('inventory:product_list')
+    soft_list = list(soft)
     soft.update(is_active=False)
+    for p in soft_list:
+        audit.record(request, pharmacy=p.pharmacy, action=InventoryChangeLog.Action.PRODUCT_ARCHIVED, product=p,
+                     summary='Removed from the catalog (stock and sales history kept)',
+                     changes=[{'field': 'is_active', 'label': 'Active in catalog', 'old': 'Yes', 'new': 'No'}])
     messages.success(request, f"{count} product{'s' if count != 1 else ''} removed from the catalog. Stock and sales history were kept.")
     return redirect('inventory:product_list')
 
@@ -816,6 +828,12 @@ def product_merge_view(request, pk):
 
                 source.is_active = False
                 source.save(update_fields=['is_active', 'updated_at'])
+                audit.record(
+                    request, pharmacy=target.pharmacy, action=InventoryChangeLog.Action.PRODUCT_MERGED, product=target,
+                    summary=f"'{source_name}' merged into '{target_name}'",
+                    changes=[{'field': 'merge', 'label': 'Moved to this product', 'old': source_name,
+                              'new': f'{batch_count} batch(es), {sale_item_count} sale line(s), {movement_count} stock movement(s)'}],
+                )
 
                 notify_many(
                     target.pharmacy.managers.all(),
@@ -887,10 +905,12 @@ def batch_edit_view(request, pk, batch_pk):
     product = get_object_or_404(Product, pk=pk, pharmacy=request.pharmacy)
     batch = get_object_or_404(ProductBatch, pk=batch_pk, product=product)
     old_quantity = batch.quantity
+    before = audit.snapshot_batch(batch)   # taken BEFORE the form touches the instance
 
     form = ProductBatchEditForm(request.POST or None, instance=batch, require_expiry=product.requires_expiry)
     if request.method == 'POST' and form.is_valid():
         updated_batch = form.save()
+        audit.log_batch_edit(request, updated_batch, before, reason=(request.POST.get('change_reason') or '').strip())
 
         quantity_change = updated_batch.quantity - old_quantity
         if quantity_change != 0:
@@ -1335,9 +1355,12 @@ def _commit_import(records, mode, user, pharmacy, file_name, file_sha256):
                                 ),
                             )
                             flag_if_similar_product_exists(product, user)
+                            audit.record(None, pharmacy=pharmacy, action=InventoryChangeLog.Action.PRODUCT_CREATED, product=product, user=user,
+                                         summary=f"Created by bulk upload {reference} row {rec['row']}")
                             result['new_products'] += 1
                         else:
                             changed = False
+                            before_product = audit.snapshot_product(product)
                             if not product.is_active:
                                 product.is_active = True
                                 changed = True
@@ -1370,6 +1393,8 @@ def _commit_import(records, mode, user, pharmacy, file_name, file_sha256):
                                 changed = True
                             if changed:
                                 product.save()
+                                audit.log_product_edit(None, product, before_product, user=user,
+                                                       reason=f"Bulk upload {reference} row {rec['row']}")
 
                         existing_batch = None
                         reused_opening = False
@@ -1402,6 +1427,7 @@ def _commit_import(records, mode, user, pharmacy, file_name, file_sha256):
                             ).first()
 
                         if existing_batch:
+                            before_batch = audit.snapshot_batch(existing_batch)
                             existing_batch.quantity += rec['base_quantity']
                             existing_batch.initial_quantity += rec['base_quantity']
                             existing_batch.purchase_quantity += rec['purchase_qty']
@@ -1410,6 +1436,8 @@ def _commit_import(records, mode, user, pharmacy, file_name, file_sha256):
                                 'quantity', 'initial_quantity', 'purchase_quantity',
                                 'purchase_unit_price'
                             ])
+                            audit.log_batch_edit(None, existing_batch, before_batch, user=user,
+                                                 reason=f"Bulk upload {reference} row {rec['row']} - exact batch restock")
                             StockMovement.objects.create(
                                 product=product, batch=existing_batch,
                                 movement_type=StockMovement.MovementType.BULK_UPLOAD,
@@ -1746,3 +1774,56 @@ def stock_transfer_pdf_view(request, pk):
     response['Content-Disposition'] = f'attachment; filename="{transfer.reference}.pdf"'
     response['Cache-Control'] = 'private, no-store'
     return response
+
+
+# ---------------------------------------------------------------------------
+# Edit history: who changed which product / batch, when, and the old -> new values.
+# Read-only. Branch-scoped, management only.
+# ---------------------------------------------------------------------------
+def _history_qs(request):
+    qs = InventoryChangeLog.objects.filter(pharmacy=request.pharmacy).select_related('performed_by', 'product', 'batch')
+    product_id = (request.GET.get('product') or '').strip()
+    if product_id.isdigit():
+        qs = qs.filter(product_id=int(product_id))
+    action = (request.GET.get('action') or '').strip()
+    if action in dict(InventoryChangeLog.Action.choices):
+        qs = qs.filter(action=action)
+    user_id = (request.GET.get('user') or '').strip()
+    if user_id.isdigit():
+        qs = qs.filter(performed_by_id=int(user_id))
+    q = (request.GET.get('q') or '').strip()[:100]
+    if q:
+        qs = qs.filter(Q(product_name__icontains=q) | Q(batch_number__icontains=q) | Q(reason__icontains=q) | Q(summary__icontains=q))
+    for key, lookup in (('from', 'created_at__date__gte'), ('to', 'created_at__date__lte')):
+        raw = (request.GET.get(key) or '').strip()
+        try:
+            qs = qs.filter(**{lookup: datetime.strptime(raw, '%Y-%m-%d').date()})
+        except ValueError:
+            pass
+    return qs
+
+
+@admin_required
+def inventory_history_view(request, pk=None):
+    """Edit history for the whole branch, or for one product when ``pk`` is given."""
+    if not _require_pharmacy(request):
+        return redirect('pharmacies:list')
+    product = None
+    if pk is not None:
+        product = get_object_or_404(Product, pk=pk, pharmacy=request.pharmacy)
+    qs = _history_qs(request)
+    if product:
+        qs = qs.filter(product=product)
+    params = request.GET.copy()
+    params.pop('page', None)
+    page_obj = Paginator(qs, 30).get_page(request.GET.get('page'))
+    from django.contrib.auth import get_user_model
+    people = (get_user_model().objects.filter(pk__in=InventoryChangeLog.objects.filter(pharmacy=request.pharmacy)
+              .exclude(performed_by__isnull=True).values_list('performed_by_id', flat=True).distinct()))
+    return render(request, 'inventory/change_history.html', {
+        'page_obj': page_obj, 'product': product, 'actions': InventoryChangeLog.Action.choices,
+        'people': people, 'querystring': params.urlencode(),
+        'f': {k: (request.GET.get(k) or '').strip() for k in ('q', 'action', 'user', 'from', 'to')},
+        'filtered': any((request.GET.get(k) or '').strip() for k in ('q', 'action', 'user', 'from', 'to')),
+        'total': qs.count(),
+    })

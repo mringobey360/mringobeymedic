@@ -155,17 +155,95 @@ def approve_expense(expense, user, note=''):
         notify(locked.submitted_by, 'Expense approved', f'{locked.title} — TZS {locked.amount:,.0f} was approved.', category=Notification.Category.SALES, level=Notification.Level.SUCCESS, link_url=reverse('expenses:detail', args=[locked.pk]), pharmacy=locked.pharmacy)
         return locked
 
-def reject_expense(expense, user, note=''):
+def record_auto_expense(expense, user):
+    """V97.36: an employee's sales-cash expense leaves the drawer IMMEDIATELY and the boss is notified.
+
+    The expense is saved as APPROVED + auto_recorded so profit, reports and the drawer all include it at once;
+    `cash_out_at` fixes the exact moment the cash left. The boss reviews afterwards (confirm or reject, at any
+    time). `expense` must be unsaved or saved; this saves it."""
     with transaction.atomic():
-        locked = Expense.objects.select_for_update().get(pk=expense.pk)
-        if locked.status != Expense.Status.PENDING:
+        now = timezone.now()
+        today = timezone.localtime(now).date()
+        day = CashDay.objects.select_for_update().filter(pharmacy=expense.pharmacy, date=today).first()
+        if day is None:
+            day = ensure_cash_day_for_date(expense.pharmacy, user, today)
+        if day is None:
+            raise ValueError("Open today's cash day before recording a cash expense.")
+        if day.status != CashDay.Status.OPEN:
+            raise ValueError("Today's cash day has already ended or closed, so a cash expense cannot be recorded now. Ask the manager.")
+        expense.status = Expense.Status.APPROVED
+        expense.auto_recorded = True
+        expense.cash_date = today            # money physically leaves TODAY's drawer; profit still follows expense_date
+        expense.cash_out_at = now
+        expense.decided_at = now
+        expense.decided_by = None
+        expense.decision_note = 'Recorded automatically from the drawer. Awaiting boss review.'
+        expense.save()
+    who = user.get_full_name() or user.get_username()
+    notify_managers(
+        expense.pharmacy, 'Expense deducted from drawer - review',
+        f'{who} recorded "{expense.title}" - TZS {expense.amount:,.0f}. It was deducted from the drawer automatically. '
+        f'Open it to confirm or reject.',
+        level=Notification.Level.WARNING, link=reverse('expenses:detail', args=[expense.pk]),
+    )
+    return expense
+
+
+def confirm_expense(expense, user, note=''):
+    """Boss acknowledges an auto-recorded expense. Changes no money; it only closes the review."""
+    with transaction.atomic():
+        locked = Expense.objects.select_for_update().select_related('submitted_by', 'pharmacy').get(pk=expense.pk)
+        if not locked.awaiting_review:
+            raise ValueError('This expense is not awaiting review.')
+        locked.reviewed_by = user
+        locked.reviewed_at = timezone.now()
+        if note.strip():
+            locked.decision_note = note.strip()
+        locked.save(update_fields=['reviewed_by', 'reviewed_at', 'decision_note', 'updated_at'])
+        notify(locked.submitted_by, 'Expense confirmed', f'{locked.title} - TZS {locked.amount:,.0f} was confirmed by the boss.',
+               category=Notification.Category.SALES, level=Notification.Level.SUCCESS,
+               link_url=reverse('expenses:detail', args=[locked.pk]), pharmacy=locked.pharmacy)
+        return locked
+
+
+def reject_expense(expense, user, note=''):
+    """Reject an expense.
+
+    * PENDING expense: never touched the drawer; simply rejected.
+    * Auto-recorded expense (already deducted): rejectable AT ANY TIME, however old. The day it left the drawer
+      is never rewritten (closed days stay as they were); a reversal is recorded on TODAY (reversed_at), so
+      today's expected cash rises by the amount and only real expenses stay deducted. Profit follows
+      expense_date, so the rejected expense also drops out of that day's profit and reports."""
+    with transaction.atomic():
+        locked = Expense.objects.select_for_update().select_related('pharmacy', 'submitted_by').get(pk=expense.pk)
+        now = timezone.now()
+        if locked.status == Expense.Status.PENDING:
+            locked.status = Expense.Status.REJECTED
+            locked.decided_by = user
+            locked.decided_at = now
+            locked.decision_note = note.strip()
+            locked.save(update_fields=['status', 'decided_by', 'decided_at', 'decision_note', 'updated_at'])
+            msg = f'{locked.title} - TZS {locked.amount:,.0f} was rejected.'
+        elif locked.auto_recorded and locked.status == Expense.Status.APPROVED and locked.reversed_at is None:
+            if not note.strip():
+                raise ValueError('Please give a reason for rejecting an expense that was already deducted.')
+            today = timezone.localtime(now).date()
+            # Make sure today's cash day exists so the reversal is attributed to a real business day.
+            # A day that already ended/closed is fine: the reversal then shows as post-close activity for review.
+            ensure_cash_day_for_date(locked.pharmacy, user, today)
+            locked.status = Expense.Status.REJECTED
+            locked.reversed_at = now
+            locked.reversed_by = user
+            locked.decided_by = user
+            locked.decided_at = now
+            locked.decision_note = note.strip()
+            locked.save(update_fields=['status', 'reversed_at', 'reversed_by', 'decided_by', 'decided_at', 'decision_note', 'updated_at'])
+            msg = (f'{locked.title} - TZS {locked.amount:,.0f} was rejected by the boss. '
+                   f'The amount was returned to the cash books today.')
+        else:
             raise ValueError('This expense has already been decided.')
-        locked.status = Expense.Status.REJECTED
-        locked.decided_by = user
-        locked.decided_at = timezone.now()
-        locked.decision_note = note.strip()
-        locked.save(update_fields=['status','decided_by','decided_at','decision_note','updated_at'])
-        notify(locked.submitted_by, 'Expense rejected', f'{locked.title} — TZS {locked.amount:,.0f} was rejected.', category=Notification.Category.SALES, level=Notification.Level.WARNING, link_url=reverse('expenses:detail', args=[locked.pk]), pharmacy=locked.pharmacy)
+        notify(locked.submitted_by, 'Expense rejected', msg, category=Notification.Category.SALES,
+               level=Notification.Level.WARNING, link_url=reverse('expenses:detail', args=[locked.pk]), pharmacy=locked.pharmacy)
         return locked
 
 # ---------------------------------------------------------------------------

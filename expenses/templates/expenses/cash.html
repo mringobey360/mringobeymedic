@@ -223,20 +223,22 @@
 
     <div class="mt-4 rounded-2xl border border-ink-100 bg-white p-4 md:p-5">
       <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-1 mb-3">
-        <div><p class="font-extrabold">Cash by employee today <span class="text-ink-400 font-semibold text-xs">(reference)</span></p><p class="text-xs text-ink-500 mt-1">Each employee's cash sales minus refunds they handed back and their meal money. Same figure the employee sees on their dashboard.</p></div>
+        <div><p class="font-extrabold">Cash by employee today <span class="text-ink-400 font-semibold text-xs">(reference)</span></p><p class="text-xs text-ink-500 mt-1">Each employee's cash sales minus refunds, meal money and expenses they paid from the drawer. Exactly the same statement the employee sees on their own dashboard.</p></div>
         {% if meals_not_deducted %}<span class="chip chip-warn">TZS {{ meals_not_deducted|floatformat:0|intcomma }} meals claimed but not yet deducted (no funding sale / awaiting settlement)</span>{% endif %}
       </div>
       <div class="overflow-x-auto"><table class="w-full text-sm">
-        <thead><tr class="text-left border-b border-ink-100 th-sm"><th class="py-2 font-bold">Employee</th><th class="font-bold text-right">Cash sales</th><th class="font-bold text-right">− Refunds</th><th class="font-bold text-right">− Meal (deducted)</th><th class="font-bold text-right">Expected cash</th><th class="font-bold text-right">Meal not yet deducted</th></tr></thead>
+        <thead><tr class="text-left border-b border-ink-100 th-sm"><th class="py-2 font-bold">Employee</th><th class="font-bold text-right">Total sales</th><th class="font-bold text-right">Cash sales</th><th class="font-bold text-right">− Refunds</th><th class="font-bold text-right">− Meal (deducted)</th><th class="font-bold text-right">− Expenses</th><th class="font-bold text-right">Expected cash</th><th class="font-bold text-right">Meal not yet deducted</th></tr></thead>
         <tbody>
         {% for r in employee_cash_rows %}<tr class="border-b border-ink-100">
           <td class="py-2.5 font-medium"><a href="{% url 'dashboard:my_cash_history' %}?employee={{ r.employee.pk }}" class="hover:underline text-brand-700">{% firstof r.employee.get_full_name r.employee.username %}</a></td>
+          <td class="text-right text-ink-500">TZS {{ r.total_sales|floatformat:0|intcomma }}</td>
           <td class="text-right">TZS {{ r.cash_sales|floatformat:0|intcomma }}</td>
           <td class="text-right {% if r.cash_refunds %}text-rose-700 font-semibold{% else %}text-ink-400{% endif %}">TZS {{ r.cash_refunds|floatformat:0|intcomma }}</td>
           <td class="text-right">TZS {{ r.meal_earned|floatformat:0|intcomma }}</td>
+          <td class="text-right {% if r.expenses %}font-semibold{% else %}text-ink-400{% endif %}">TZS {{ r.expenses|floatformat:0|intcomma }}</td>
           <td class="text-right font-bold text-brand-700">TZS {{ r.expected|floatformat:0|intcomma }}</td>
           <td class="text-right {% if r.meal_not_deducted %}text-amber-700 font-semibold{% else %}text-ink-400{% endif %}">TZS {{ r.meal_not_deducted|floatformat:0|intcomma }}</td>
-        </tr>{% empty %}<tr><td colspan="6" class="py-6 text-center text-ink-400">No cash sales or meals recorded today yet.</td></tr>{% endfor %}
+        </tr>{% empty %}<tr><td colspan="8" class="py-6 text-center text-ink-400">No cash sales or meals recorded today yet.</td></tr>{% endfor %}
         </tbody>
       </table></div>
     </div>

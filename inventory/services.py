@@ -13,6 +13,7 @@ from notifications.utils import notify_many
 from .mistake_detection import flag_batch_if_suspicious, flag_if_similar_product_exists
 from .barcode_lookup import remember_registered_name
 from .models import StockMovement
+from . import audit
 
 
 @transaction.atomic
@@ -34,6 +35,7 @@ def register_product(user, pharmacy, product_form, batch_form):
         product=product, batch=batch, movement_type=StockMovement.MovementType.NEW_BATCH,
         quantity_change=batch.quantity, note="Initial batch on registration", performed_by=user,
     )
+    audit.log_product_created(user, product, batch)
     remember_registered_name(product.barcode, product.name)   # next scan of this pack fills the name
     notify_many(
         product.pharmacy.managers.all(),
@@ -57,6 +59,7 @@ def receive_batch(user, product, batch_form):
         product=product, batch=batch, movement_type=StockMovement.MovementType.NEW_BATCH,
         quantity_change=batch.quantity, note=batch.note or "New batch received", performed_by=user,
     )
+    audit.log_batch_added(user, batch)
     flag_batch_if_suspicious(batch)
     notify_many(
         product.pharmacy.managers.all(),

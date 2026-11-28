@@ -246,6 +246,26 @@ def _meal_and_expense_checks(pharmacy, start, end):
         out.append(Issue('EXPENSE_PENDING_OLD', 'warning',
                          f"{stale['n']} cash expense(s) have waited over 2 days for approval; cash that already "
                          "left the drawer is not deducted until they are approved."))
+    # V97.38: auto-recorded employee expenses the boss has not reviewed. The cash already left the drawer, so the
+    # figures are right, but an old unreviewed expense should not stay unnoticed.
+    unreviewed = (Expense.objects.filter(pharmacy=pharmacy, auto_recorded=True, status=Expense.Status.APPROVED,
+                                         reviewed_at__isnull=True, submitted_at__lt=timezone.now() - timedelta(days=2))
+                  .aggregate(n=Count('pk')))
+    if unreviewed['n']:
+        out.append(Issue('EXPENSE_UNREVIEWED_OLD', 'warning',
+                         f"{unreviewed['n']} employee expense(s) were deducted from the drawer more than 2 days ago "
+                         "and are still waiting for boss review."))
+    # Internal consistency: the drawer total of each day must equal the sum of its itemised ledger lines, so the
+    # summary, the drill-down and every report can never disagree. Checked for the most recent 31 days of the range.
+    from expenses.ledger import CashLedgerService
+    from expenses.models import CashDay
+    for day in CashDay.objects.filter(pharmacy=pharmacy, date__range=(max(start, end - timedelta(days=30)), end)):
+        net = CashLedgerService.totals(day).net
+        itemised = sum((e.signed_amount for e in CashLedgerService.entries(day)), Decimal('0'))
+        if abs(net - itemised) > Decimal('0.5'):
+            out.append(Issue('LEDGER_ITEMISED_MISMATCH', 'warning',
+                             f'{day.date}: the cash total (TZS {net:,.0f}) differs from the sum of its itemised '
+                             f'movements (TZS {itemised:,.0f}). Please report this so it can be investigated.'))
     return out
 
 

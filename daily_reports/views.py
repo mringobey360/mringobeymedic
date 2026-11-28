@@ -1,4 +1,5 @@
 import logging
+from decimal import Decimal
 
 from django.contrib import messages
 from django.core.paginator import Paginator
@@ -43,12 +44,28 @@ def report_list(request):
     page_obj = Paginator(reports, 15).get_page(request.GET.get('page'))
     return render(request, 'daily_reports/list.html', {'page_obj': page_obj})
 
+def _boss_totals(summary):
+    """Combined figures for the simplified boss view (snapshot values are stored as strings)."""
+    d = lambda k: Decimal(str(summary.get(k) or 0))
+    refunds = summary.get('refunds_paid_today')
+    refunds = Decimal(str(refunds)) if refunds not in (None, '') else d('refunds_prior_days')
+    return {
+        'costs_other': d('expenses') + d('meals_cost'),
+        'cash_costs': d('cash_expenses') + d('meals_cost'),
+        'collected': d('debt_collected') + d('deposits_received'),
+        'layaway_in': d('layaway_cash_received') + d('layaway_mobile_received') + d('layaway_bank_received') + d('layaway_other_received'),
+        'layaway_out': d('layaway_cash_refunds') + d('layaway_mobile_refunds'),
+        'refunds_out': refunds,
+    }
+
+
 def public_report(request, token):
     report = get_object_or_404(DailySalesReport.objects.select_related('owner'), access_token=token)
     if report.is_expired:
         return render(request, 'daily_reports/expired.html', {'report': report}, status=410)
     return render(request, 'daily_reports/report.html', {
         'report': report, 'snapshot': report.snapshot,
+        'x': _boss_totals(report.snapshot.get('summary', {})),
         'pdf_error': request.GET.get('pdf_error') == '1',
     })
 

@@ -90,7 +90,10 @@ def site_settings(request):
                 from sales.models import Sale
                 context['needs_review_count'] = Sale.objects.filter(pharmacy=pharmacy, needs_review=True).count()
                 from expenses.models import Expense
-                context['pending_expenses_count'] = Expense.objects.filter(pharmacy=pharmacy, status=Expense.Status.PENDING).count()
+                from django.db.models import Q
+                context['pending_expenses_count'] = Expense.objects.filter(pharmacy=pharmacy).filter(
+                    Q(status=Expense.Status.PENDING) |
+                    Q(auto_recorded=True, status=Expense.Status.APPROVED, reviewed_at__isnull=True)).count()
                 from sales.models import SaleReturnRequest
                 context['pending_returns_count'] = SaleReturnRequest.objects.filter(
                     pharmacy=pharmacy, status=SaleReturnRequest.Status.PENDING

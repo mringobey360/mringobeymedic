@@ -35,7 +35,7 @@
     <div class="xp-cell">
       <p class="xp-cell-label">{% if user.is_admin_role %}Pending approval{% else %}My pending approval{% endif %}</p>
       <p class="xp-cell-value {% if pending_count %}is-warn{% endif %}">{{ pending_count|intcomma }}</p>
-      {% if pending_count %}<p class="xp-cell-hint"><a href="{% url 'expenses:list' %}?status=PENDING">Review pending</a></p>{% endif %}
+      {% if pending_count %}<p class="xp-cell-hint"><a href="{% url 'expenses:list' %}?status=PENDING">Review pending</a></p>{% endif %}{% if review_count %}<p class="xp-cell-hint">{{ review_count }} deducted from drawer, awaiting boss review</p>{% endif %}
     </div>
     <div class="xp-cell">
       <p class="xp-cell-label">Control principle</p>
@@ -138,7 +138,7 @@
             </td>
             <td>{{ e.category.name }}</td>
             <td>{{ e.get_payment_source_display }}</td>
-            <td><span class="xp-status {% if e.status == 'APPROVED' %}is-approved{% elif e.status == 'REJECTED' %}is-rejected{% elif e.status == 'PENDING' %}is-pending{% endif %}">{{ e.get_status_display }}</span></td>
+            <td><span class="xp-status {% if e.auto_recorded and e.status == 'APPROVED' and not e.reviewed_at %}is-pending{% elif e.status == 'APPROVED' %}is-approved{% elif e.status == 'REJECTED' %}is-rejected{% elif e.status == 'PENDING' %}is-pending{% endif %}">{% if e.reversed_at %}Rejected · returned{% elif e.auto_recorded and e.status == 'APPROVED' and not e.reviewed_at %}Deducted · to review{% elif e.auto_recorded and e.status == 'APPROVED' %}Deducted · confirmed{% else %}{{ e.get_status_display }}{% endif %}</span></td>
             <td class="xp-num xp-strong">TZS {{ e.amount|floatformat:0|intcomma }}</td>
             <td class="xp-num"><a href="{% url 'expenses:detail' e.pk %}" class="row-action">View</a></td>
           </tr>
@@ -163,7 +163,7 @@
           </div>
           <div class="xp-mrow">
             <span class="xp-meta">{{ e.expense_date|date:"d M Y" }} · {% firstof e.submitted_by.get_full_name e.submitted_by.username %}</span>
-            <span class="xp-status {% if e.status == 'APPROVED' %}is-approved{% elif e.status == 'REJECTED' %}is-rejected{% elif e.status == 'PENDING' %}is-pending{% endif %}">{{ e.get_status_display }}</span>
+            <span class="xp-status {% if e.auto_recorded and e.status == 'APPROVED' and not e.reviewed_at %}is-pending{% elif e.status == 'APPROVED' %}is-approved{% elif e.status == 'REJECTED' %}is-rejected{% elif e.status == 'PENDING' %}is-pending{% endif %}">{% if e.reversed_at %}Rejected · returned{% elif e.auto_recorded and e.status == 'APPROVED' and not e.reviewed_at %}Deducted · to review{% elif e.auto_recorded and e.status == 'APPROVED' %}Deducted · confirmed{% else %}{{ e.get_status_display }}{% endif %}</span>
           </div>
         </a>
       </li>

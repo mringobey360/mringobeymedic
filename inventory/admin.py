@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib import messages
 from django.db.models.deletion import ProtectedError
-from .models import Category, UnitCatalog, Product, ProductBatch, StockMovement, StockImport
+from .models import Category, UnitCatalog, Product, ProductBatch, StockMovement, StockImport, InventoryChangeLog
 from .purge import dependency_counts, purge_product
 
 
@@ -94,4 +94,22 @@ class StockImportAdmin(admin.ModelAdmin):
     readonly_fields = [f.name for f in StockImport._meta.fields]
 
     def has_add_permission(self, request):
+        return False
+
+
+@admin.register(InventoryChangeLog)
+class InventoryChangeLogAdmin(admin.ModelAdmin):
+    """Read-only: the audit trail can be viewed here but never edited or deleted."""
+    list_display = ('created_at', 'pharmacy', 'action', 'product_name', 'batch_number', 'performed_by_name', 'summary')
+    list_filter = ('pharmacy', 'action')
+    search_fields = ('product_name', 'batch_number', 'performed_by_name', 'summary', 'reason')
+    date_hierarchy = 'created_at'
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
         return False

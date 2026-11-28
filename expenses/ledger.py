@@ -15,6 +15,10 @@ Accounting rules (kept deliberately simple and explicit):
                detection.
 * Cash expense: approved Expense paid from CASH_SALES, on the day it was APPROVED (cash_date; legacy rows: expense_date), timed by
                decided_at (legacy rows: submitted_at).
+* Auto-recorded expense (V97.36): an expense an employee enters from sales cash leaves the drawer the moment it is
+               saved (Expense.auto_recorded, timed by cash_out_at) and the boss is notified. If the boss later REJECTS it
+               - even weeks later - the original day is never rewritten: a REVERSAL puts the cash back on the day of
+               the rejection (Expense.reversed_at), shown as its own line. Same pattern as a meal reversal.
 * Meal payment: an EARNED staff meal is paid from the drawer automatically
                (MealCashPayment, V50.42). Cash leaves on the day the payment is
                recorded; a reversal (meal no longer EARNED) returns it on the day it
@@ -117,6 +121,7 @@ def cash_layaway_refunds_qs(pharmacy_id):
 
 
 def cash_expenses_qs(pharmacy_id):
+    """LIVE cash expenses: approved and not reversed. Used by profit / reconciliation helpers."""
     from .models import Expense
     # `cash_day` = the business day the money left the drawer: the approval day (cash_date) or,
     # for legacy rows without one, the expense_date.
@@ -126,10 +131,28 @@ def cash_expenses_qs(pharmacy_id):
     ).annotate(cash_day=Coalesce('cash_date', 'expense_date'))
 
 
+def cash_expenses_gross_qs(pharmacy_id):
+    """Every expense that EVER took cash out of the drawer: live ones plus the ones rejected afterwards.
+    A rejected expense keeps its original cash-out line; its reversal is a separate line on the rejection day."""
+    from .models import Expense
+    return Expense.objects.filter(
+        pharmacy_id=pharmacy_id, payment_source=Expense.PaymentSource.CASH_SALES,
+    ).filter(models.Q(status=Expense.Status.APPROVED) | models.Q(reversed_at__isnull=False)
+             ).annotate(cash_day=Coalesce('cash_date', 'expense_date'))
+
+
+def expense_reversals_qs(pharmacy_id):
+    """Auto-recorded cash expenses the boss rejected after the cash had left: cash returns on reversed_at."""
+    from .models import Expense
+    return Expense.objects.filter(
+        pharmacy_id=pharmacy_id, payment_source=Expense.PaymentSource.CASH_SALES, reversed_at__isnull=False)
+
+
 def _expense_time_q(op, cutoff):
-    """Expense timestamp is decided_at, falling back to submitted_at for legacy rows."""
-    return (models.Q(**{f'decided_at__{op}': cutoff}) |
-            models.Q(decided_at__isnull=True, **{f'submitted_at__{op}': cutoff}))
+    """When the cash left: cash_out_at (auto-recorded), else decided_at, else submitted_at for legacy rows."""
+    return (models.Q(**{f'cash_out_at__{op}': cutoff}) |
+            models.Q(cash_out_at__isnull=True, **{f'decided_at__{op}': cutoff}) |
+            models.Q(cash_out_at__isnull=True, decided_at__isnull=True, **{f'submitted_at__{op}': cutoff}))
 
 
 def meal_payments_qs(pharmacy_id):
@@ -185,7 +208,10 @@ class LedgerEntry:
 class LedgerTotals:
     cash_sales: Decimal = ZERO
     cash_refunds: Decimal = ZERO
-    cash_expenses: Decimal = ZERO
+    cash_expenses: Decimal = ZERO           # NET: paid out minus reversed (rejected) expenses
+    expense_paid: Decimal = ZERO
+    expense_reversed: Decimal = ZERO
+    expense_reversal_count: int = 0
     cash_debt_collected: Decimal = ZERO   # debt repayments received in cash (drawer cash IN)
     cash_layaway_collected: Decimal = ZERO   # part of cash_debt_collected that came from layaway plans
     cash_layaway_refunded: Decimal = ZERO    # part of cash_refunds that was paid back on cancelled layaway plans
@@ -269,11 +295,20 @@ class CashLedgerService:
 
     @staticmethod
     def _day_expenses(day, after=None, upto=None):
-        qs = cash_expenses_qs(day.pharmacy_id).filter(cash_day=day.date)
+        qs = cash_expenses_gross_qs(day.pharmacy_id).filter(cash_day=day.date)
         if after is not None:
             qs = qs.filter(_expense_time_q('gt', after))
         if upto is not None:
             qs = qs.filter(_expense_time_q('lte', upto))
+        return qs
+
+    @staticmethod
+    def _day_expense_reversals(day, after=None, upto=None):
+        qs = expense_reversals_qs(day.pharmacy_id).filter(reversed_at__date=day.date)
+        if after is not None:
+            qs = qs.filter(reversed_at__gt=after)
+        if upto is not None:
+            qs = qs.filter(reversed_at__lte=upto)
         return qs
 
     @staticmethod
@@ -324,8 +359,12 @@ class CashLedgerService:
         t.cash_refunds += t.cash_layaway_refunded
         t.refund_count += lr['n'] or 0
         e = cls._day_expenses(day, after, upto).aggregate(v=Sum('amount'), n=models.Count('pk'))
-        t.cash_expenses = e['v'] or ZERO
-        t.expense_count = e['n'] or 0
+        xr = cls._day_expense_reversals(day, after, upto).aggregate(v=Sum('amount'), n=models.Count('pk'))
+        t.expense_paid = e['v'] or ZERO
+        t.expense_reversed = xr['v'] or ZERO
+        t.cash_expenses = t.expense_paid - t.expense_reversed
+        t.expense_reversal_count = xr['n'] or 0
+        t.expense_count = (e['n'] or 0) + t.expense_reversal_count
         p = cls._day_meal_payments(day, after, upto).aggregate(v=Sum('amount'), n=models.Count('pk'))
         r2 = cls._day_meal_reversals(day, after, upto).aggregate(v=Sum('amount'), n=models.Count('pk'))
         t.meal_paid = p['v'] or ZERO
@@ -354,7 +393,8 @@ class CashLedgerService:
         t = cls.totals(day, upto=as_of)
         meals_qs = cls._day_expenses(day, upto=as_of).filter(category__name__iexact=STAFF_MEALS_CATEGORY)
         m = meals_qs.aggregate(v=Sum('amount'), n=models.Count('pk'))
-        legacy_meals = m['v'] or ZERO
+        mr = cls._day_expense_reversals(day, upto=as_of).filter(category__name__iexact=STAFF_MEALS_CATEGORY).aggregate(v=Sum('amount'))
+        legacy_meals = (m['v'] or ZERO) - (mr['v'] or ZERO)
         meals = legacy_meals + t.cash_meals   # manual Staff Meals expenses + automatic meal payments
         pend = Expense.objects.filter(
             pharmacy_id=day.pharmacy_id, expense_date=day.date, status=Expense.Status.PENDING,
@@ -374,6 +414,8 @@ class CashLedgerService:
             'staff_meals_auto': t.cash_meals,
             'staff_meals_expense': legacy_meals,
             'other_expenses': t.cash_expenses - legacy_meals,
+            'expense_reversed': t.expense_reversed,
+            'expense_reversal_count': t.expense_reversal_count,
             'cash_expenses_total': t.cash_expenses + t.cash_meals,
             'pending_expenses': pend['v'] or ZERO,
             'pending_count': pend['n'] or 0,
@@ -388,6 +430,7 @@ class CashLedgerService:
                 or cls._day_layaway_refunds(day, after=cutoff).exists()
                 or cls._day_refunds(day, after=cutoff).exists()
                 or cls._day_expenses(day, after=cutoff).exists()
+                or cls._day_expense_reversals(day, after=cutoff).exists()
                 or cls._day_meal_payments(day, after=cutoff).exists()
                 or cls._day_meal_reversals(day, after=cutoff).exists()
                 or cls._day_transfers(day, 'MOBILE_TO_CASH', after=cutoff).exists()
@@ -460,12 +503,24 @@ class CashLedgerService:
         expenses = (cls._day_expenses(day, after, upto)
                     .select_related('submitted_by'))
         for x in expenses:
+            if x.auto_recorded:
+                note = 'Auto-recorded from the drawer when submitted'
+                note += ' - awaiting boss review' if (x.reviewed_at is None and x.reversed_at is None) else (
+                    ' - rejected later, see the reversal line' if x.reversed_at else ' - confirmed by boss')
+            else:
+                note = f'Expense dated {x.expense_date}, approved {x.cash_day}' if x.cash_day != x.expense_date else ''
             out.append(LedgerEntry(
-                kind='EXPENSE', reference=x.title[:60], occurred_at=x.decided_at or x.submitted_at,
-                amount=x.amount, sign=-1, business_date=x.cash_day,
-                note=(f'Expense dated {x.expense_date}, approved {x.cash_day}' if x.cash_day != x.expense_date else ''),
+                kind='EXPENSE', reference=x.title[:60], occurred_at=x.cash_out_at or x.decided_at or x.submitted_at,
+                amount=x.amount, sign=-1, business_date=x.cash_day, note=note,
                 actor=(x.submitted_by.get_full_name() or x.submitted_by.get_username()) if x.submitted_by else '',
             ))
+        for x in cls._day_expense_reversals(day, after, upto).select_related('submitted_by', 'reversed_by'):
+            who = x.reversed_by
+            out.append(LedgerEntry(
+                kind='EXPENSE', reference=f'Reversal - {x.title[:50]}', occurred_at=x.reversed_at, amount=x.amount, sign=1,
+                business_date=timezone.localtime(x.reversed_at).date(),
+                actor=(who.get_full_name() or who.get_username()) if who else '',
+                note=f'Expense of {timezone.localtime(x.cash_out_at or x.decided_at or x.submitted_at).date()} rejected by the boss; cash returned to the books today.'))
         for mp in (cls._day_meal_payments(day, after, upto).select_related('meal__employee')):
             emp = mp.meal.employee
             out.append(LedgerEntry(
@@ -537,10 +592,15 @@ class CashLedgerService:
             t.cash_layaway_refunded += row['amount']
             t.cash_refunds += row['amount']
             t.refund_count += row['n']
-        for row in (cash_expenses_qs(pharmacy_id).filter(cash_day__range=(start_date, end_date))
+        for row in (cash_expenses_gross_qs(pharmacy_id).filter(cash_day__range=(start_date, end_date))
                     .values('cash_day').annotate(amount=Coalesce(Sum('amount'), zero), n=models.Count('pk'))):
             t = slot(row['cash_day'])
-            t.cash_expenses, t.expense_count = row['amount'], row['n']
+            t.expense_paid = row['amount']; t.cash_expenses += row['amount']; t.expense_count += row['n']
+        for row in (expense_reversals_qs(pharmacy_id).filter(reversed_at__date__range=(start_date, end_date))
+                    .values('reversed_at__date').annotate(amount=Coalesce(Sum('amount'), zero), n=models.Count('pk'))):
+            t = slot(row['reversed_at__date'])
+            t.expense_reversed = row['amount']; t.cash_expenses -= row['amount']
+            t.expense_reversal_count = row['n']; t.expense_count += row['n']
         for row in (meal_payments_qs(pharmacy_id).filter(paid_at__date__range=(start_date, end_date))
                     .values('paid_at__date').annotate(amount=Coalesce(Sum('amount'), zero), n=models.Count('pk'))):
             t = slot(row['paid_at__date'])
@@ -586,6 +646,45 @@ def employee_cash_refunds(pharmacy_id, start_date, end_date, employee=None):
     return out
 
 
+def employee_expense_net(pharmacy_id, start_date, end_date, employee=None):
+    """V97.37: {(employee_id, date): net cash the employee's auto-recorded expenses took from the drawer}.
+    Same two rules as the drawer ledger: an expense counts on the day the cash left (cash_date) and a
+    rejected one gives the cash back on the day of the rejection (reversed_at). Managers' own expenses are
+    never counted here (auto_recorded is only set for employee entries)."""
+    out = {}
+    paid = (cash_expenses_gross_qs(pharmacy_id).filter(auto_recorded=True, cash_day__range=(start_date, end_date))
+            .values('submitted_by_id', 'cash_day').annotate(v=Sum('amount')))
+    if employee is not None:
+        paid = paid.filter(submitted_by=employee)
+    for row in paid:
+        key = (row['submitted_by_id'], row['cash_day'])
+        out[key] = out.get(key, ZERO) + row['v']
+    back = (expense_reversals_qs(pharmacy_id).filter(auto_recorded=True, reversed_at__date__range=(start_date, end_date))
+            .values('submitted_by_id', 'reversed_at__date').annotate(v=Sum('amount')))
+    if employee is not None:
+        back = back.filter(submitted_by=employee)
+    for row in back:
+        key = (row['submitted_by_id'], row['reversed_at__date'])
+        out[key] = out.get(key, ZERO) - row['v']
+    return out
+
+
+def employee_total_sales(pharmacy_id, start_date, end_date, employee=None):
+    """V97.37: {(employee_id, date): total sales value, ALL payment methods} - the figure the employee
+    sees as "Your Total Today". Same line rule as sales_amount (original totals, returns not netted)."""
+    from sales.models import Sale, SaleItem
+    line = ExpressionWrapper(F('unit_price') * (F('quantity') + F('returned_quantity')), output_field=_MONEY)
+    qs = SaleItem.objects.filter(
+        sale__pharmacy_id=pharmacy_id, sale__business_date__range=(start_date, end_date),
+        sale__status__in=[Sale.Status.COMPLETED, Sale.Status.PARTIALLY_RETURNED, Sale.Status.VOIDED],
+        sale__served_by__isnull=False)
+    if employee is not None:
+        qs = qs.filter(sale__served_by=employee)
+    return {(r['sale__served_by_id'], r['sale__business_date']): r['v']
+            for r in qs.values('sale__served_by_id', 'sale__business_date').annotate(v=Coalesce(Sum(line), Value(ZERO, output_field=_MONEY)))}
+
+
+
 def employee_cash_reference(pharmacy_id, date_value, employee=None):
     """Per employee, for one business date: cash sales they made, the meal money that leaves the drawer
     for them (EARNED meals), and the cash they should hand over = cash sales - earned meals.
@@ -599,8 +698,10 @@ def employee_cash_reference(pharmacy_id, date_value, employee=None):
         sales = sales.filter(served_by=employee)
         meals = meals.filter(employee=employee)
     refunds = employee_cash_refunds(pharmacy_id, date_value, date_value, employee)
+    expenses = employee_expense_net(pharmacy_id, date_value, date_value, employee)
+    totals_all = employee_total_sales(pharmacy_id, date_value, date_value, employee)
     ids = (set(sales.values_list('served_by_id', flat=True)) | set(meals.values_list('employee_id', flat=True))
-           | {uid for (uid, _d) in refunds})
+           | {uid for (uid, _d) in refunds} | {uid for (uid, _d) in expenses})
     if employee is not None:
         ids.add(employee.pk)
     users = get_user_model().objects.in_bulk(ids)
@@ -612,11 +713,14 @@ def employee_cash_reference(pharmacy_id, date_value, employee=None):
         debt = mine.filter(status='DEBT').aggregate(v=Sum('amount'))['v'] or ZERO
         waiting = mine.filter(status='PENDING').aggregate(v=Sum('amount'))['v'] or ZERO
         refunded = refunds.get((uid, date_value), ZERO)
+        spent = expenses.get((uid, date_value), ZERO)
+        total = totals_all.get((uid, date_value), ZERO)
         rows.append({
             'employee': users.get(uid), 'cash_sales': amount, 'sales_count': count,
-            'cash_refunds': refunded,
+            'total_sales': total, 'non_cash_sales': max(total - amount, ZERO),
+            'cash_refunds': refunded, 'expenses': spent,
             'meal_earned': earned, 'meal_debt': debt, 'meal_awaiting': waiting,
-            'meal_not_deducted': debt + waiting, 'expected': amount - refunded - earned,
+            'meal_not_deducted': debt + waiting, 'expected': amount - refunded - earned - spent,
         })
     rows.sort(key=lambda r: ((r['employee'].get_full_name() or r['employee'].get_username()).lower() if r['employee'] else ''))
     return rows
@@ -637,6 +741,7 @@ def employee_cash_history(pharmacy_id, employee, start_date, end_date):
 
     def slot(d):
         return days.setdefault(d, {'date': d, 'sales_count': 0, 'cash_sales': ZERO, 'cash_refunds': ZERO,
+                                   'total_sales': ZERO, 'non_cash_sales': ZERO, 'expenses': ZERO,
                                    'meal_earned': ZERO, 'meal_not_deducted': ZERO, 'meals_count': 0})
 
     for row in (SaleItem.objects.filter(sale__in=sales.filter(payment_method='CASH').values('pk'))
@@ -663,7 +768,12 @@ def employee_cash_history(pharmacy_id, employee, start_date, end_date):
             r['meal_not_deducted'] += m.amount or ZERO
     for (uid, d), amount in employee_cash_refunds(pharmacy_id, start_date, end_date, employee).items():
         slot(d)['cash_refunds'] += amount
+    for (uid, d), amount in employee_expense_net(pharmacy_id, start_date, end_date, employee).items():
+        slot(d)['expenses'] += amount
+    for (uid, d), amount in employee_total_sales(pharmacy_id, start_date, end_date, employee).items():
+        slot(d)['total_sales'] = amount
     rows = sorted(days.values(), key=lambda r: r['date'], reverse=True)
     for r in rows:
-        r['expected'] = r['cash_sales'] - r['cash_refunds'] - r['meal_earned']
+        r['non_cash_sales'] = max(r['total_sales'] - r['cash_sales'], ZERO)
+        r['expected'] = r['cash_sales'] - r['cash_refunds'] - r['meal_earned'] - r['expenses']
     return rows

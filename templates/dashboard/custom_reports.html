@@ -60,7 +60,7 @@
     <div class="rounded-xl border border-ink-200 p-4"><div class="text-xs text-ink-500">Opening cash</div><div class="text-xl font-bold text-ink-900 mt-1">TZS {{ cash_control.opening|smart_number }}</div></div>
     <div class="rounded-xl border border-ink-200 p-4"><div class="text-xs text-ink-500">Cash sales received</div><div class="text-xl font-bold text-emerald-700 mt-1">+ TZS {{ cash_control.cash_sales|smart_number }}</div></div>
     <div class="rounded-xl border border-ink-200 p-4"><div class="text-xs text-ink-500">Cash refunds paid</div><div class="text-xl font-bold text-ink-900 mt-1">− TZS {{ cash_control.refunds|smart_number }}</div></div>
-    <div class="rounded-xl border border-ink-200 p-4"><div class="text-xs text-ink-500">Approved expenses paid from the drawer</div><div class="text-xl font-bold text-ink-900 mt-1">− TZS {{ cash_control.expenses|smart_number }}</div></div>
+    <div class="rounded-xl border border-ink-200 p-4"><div class="text-xs text-ink-500">Expenses paid from the drawer (net of rejected)</div><div class="text-xl font-bold text-ink-900 mt-1">− TZS {{ cash_control.expenses|smart_number }}</div></div>
     <div class="rounded-xl border border-ink-200 p-4"><div class="text-xs text-ink-500">Staff meals paid from drawer (automatic)</div><div class="text-xl font-bold text-ink-900 mt-1">− TZS {{ cash_control.meals|smart_number }}</div></div>
     <div class="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4"><div class="text-xs text-ink-500">Net cash sales after meals</div><div class="text-xl font-bold text-emerald-700 mt-1">TZS {{ cash_control.cash_after_meals|smart_number }}</div><div class="text-xs text-ink-500 mt-1">Cash sales {{ cash_control.cash_sales|smart_number }} − staff meals {{ cash_control.meals|smart_number }}</div></div>
     <div class="rounded-xl border-2 border-brand-300 bg-brand-50/40 p-4"><div class="text-xs text-ink-600">Expected cash balance</div><div class="text-2xl font-bold text-brand-700 mt-1">TZS {{ cash_control.expected|smart_number }}</div><div class="text-xs text-ink-500 mt-1">Opening + cash sales − refunds − cash expenses − staff meals</div></div>
@@ -69,6 +69,66 @@
   <p class="text-xs text-ink-500">Earned staff meals are deducted from the drawer automatically (do not also record them as expenses). Only expenses paid from “Sales cash / petty cash” reduce the drawer; bank and mobile-money expenses reduce profit only. Mobile money, bank payments, credit sales and uncollected debts never enter the physical drawer.</p>
   {% if cash_control.provisional_opening %}<div class="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"><strong>First-time historical detection:</strong> The system has automatically searched previous cash sales, approved cash refunds and approved cash expenses, including activity from previous months. This is a movement-based estimate, not proof of the physical cash balance that existed before the earliest recorded transaction. To make the report fully verified, physically count cash and record a manager-approved opening balance in Cash Control.</div>{% elif cash_control.baseline_source == 'previous_physical_close' %}<div class="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">Opening balance is anchored to a previous physical cash count, then adjusted for recorded cash activity up to the selected start date.</div>{% endif %}
   {% if cash_control.days_recorded < cash_control.days_expected %}<p class="mt-3 text-xs text-amber-800 bg-amber-50 rounded-lg p-3">Cash control records exist for {{ cash_control.days_recorded }} of {{ cash_control.days_expected }} dates in this interval. Review missing cash-day openings/records before relying on the expected balance.</p>{% endif %}
+</div>
+
+<div class="card mb-6" id="drawer-statement">
+  <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 mb-4">
+    <div><div class="text-xs font-semibold uppercase tracking-wider text-brand-700 mb-1">Drawer statement</div><h2 class="text-lg font-bold text-ink-900">Expected Cash, Day by Day</h2><p class="text-sm text-ink-500 mt-1">{{ summary.start|date:'d M Y' }} to {{ summary.end|date:'d M Y' }}. Each day starts from the previous day's expected cash. Staff meals and expenses are deducted from cash sales exactly as the drawer records them.</p></div>
+    {% if drawer_ok %}<span class="text-xs font-semibold rounded-lg bg-emerald-50 text-emerald-800 px-3 py-2 whitespace-nowrap">&#10003; Reconciled: all figures agree</span>{% else %}<span class="text-xs font-semibold rounded-lg bg-red-50 text-red-800 px-3 py-2 whitespace-nowrap">Figures do not agree: see checks below</span>{% endif %}
+  </div>
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm min-w-[1180px]">
+      <thead><tr class="text-left text-ink-500 border-b border-ink-200">
+        <th class="py-3 pr-3">Date</th><th class="py-3 pr-3 text-right">Opening</th><th class="py-3 pr-3 text-right">Total sales</th><th class="py-3 pr-3 text-right">Cash sales</th><th class="py-3 pr-3 text-right">&minus; Meals</th><th class="py-3 pr-3 text-right">Cash after meals</th><th class="py-3 pr-3 text-right">+ Debt / layaway cash</th><th class="py-3 pr-3 text-right">+ Mobile cashed out</th><th class="py-3 pr-3 text-right">&minus; Refunds</th><th class="py-3 pr-3 text-right">&minus; Expenses</th><th class="py-3 pr-3 text-right">&minus; Cash to mobile</th><th class="py-3 pr-3 text-right">Expected cash</th><th class="py-3 pr-3 text-right">Counted</th><th class="py-3 pr-3 text-right">Difference</th>
+      </tr></thead>
+      <tbody>
+      {% for r in drawer_rows %}<tr class="border-b border-ink-100">
+        <td class="py-3 pr-3 whitespace-nowrap font-medium">{{ r.date|date:'D, d M' }}</td>
+        <td class="py-3 pr-3 text-right whitespace-nowrap text-ink-500">{{ r.opening|smart_number }}</td>
+        <td class="py-3 pr-3 text-right whitespace-nowrap text-ink-500">{{ r.total_sales|smart_number }}</td>
+        <td class="py-3 pr-3 text-right whitespace-nowrap">{{ r.sales|smart_number }}</td>
+        <td class="py-3 pr-3 text-right whitespace-nowrap {% if r.meals %}text-red-700{% else %}text-ink-400{% endif %}">{% if r.meals %}&minus; {{ r.meals|smart_number }}{% else %}0{% endif %}</td>
+        <td class="py-3 pr-3 text-right whitespace-nowrap font-semibold text-emerald-700">{{ r.cash_after_meals|smart_number }}</td>
+        <td class="py-3 pr-3 text-right whitespace-nowrap">{{ r.debt_cash|smart_number }}</td>
+        <td class="py-3 pr-3 text-right whitespace-nowrap">{{ r.transfer_in|smart_number }}</td>
+        <td class="py-3 pr-3 text-right whitespace-nowrap {% if r.refunds %}text-red-700{% else %}text-ink-400{% endif %}">{% if r.refunds %}&minus; {{ r.refunds|smart_number }}{% else %}0{% endif %}</td>
+        <td class="py-3 pr-3 text-right whitespace-nowrap {% if r.expenses %}text-red-700{% elif r.expense_reversed %}text-emerald-700{% else %}text-ink-400{% endif %}">{% if r.expense_paid or r.expense_reversed %}{% if r.expenses > 0 %}&minus; {{ r.expenses|smart_number }}{% elif r.expenses < 0 %}+ {{ r.expenses|cut:'-'|smart_number }}{% else %}0{% endif %}{% if r.expense_reversed %}<span class="block text-[11px] font-normal text-emerald-700">includes {{ r.expense_reversed|smart_number }} returned (rejected)</span>{% endif %}{% else %}0{% endif %}</td>
+        <td class="py-3 pr-3 text-right whitespace-nowrap">{{ r.transfer_out|smart_number }}</td>
+        <td class="py-3 pr-3 text-right whitespace-nowrap font-bold text-brand-700">{{ r.expected|smart_number }}</td>
+        <td class="py-3 pr-3 text-right whitespace-nowrap">{% if r.actual is not None %}{{ r.actual|smart_number }}{% else %}<span class="text-ink-400">not counted</span>{% endif %}</td>
+        <td class="py-3 pr-3 text-right whitespace-nowrap {% if r.variance is None %}text-ink-400{% elif r.variance < 0 %}text-red-700 font-semibold{% elif r.variance > 0 %}text-amber-700 font-semibold{% else %}text-emerald-700{% endif %}">{% if r.variance is None %}-{% else %}{{ r.variance|smart_number }}{% endif %}</td>
+      </tr>{% empty %}<tr><td colspan="14" class="py-8 text-center text-ink-400">No dates in this range.</td></tr>{% endfor %}
+      </tbody>
+      <tfoot><tr class="font-bold bg-ink-50 border-t-2 border-ink-200">
+        <td class="py-3 pr-3">PERIOD TOTAL</td><td class="py-3 pr-3 text-right">{{ cash_control.opening|smart_number }}</td><td class="py-3 pr-3 text-right">{{ drawer_totals.total_sales|smart_number }}</td><td class="py-3 pr-3 text-right">{{ drawer_totals.sales|smart_number }}</td><td class="py-3 pr-3 text-right text-red-700">&minus; {{ drawer_totals.meals|smart_number }}</td><td class="py-3 pr-3 text-right text-emerald-700">{{ drawer_totals.cash_after_meals|smart_number }}</td><td class="py-3 pr-3 text-right">{{ drawer_totals.debt_cash|smart_number }}</td><td class="py-3 pr-3 text-right">{{ drawer_totals.transfer_in|smart_number }}</td><td class="py-3 pr-3 text-right text-red-700">&minus; {{ drawer_totals.refunds|smart_number }}</td><td class="py-3 pr-3 text-right text-red-700">&minus; {{ drawer_totals.expenses|smart_number }}</td><td class="py-3 pr-3 text-right">{{ drawer_totals.transfer_out|smart_number }}</td><td class="py-3 pr-3 text-right text-brand-700">{{ cash_control.expected|smart_number }}</td><td class="py-3 pr-3 text-right">{% if cash_control.has_ending_count %}{{ cash_control.actual|smart_number }}{% else %}-{% endif %}</td><td class="py-3 pr-3 text-right">{% if cash_control.has_ending_count %}{{ cash_control.variance|smart_number }}{% else %}-{% endif %}</td>
+      </tr></tfoot>
+    </table>
+  </div>
+
+  <div class="mt-5 grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div class="rounded-xl border border-ink-200 overflow-hidden">
+      <p class="px-4 py-2 bg-ink-50 text-xs font-extrabold uppercase tracking-wider text-ink-500">How the total is calculated</p>
+      <dl class="text-sm divide-y divide-ink-100">
+        <div class="flex justify-between px-4 py-2.5"><dt>Opening cash</dt><dd class="font-semibold">TZS {{ cash_control.opening|smart_number }}</dd></div>
+        <div class="flex justify-between px-4 py-2.5"><dt>+ Cash sales</dt><dd class="font-semibold">TZS {{ drawer_totals.sales|smart_number }}</dd></div>
+        <div class="flex justify-between px-4 py-2.5"><dt>&minus; Staff meals paid from the drawer</dt><dd class="font-semibold text-red-700">TZS {{ drawer_totals.meals|smart_number }}</dd></div>
+        <div class="flex justify-between px-4 py-2.5 bg-emerald-50/60"><dt class="font-semibold">= Net cash sales after meals</dt><dd class="font-bold text-emerald-700">TZS {{ drawer_totals.cash_after_meals|smart_number }}</dd></div>
+        <div class="flex justify-between px-4 py-2.5"><dt>+ Debt / layaway cash received</dt><dd class="font-semibold">TZS {{ drawer_totals.debt_cash|smart_number }}</dd></div>
+        <div class="flex justify-between px-4 py-2.5"><dt>+ Mobile money cashed out into the drawer</dt><dd class="font-semibold">TZS {{ drawer_totals.transfer_in|smart_number }}</dd></div>
+        <div class="flex justify-between px-4 py-2.5"><dt>&minus; Cash refunds paid</dt><dd class="font-semibold text-red-700">TZS {{ drawer_totals.refunds|smart_number }}</dd></div>
+        <div class="flex justify-between px-4 py-2.5"><dt>&minus; Expenses paid from the drawer{% if drawer_totals.expense_reversed %} <span class="text-xs text-ink-500">(TZS {{ drawer_totals.expense_paid|smart_number }} paid, TZS {{ drawer_totals.expense_reversed|smart_number }} returned after rejection)</span>{% endif %}</dt><dd class="font-semibold text-red-700">TZS {{ drawer_totals.expenses|smart_number }}</dd></div>
+        <div class="flex justify-between px-4 py-2.5"><dt>&minus; Drawer cash put into mobile money</dt><dd class="font-semibold">TZS {{ drawer_totals.transfer_out|smart_number }}</dd></div>
+        <div class="flex justify-between px-4 py-3 bg-brand-50 font-extrabold text-brand-800"><dt>= Expected cash in the drawer</dt><dd>TZS {{ cash_control.expected|smart_number }}</dd></div>
+      </dl>
+    </div>
+    <div class="rounded-xl border border-ink-200 overflow-hidden">
+      <p class="px-4 py-2 bg-ink-50 text-xs font-extrabold uppercase tracking-wider text-ink-500">Consistency checks</p>
+      <ul class="text-sm divide-y divide-ink-100">
+        {% for label, ok in drawer_checks %}<li class="flex items-start gap-2 px-4 py-2.5"><span class="{% if ok %}text-emerald-700{% else %}text-red-700{% endif %} font-bold">{% if ok %}&#10003;{% else %}&#10007;{% endif %}</span><span class="{% if not ok %}text-red-800 font-semibold{% endif %}">{{ label }}</span></li>{% endfor %}
+      </ul>
+      <p class="px-4 py-2 text-[11px] text-ink-500 border-t border-ink-100">Cash sales are shown at their original amount; refunds are deducted separately. Total sales are net of voids and partial returns. Expenses are counted on the day the cash left the drawer; a rejected expense returns the cash on the day of the rejection.</p>
+    </div>
+  </div>
 </div>
 
 <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 mb-6">
