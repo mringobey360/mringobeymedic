@@ -569,7 +569,34 @@ def dashboard_home_view(request):
         my_items_today = SaleItem.objects.filter(sale__in=my_sales_today)
         my_total_today, _my_cost_today, _my_units_today = _sum_items(my_items_today)
         pending_expenses_count = Expense.objects.filter(pharmacy=pharmacy, submitted_by=request.user, status=Expense.Status.PENDING).count()
+        # Blind count (V97.44): the employee sees NO system figure until he has submitted what he counted.
+        # After that he sees the statement FROZEN at the moment of his count, so nothing can be adjusted to fit.
+        from expenses import shift_count as _sc
+        from expenses.models import EmployeeShiftCount
+        my_count = _sc.current_count(request.user, today)
+        my_cash_ref = None
+        count_stale = False
+        if my_count:
+            _live = _sc.statement(pharmacy, request.user, today)
+            my_cash_ref = {
+                'opening': my_count.opening_cash, 'opening_carried': _live['opening_carried'],
+                'opening_elsewhere': _live['opening_elsewhere'],
+                'total_sales': _live['total_sales'], 'non_cash_sales': _live['non_cash_sales'],
+                'sales_count': _live['sales_count'], 'cash_sales': my_count.cash_sales,
+                'cash_refunds': my_count.cash_refunds, 'meal_earned': my_count.meal_earned,
+                'expenses': my_count.expenses_paid, 'meal_not_deducted': _live['meal_not_deducted'],
+                'handover': my_count.system_amount,
+                'expected': my_count.system_amount - (my_count.opening_cash or Decimal('0')),
+            }
+            count_stale = abs(_live['handover'] - my_count.system_amount) >= Decimal('1')
+        my_recount_request = (EmployeeShiftCount.objects
+                              .filter(employee=request.user, date=today, status=EmployeeShiftCount.Status.REJECTED)
+                              .order_by('-decided_at').first()) if not my_count else None
+        my_recent_counts = list(EmployeeShiftCount.objects.filter(employee=request.user, date__lt=today)
+                                .exclude(status=EmployeeShiftCount.Status.REJECTED).order_by('-date')[:7])
         context = {
+            'my_cash_ref': my_cash_ref, 'my_count': my_count, 'count_stale': count_stale,
+            'my_recount_request': my_recount_request, 'my_recent_counts': my_recent_counts,
             'pending_expenses_count': pending_expenses_count,
             'my_sales_count_today': my_sales_today.count(),
             'my_total_today': my_total_today,
@@ -592,9 +619,6 @@ def dashboard_home_view(request):
             'today_meal_awaiting': sum((x.amount for x in meal_qs.filter(status=MealLedger.Status.PENDING, claimed_at__isnull=False)), Decimal('0')),
             'today_branch_has_sales': sales_exist(request.user, today),
         }
-        from expenses.ledger import employee_cash_reference
-        _ref = employee_cash_reference(pharmacy.pk, today, request.user)
-        context['my_cash_ref'] = _ref[0] if _ref else None
         return render(request, 'dashboard/employee_dashboard.html', context)
 
 
@@ -1297,17 +1321,18 @@ def export_profit_report_pdf(request):
 
 @login_required
 def my_cash_history_view(request):
-    """V54.44: day-by-day expected cash (cash sales - meal money) for one employee, with CSV export.
-    Employees see only themselves; management may open any employee of the branch with ?employee=<id>."""
+    """Day-by-day expected cash (cash sales - meal money) for one employee, with CSV export.
+    MANAGEMENT ONLY: employees must not see what the drawer is expected to hold, so the boss
+    finds the real amount. Management opens an employee of the branch with ?employee=<id>."""
     from django.http import HttpResponse
     from django.shortcuts import get_object_or_404
     from expenses.ledger import employee_cash_history
     import csv
     if request.user.is_employee_role():
-        employee = request.user
-    else:
-        employee = get_object_or_404(User, pk=request.GET.get('employee'), role=User.Role.EMPLOYEE,
-                                     pharmacy=request.pharmacy)
+        from django.core.exceptions import PermissionDenied
+        raise PermissionDenied('Expected cash is only visible to management.')
+    employee = get_object_or_404(User, pk=request.GET.get('employee'), role=User.Role.EMPLOYEE,
+                                 pharmacy=request.pharmacy)
     pharmacy = employee.pharmacy or request.pharmacy
     today = timezone.localdate()
 

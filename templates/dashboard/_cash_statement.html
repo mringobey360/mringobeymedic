@@ -2,13 +2,14 @@
 {# One statement, used by the employee dashboard AND the boss (per employee), so both always read the same figures. Context: r = employee_cash_reference row. #}
 <div class="cash-statement rounded-xl border border-ink-100 bg-white overflow-hidden">
   <dl class="text-sm divide-y divide-ink-100">
+    {% if r.opening is not None %}<div class="flex justify-between px-4 py-2.5 bg-ink-50"><dt class="text-ink-700">Opening cash <span class="text-ink-400 text-xs">({% if r.opening_carried %}carried forward from yesterday&rsquo;s closing{% else %}set by your boss for today{% endif %})</span></dt><dd class="font-semibold">TZS {{ r.opening|floatformat:0|intcomma }}</dd></div>{% endif %}
     <div class="flex justify-between px-4 py-2.5"><dt class="text-ink-600">Total sales <span class="text-ink-400 text-xs">({{ r.sales_count }} cash sale{{ r.sales_count|pluralize }} counted below)</span></dt><dd class="font-semibold">TZS {{ r.total_sales|floatformat:0|intcomma }}</dd></div>
     {% if r.non_cash_sales %}<div class="flex justify-between px-4 py-2.5 text-ink-500"><dt>&minus; Not cash (mobile money, bank, debt)</dt><dd>TZS {{ r.non_cash_sales|floatformat:0|intcomma }}</dd></div>{% endif %}
-    <div class="flex justify-between px-4 py-2.5"><dt>Cash sales</dt><dd class="font-semibold">TZS {{ r.cash_sales|floatformat:0|intcomma }}</dd></div>
+    <div class="flex justify-between px-4 py-2.5"><dt>+ Cash sales</dt><dd class="font-semibold">TZS {{ r.cash_sales|floatformat:0|intcomma }}</dd></div>
     {% if r.cash_refunds %}<div class="flex justify-between px-4 py-2.5"><dt>&minus; Refunds handed back</dt><dd class="font-semibold text-rose-700">TZS {{ r.cash_refunds|floatformat:0|intcomma }}</dd></div>{% endif %}
     <div class="flex justify-between px-4 py-2.5"><dt>&minus; Meal money (deducted)</dt><dd class="font-semibold">TZS {{ r.meal_earned|floatformat:0|intcomma }}</dd></div>
     {% if r.expenses %}<div class="flex justify-between px-4 py-2.5"><dt>&minus; Expenses paid from the drawer</dt><dd class="font-semibold">TZS {{ r.expenses|floatformat:0|intcomma }}</dd></div>{% endif %}
-    <div class="flex justify-between px-4 py-3 bg-brand-50 font-extrabold text-brand-800"><dt>= Expected cash</dt><dd>TZS {{ r.expected|floatformat:0|intcomma }}</dd></div>
+    <div class="flex justify-between px-4 py-3 bg-brand-50 font-extrabold text-brand-800"><dt>= Cash to hand over to boss</dt><dd>TZS {% if r.handover is not None %}{{ r.handover|floatformat:0|intcomma }}{% else %}{{ r.expected|floatformat:0|intcomma }}{% endif %}</dd></div>
   </dl>
   {% if r.meal_not_deducted %}<p class="px-4 py-2 text-xs text-amber-700 bg-amber-50 border-t border-amber-100">TZS {{ r.meal_not_deducted|floatformat:0|intcomma }} of meals claimed but not deducted yet (debt or awaiting settlement). It is deducted automatically once funded by sales.</p>{% endif %}
 </div>

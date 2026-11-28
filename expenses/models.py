@@ -550,3 +550,56 @@ class CashTransfer(models.Model):
 
     def __str__(self):
         return f'{self.get_direction_display()} {self.amount:,.0f} on {self.transfer_date}'
+
+
+class EmployeeShiftCount(models.Model):
+    """An employee's blind count of the drawer cash they are responsible for (V97.44).
+
+    The employee counts FIRST, without seeing the system figure. On submit the system figure is computed
+    server-side and frozen on this row with the difference, so nothing can be adjusted to fit afterwards.
+    A zero difference is accepted automatically; any other difference waits for the manager's decision.
+    """
+    class Status(models.TextChoices):
+        PENDING = 'PENDING', 'Awaiting manager'
+        ACCEPTED = 'ACCEPTED', 'Accepted'
+        REJECTED = 'REJECTED', 'Recount requested'
+
+    pharmacy = models.ForeignKey('pharmacies.Pharmacy', on_delete=models.CASCADE, related_name='shift_counts')
+    employee = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='shift_counts')
+    date = models.DateField(db_index=True)
+    counted_cash = models.DecimalField(max_digits=14, decimal_places=2)
+    # Frozen statement at the moment of the count.
+    opening_cash = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+    cash_sales = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    cash_refunds = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    meal_earned = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    expenses_paid = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    system_amount = models.DecimalField(max_digits=14, decimal_places=2)
+    difference = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING, db_index=True)
+    reason = models.TextField(blank=True)
+    reason_at = models.DateTimeField(null=True, blank=True)
+    counted_at = models.DateTimeField(auto_now_add=True)
+    auto_accepted = models.BooleanField(default=False)
+    decided_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True,
+                                   related_name='decided_shift_counts')
+    decided_at = models.DateTimeField(null=True, blank=True)
+    decision_note = models.CharField(max_length=255, blank=True)
+
+    class Meta:
+        ordering = ['-date', '-counted_at']
+        indexes = [models.Index(fields=['pharmacy', 'date'], name='shiftcount_pharm_date_idx')]
+        constraints = [models.UniqueConstraint(
+            fields=['employee', 'date'], condition=models.Q(status__in=['PENDING', 'ACCEPTED']),
+            name='one_live_shift_count_per_employee_day')]
+
+    def __str__(self):
+        return f'{self.employee_id} {self.date} counted {self.counted_cash} ({self.status})'
+
+    @property
+    def is_short(self):
+        return self.difference < 0
+
+    @property
+    def is_over(self):
+        return self.difference > 0

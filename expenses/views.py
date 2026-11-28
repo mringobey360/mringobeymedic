@@ -558,9 +558,13 @@ def cash_control(request):
     count_is_outdated = current.count_is_outdated if current else False
     count_history = list(current.physical_counts.select_related('counted_by', 'supersedes').order_by('-counted_at')[:6]) if current else []
     employee_cash_rows = employee_cash_reference(pharmacy.pk, today)
+    from .models import EmployeeShiftCount
+    shift_counts_today = list(EmployeeShiftCount.objects.filter(pharmacy=pharmacy, date=today)
+                              .select_related('employee', 'decided_by').order_by('-counted_at'))
     meals_not_deducted = sum((r['meal_not_deducted'] for r in employee_cash_rows), Decimal('0'))
     return render(request, 'expenses/cash.html', {
         'employee_cash_rows': employee_cash_rows, 'meals_not_deducted': meals_not_deducted,
+        'shift_counts_today': shift_counts_today,
         'current': current, 'days': days_page, 'days_page': days_page, 'today': today, 'auto_message': auto_message,
         'previous': previous, 'yesterday_actual': yesterday_actual,
         'yesterday_expected': yesterday_expected, 'previous_post_close_activity': previous_post_close_activity, 'blocked_day': blocked_day, 'last_reset': pharmacy.cash_control_resets.select_related('reset_by').first(), 'latest_count': latest_count, 'count_is_outdated': count_is_outdated,
@@ -1381,3 +1385,63 @@ def cash_transfer_export(request):
     resp = HttpResponse(buf.getvalue(), content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     resp['Content-Disposition'] = f'attachment; filename="cash_transfers_{timezone.localtime():%Y%m%d_%H%M}.xlsx"'
     return resp
+
+
+
+# ── Employee blind drawer count (V97.44) ─────────────────────────────────────────────────────────────────────────
+def _employee_only(request):
+    from django.core.exceptions import PermissionDenied
+    if not request.user.is_employee_role() or request.pharmacy is None:
+        raise PermissionDenied('Only employees submit a drawer count.')
+
+
+@employee_or_admin_required
+@require_http_methods(['POST'])
+def shift_count_submit(request):
+    from . import shift_count
+    _employee_only(request)
+    try:
+        count = shift_count.submit_count(request.pharmacy, request.user, timezone.localdate(), request.POST.get('counted_cash'))
+    except ValidationError as exc:
+        messages.error(request, ' '.join(exc.messages))
+    else:
+        if count.difference == 0:
+            messages.success(request, 'Your count matches the system. Thank you.')
+        else:
+            messages.warning(request, 'Your count differs from the system. Please write a short explanation below.')
+    return redirect('dashboard:home')
+
+
+@employee_or_admin_required
+@require_http_methods(['POST'])
+def shift_count_reason(request, pk):
+    from . import shift_count
+    from .models import EmployeeShiftCount
+    _employee_only(request)
+    count = get_object_or_404(EmployeeShiftCount, pk=pk, employee=request.user, pharmacy=request.pharmacy)
+    try:
+        shift_count.add_reason(count, request.user, request.POST.get('reason'))
+    except ValidationError as exc:
+        messages.error(request, ' '.join(exc.messages))
+    else:
+        messages.success(request, 'Explanation sent to your manager.')
+    return redirect('dashboard:home')
+
+
+@admin_required
+@require_http_methods(['POST'])
+def shift_count_decide(request, pk):
+    from . import shift_count
+    from .models import EmployeeShiftCount
+    count = get_object_or_404(EmployeeShiftCount, pk=pk, pharmacy=request.pharmacy)
+    accept = request.POST.get('decision') == 'accept'
+    if not accept and request.POST.get('decision') != 'recount':
+        messages.error(request, 'Unknown decision.')
+        return redirect('expenses:cash')
+    try:
+        shift_count.decide(count, request.user, accept, request.POST.get('note'))
+    except ValidationError as exc:
+        messages.error(request, ' '.join(exc.messages))
+    else:
+        messages.success(request, 'Count accepted.' if accept else 'Recount requested from the employee.')
+    return redirect('expenses:cash')

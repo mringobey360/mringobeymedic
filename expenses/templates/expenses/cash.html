@@ -221,6 +221,27 @@
     </div>
     {% endwith %}
 
+    <div class="mt-4 rounded-2xl border border-ink-100 bg-white p-4 md:p-5" id="employee-counts">
+      <p class="font-extrabold">Employee drawer counts today</p>
+      <p class="text-xs text-ink-500 mt-1 mb-3">Each employee counts blind, then the system figure is frozen next to it. Differences need your decision.</p>
+      <div class="overflow-x-auto"><table class="w-full text-sm">
+        <thead><tr class="text-left border-b border-ink-100 th-sm"><th class="py-2 font-bold">Employee</th><th class="font-bold text-right">Counted</th><th class="font-bold text-right">System</th><th class="font-bold text-right">Difference</th><th class="font-bold">Explanation</th><th class="font-bold">Status</th><th class="font-bold">Decision</th></tr></thead>
+        <tbody>
+        {% for c in shift_counts_today %}<tr class="border-b border-ink-100 align-top">
+          <td class="py-2.5 font-medium">{% firstof c.employee.get_full_name c.employee.username %}<span class="block text-xs text-ink-400">{{ c.counted_at|date:"H:i" }}</span></td>
+          <td class="text-right">TZS {{ c.counted_cash|floatformat:0|intcomma }}</td>
+          <td class="text-right">TZS {{ c.system_amount|floatformat:0|intcomma }}{% if c.opening_cash is not None %}<span class="block text-xs text-ink-400">incl. opening {{ c.opening_cash|floatformat:0|intcomma }}</span>{% endif %}</td>
+          <td class="text-right font-bold {% if c.difference < 0 %}text-rose-700{% elif c.difference > 0 %}text-amber-700{% else %}text-emerald-700{% endif %}">{% if c.difference > 0 %}+{% endif %}{{ c.difference|floatformat:0|intcomma }}</td>
+          <td class="max-w-xs">{% if c.reason %}{{ c.reason }}{% elif c.difference and c.status == 'PENDING' %}<span class="text-ink-400">No explanation yet</span>{% else %}<span class="text-ink-400">&mdash;</span>{% endif %}</td>
+          <td>{{ c.get_status_display }}{% if c.auto_accepted %} <span class="text-xs text-ink-400">(auto)</span>{% elif c.decided_by %}<span class="block text-xs text-ink-400">by {% firstof c.decided_by.get_full_name c.decided_by.username %}</span>{% endif %}{% if c.decision_note %}<span class="block text-xs text-ink-400">{{ c.decision_note }}</span>{% endif %}</td>
+          <td>{% if c.status == 'PENDING' %}<form method="post" action="{% url 'expenses:shift_count_decide' c.pk %}" class="flex flex-col gap-1 min-w-[10rem]">{% csrf_token %}
+            <input name="note" maxlength="255" class="form-input" placeholder="Note (optional)">
+            <div class="flex gap-1"><button name="decision" value="accept" class="btn btn-primary btn-sm">Accept</button><button name="decision" value="recount" class="btn btn-secondary btn-sm">Recount</button></div></form>{% endif %}</td>
+        </tr>{% empty %}<tr><td colspan="7" class="py-6 text-center text-ink-400">No employee has submitted a drawer count today.</td></tr>{% endfor %}
+        </tbody>
+      </table></div>
+    </div>
+
     <div class="mt-4 rounded-2xl border border-ink-100 bg-white p-4 md:p-5">
       <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-1 mb-3">
         <div><p class="font-extrabold">Cash by employee today <span class="text-ink-400 font-semibold text-xs">(reference)</span></p><p class="text-xs text-ink-500 mt-1">Each employee's cash sales minus refunds, meal money and expenses they paid from the drawer. Exactly the same statement the employee sees on their own dashboard.</p></div>

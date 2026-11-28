@@ -24,5 +24,8 @@ urlpatterns=[
     path('cash/<int:pk>/close/', views.cash_close, name='cash_close'),
     path('cash/<int:pk>/verify-previous-from-opening/', views.cash_verify_previous_from_opening, name='cash_verify_previous_from_opening'),
     path('cash/<int:pk>/reopen/', views.cash_reopen, name='cash_reopen'),
+    path('shift-count/', views.shift_count_submit, name='shift_count_submit'),
+    path('shift-count/<int:pk>/reason/', views.shift_count_reason, name='shift_count_reason'),
+    path('shift-count/<int:pk>/decide/', views.shift_count_decide, name='shift_count_decide'),
     path('cash/<int:pk>/activity/', views.cash_activity_detail, name='cash_activity_detail'),
 ]
